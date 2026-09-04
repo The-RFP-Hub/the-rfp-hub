@@ -299,7 +299,7 @@ describe("organization navigation", () => {
     expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
   });
 
-  it("keeps all eleven admin destinations in three semantic groups with a long organization name", async () => {
+  it("prioritizes four admin destinations and groups the complete navigation by job", async () => {
     const longName = "AnExtraordinarilyLongPublisherOrganizationNameWithoutConvenientBreaks";
     const admin: Me = {
       ...me,
@@ -318,10 +318,27 @@ describe("organization navigation", () => {
     );
 
     const navigation = await screen.findByRole("navigation", { name: "Sections" });
-    expect(navigation.querySelectorAll(":scope > ul")).toHaveLength(3);
-    expect(within(navigation).getAllByRole("list")).toHaveLength(3);
-    expect(within(navigation).getAllByRole("link")).toHaveLength(11);
-    expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
+    const primary = navigation.querySelector(".shell-nav-primary");
+    expect(primary).not.toBeNull();
+    expect(
+      within(primary as HTMLElement)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Directory", "Publishers", "Dashboard", "Review queues"]);
+
+    const toggle = screen.getByRole("button", { name: /navigation menu/i });
+    fireEvent.click(toggle);
+    const panel = document.querySelector("#account-navigation");
+    expect(panel).not.toBeNull();
+    expect(panel?.hasAttribute("hidden")).toBe(false);
+    for (const heading of ["Browse", "My work", "Administration", "Account", "Help"]) {
+      expect(within(panel as HTMLElement).getByRole("heading", { name: heading })).toBeTruthy();
+    }
+    const uniqueDestinations = new Set(
+      [...(panel?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")),
+    );
+    expect([...uniqueDestinations]).toHaveLength(11);
+    expect(within(panel as HTMLElement).getByRole("link", { name: longName })).toBeTruthy();
   });
 
   it("lets a signed-in reader reveal account navigation from the compact header", async () => {
@@ -334,15 +351,25 @@ describe("organization navigation", () => {
       </ApiClientProvider>,
     );
 
-    const toggle = screen.getByRole("button", { name: "Account" });
+    await screen.findByRole("link", { name: "Dashboard" });
+    const toggle = screen.getByRole("button", { name: /navigation menu/i });
     expect(toggle.getAttribute("aria-controls")).toBe("account-navigation");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector("#account-navigation")?.hasAttribute("hidden")).toBe(true);
 
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(
-      (await screen.findByRole("navigation", { name: "Sections" })).querySelectorAll("ul"),
-    ).not.toHaveLength(0);
+    expect(document.querySelector("#account-navigation")?.hasAttribute("hidden")).toBe(false);
+    expect(screen.getByRole("heading", { name: "My work" })).toBeTruthy();
+
+    toggle.focus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+
+    fireEvent.click(toggle);
+    fireEvent.pointerDown(screen.getByText("Publisher workbench"));
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });
 });
 
@@ -467,6 +494,7 @@ describe("the header logout guard", () => {
     );
 
     await waitFor(() => expect(screen.getByText("Dirty form")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /navigation menu/i }));
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(signOut).not.toHaveBeenCalled();

@@ -447,12 +447,23 @@ caption {
 }
 
 .shell-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-4) var(--space-6);
-  padding: var(--space-6) 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  min-block-size: 5rem;
+  padding: var(--space-4) 0;
   border-bottom: 1px solid var(--ink);
+}
+
+.shell-header[data-authenticated="true"] {
+  min-block-size: 4.25rem;
+  padding: var(--space-3) 0;
+}
+
+.shell-header[data-authenticated="true"] .brand-tagline {
+  display: none;
 }
 
 /*
@@ -464,6 +475,7 @@ caption {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-block-size: var(--control-touch);
   font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 800;
   font-size: var(--text-h2);
@@ -504,38 +516,37 @@ caption {
 }
 
 /*
- * THREE NAVIGATIONS, GROUPED AND VISIBLY SEPARATED: what anybody may read, what this account owns,
- * and what a staff role may do. They are one row with rules between the groups rather than one
- * undifferentiated list, because "Directory" and "Accounts & roles" are not peers and a flat list
- * says they are.
+ * THE WIDE HEADER IS A SHORT ORIENTATION STRIP, not a sitemap. Public discovery, the account's
+ * dashboard and the reviewer's queue are the high-frequency destinations; the complete hierarchy
+ * remains one disclosure away. A no-wrap row plus a content-driven compact breakpoint makes the
+ * composition stable instead of letting eleven unrelated labels invent new rows at every width.
  */
 .shell-nav {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: var(--space-4);
-  row-gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
   font-size: var(--text-md);
-  flex: 1;
   min-width: 0;
 }
 
+.shell-nav-primary,
 .shell-nav-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell-nav-primary {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--space-4);
   min-width: 0;
-  margin: 0;
-  padding-left: 0;
-  padding-right: var(--space-4);
-  border-right: 1px solid var(--line);
-  list-style: none;
 }
 
-.shell-nav-group:last-child {
-  border-right: 0;
-  padding-right: 0;
+.shell-nav-primary li {
+  min-width: 0;
 }
 
 /*
@@ -545,37 +556,175 @@ caption {
  * genuine "you can act here" mark and clears 3:1 against paper at 5.06. The weight is what says it
  * in greyscale.
  */
-.shell-nav a {
+.shell-nav-primary a,
+.shell-notifications {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--control-touch);
   color: var(--ink);
   text-decoration: none;
-  padding-bottom: 2px;
+  padding: var(--space-2) 0;
   border-bottom: 2px solid transparent;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
-.shell-nav .icon-label {
-  gap: var(--space-1);
-}
-
-.shell-nav .icon-label-icon {
-  inline-size: 1rem;
-  block-size: 1rem;
-}
-
-.shell-nav-group li {
-  min-width: 0;
-}
-
-.shell-nav a:hover {
+.shell-nav-primary a:hover,
+.shell-notifications:hover {
   border-bottom-color: var(--line);
+  text-decoration: none;
 }
 
-.shell-nav a[aria-current="page"] {
+.shell-nav-primary a[aria-current="page"],
+.shell-notifications[aria-current="page"] {
   font-weight: 700;
   border-bottom-color: var(--accent);
 }
 
-/* A count, not a coloured status badge: it stays compact without disturbing the wrapping nav. */
+.shell-notifications {
+  padding-inline: var(--space-2);
+}
+
+.shell-notifications .icon-label {
+  gap: var(--space-1);
+}
+
+.shell-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-touch);
+  max-inline-size: 13rem;
+  padding-inline: var(--space-3);
+  background: transparent;
+}
+
+.shell-menu-label-wide {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-menu-label-compact {
+  display: none;
+}
+
+.shell-menu-caret {
+  transition: transform 120ms ease;
+}
+
+.shell-menu-toggle[aria-expanded="true"] .shell-menu-caret {
+  transform: rotate(180deg);
+}
+
+/* The disclosure floats over the page: asking for navigation must not make the content jump. */
+.shell-account-panel {
+  position: absolute;
+  inset-block-start: calc(100% - 1px);
+  inset-inline-end: 0;
+  z-index: 10;
+  display: grid;
+  gap: var(--space-4);
+  inline-size: min(34rem, calc(100vw - var(--space-8) * 2));
+  max-block-size: calc(100dvh - 6rem);
+  overflow-y: auto;
+  padding: var(--space-4);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+}
+
+.shell-account-panel[hidden] {
+  display: none;
+}
+
+.shell-nav-section.shell-nav-section-compact {
+  display: none;
+}
+
+.shell-account-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.shell-account-column,
+.shell-nav-section {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.shell-account-column {
+  gap: var(--space-6);
+}
+
+.shell-nav-heading {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.shell-nav-group {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.shell-nav-group a {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--control-touch);
+  min-width: 0;
+  padding: var(--space-2);
+  color: var(--ink);
+  text-decoration: none;
+  border-inline-start: 2px solid transparent;
+}
+
+.shell-nav-group a:hover {
+  background: var(--panel);
+  text-decoration: none;
+}
+
+.shell-nav-group a[aria-current="page"] {
+  border-inline-start-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.shell-nav-group .icon-label,
+.shell-nav-group .icon-label-text {
+  min-width: 0;
+}
+
+.shell-nav-group .icon-label-text {
+  overflow-wrap: anywhere;
+}
+
+.shell-account-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.shell-account-session .muted {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A count, not a coloured status badge: it stays compact beside its notification label. */
 .shell-nav-count {
   display: inline-block;
   margin-inline-start: var(--space-1);
@@ -589,19 +738,6 @@ caption {
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
   text-align: center;
-}
-
-.shell-session {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-md);
-  margin-left: auto;
-}
-
-/* The account destinations stay inline on wide screens; this control exists only on narrow ones. */
-.shell-menu-toggle {
-  display: none;
 }
 
 .shell-main {
@@ -1392,10 +1528,90 @@ ul.plain {
 
 .filters-advanced {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-6) var(--space-4);
+  padding-top: var(--space-4);
+}
+
+/*
+ * ADVANCED FILTERS ARE FOUR CONCEPTUAL GROUPS, NOT EIGHT INTERCHANGEABLE CELLS. Twelve tracks let
+ * the listing-details group take nine and sorting take three without forcing that same ratio onto
+ * the two range groups below. At the page's capped desktop width this keeps every control around
+ * 17rem; around 1024px it still protects a useful 13rem minimum instead of squeezing in a fifth
+ * anonymous column.
+ */
+.filters-group {
+  min-inline-size: 0;
+  padding: var(--space-3) 0 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.filters-group > legend {
+  padding: 0 var(--space-2) 0 0;
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.filters-group-details {
+  grid-column: 1 / span 9;
+}
+
+.filters-group-sort {
+  grid-column: 10 / -1;
+}
+
+.filters-group-award {
+  grid-column: 1 / span 6;
+}
+
+.filters-group-deadline {
+  grid-column: 7 / -1;
+}
+
+.filters-group-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: var(--space-4);
-  padding-top: var(--space-4);
+}
+
+.filters-group-fields-details {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filters-group-sort .filters-group-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.filters-group-hint {
+  max-width: 62ch;
+  margin: var(--space-2) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* In the narrow-laptop band the endpoint labels wrap at different points, especially when one is
+ * active. Subgrid lets each pair share the tallest label row and keeps its controls on one baseline
+ * without guessing whether a translated or stateful label needs two lines or three. */
+@media (min-width: 56.001rem) and (max-width: 70rem) {
+  .filters-group-award .filters-group-fields,
+  .filters-group-deadline .filters-group-fields {
+    grid-template-rows: auto auto auto;
+    row-gap: var(--space-1);
+  }
+
+  .filters-group-award .field,
+  .filters-group-deadline .field {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    align-self: stretch;
+  }
 }
 
 .filters .field {
@@ -1741,16 +1957,10 @@ pre.untrusted-block {
     min-block-size: var(--control-touch);
   }
 
-  /*
-   * A NAV LINK IS A TARGET, not a word in a sentence. `.shell-nav a` is inline text with 2px of
-   * padding — about a 20px tall tap area on a phone, sitting a few pixels from the next one, in the
-   * one place where a mis-tap costs a reader the page they were on. `align-items: flex-end` rather
-   * than `center` so the current-section underline stays against the text and the extra tap area
-   * grows upward, into the header's own padding.
-   */
+  /* Header links keep the same 44px contract as controls on hybrid laptops and touch screens. */
   .shell-nav a {
     display: inline-flex;
-    align-items: flex-end;
+    align-items: center;
     min-block-size: var(--control-touch);
   }
 
@@ -1770,8 +1980,104 @@ pre.untrusted-block {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .icon-label-spin {
+  .icon-label-spin,
+  .shell-menu-caret {
     animation: none;
+    transition: none;
+  }
+}
+
+/* Once three listing-detail controls would fall below a useful width, the conceptual groups become
+ * a deliberate reading sequence. Range endpoints remain paired until the phone breakpoint. */
+@media (max-width: 56rem) {
+  .shell-header {
+    min-block-size: 4.25rem;
+    padding: var(--space-3) 0;
+  }
+
+  .shell-header[data-authenticated="true"] .brand-tagline,
+  .shell-header[data-authenticated="true"] .shell-nav-primary {
+    display: none;
+  }
+
+  .shell-header[data-authenticated="false"] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .shell-header[data-authenticated="false"] .shell-nav {
+    justify-content: flex-start;
+  }
+
+  .shell-header[data-authenticated="false"] .shell-nav-primary {
+    gap: var(--space-3);
+  }
+
+  .shell-header[data-authenticated="false"] .shell-login {
+    position: absolute;
+    inset-block-start: var(--space-3);
+    inset-inline-end: 0;
+  }
+
+  .shell-nav {
+    gap: var(--space-1);
+  }
+
+  .shell-notifications-label,
+  .shell-menu-label-wide {
+    display: none;
+  }
+
+  .shell-notifications {
+    justify-content: center;
+    min-inline-size: var(--control-touch);
+  }
+
+  .shell-menu-label-compact {
+    display: inline;
+  }
+
+  .shell-account-panel {
+    inset-inline: 0;
+    inline-size: 100%;
+    max-block-size: calc(100dvh - 5rem);
+  }
+
+  .shell-nav-section.shell-nav-section-compact {
+    display: grid;
+  }
+
+  .shell-nav-section-compact .shell-nav-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shell-nav-section-wide {
+    display: none;
+  }
+
+  .shell-account-columns,
+  .shell-account-column {
+    gap: var(--space-4);
+  }
+
+  .shell-nav-group {
+    gap: 0;
+  }
+
+  .filters-advanced {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .filters-group-details,
+  .filters-group-sort,
+  .filters-group-award,
+  .filters-group-deadline {
+    grid-column: 1;
+  }
+
+  .filters-group-sort .filters-group-fields {
+    max-width: 22rem;
   }
 }
 
@@ -1781,78 +2087,26 @@ pre.untrusted-block {
   }
 
   .shell-header {
-    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-3) 0 0;
+    gap: var(--space-3);
   }
 
-  .brand {
-    grid-column: 1;
-    grid-row: 1;
+  .shell-account-panel {
+    padding: var(--space-3);
   }
 
-  .shell-menu-toggle {
-    display: inline-flex;
-    grid-column: 2;
-    grid-row: 1;
-    align-items: center;
-    justify-self: end;
-    min-block-size: var(--control-touch);
+  .shell-account-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
   }
 
-  .shell-nav {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-gutter: stable;
-    flex-basis: auto;
-    column-gap: 0;
-    row-gap: 0;
+  .shell-nav-section-compact .shell-nav-group {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .shell-nav-group {
-    flex: 1 0 100%;
-    flex-wrap: nowrap;
-    border-right: 0;
-    border-top: 1px solid var(--line);
-    padding-top: 0;
-    padding-right: 0;
-  }
-
-  .shell-nav-group:not(:first-child) {
-    display: none;
-  }
-
-  .shell-header[data-account-open="true"] .shell-nav {
-    overflow-x: visible;
-    flex-wrap: wrap;
-  }
-
-  .shell-header[data-account-open="true"] .shell-nav-group:not(:first-child) {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .shell-session {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .shell-session-authenticated {
-    display: none;
-  }
-
-  .shell-header[data-account-open="true"] .shell-session-authenticated {
-    display: flex;
-    grid-column: 1 / -1;
-    grid-row: 3;
-    justify-content: space-between;
-    width: 100%;
-    margin-left: 0;
-    padding: 0 0 var(--space-3);
+  .shell-account-session {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .filters {
@@ -1875,7 +2129,18 @@ pre.untrusted-block {
 
   .filters-advanced {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    padding-top: var(--space-3);
+  }
+
+  .filters-group-fields,
+  .filters-group-fields-details {
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
+  }
+
+  .filters-group-sort .filters-group-fields {
+    max-width: none;
   }
 
   .filters-more > summary {
@@ -1995,21 +2260,15 @@ pre.untrusted-block {
   }
 }
 
-/* At the narrowest supported width, protect the useful navigation labels from being split into
- * fragments. The mark and page title already carry the identity, so the tagline and repeated nav
- * icons are the right details to yield. */
+/* At the narrowest supported width the utility row yields one redundant account icon, while the
+ * bell and both text labels remain unambiguous and every target remains 44px. */
 @media (max-width: 22rem) {
   .brand-tagline,
-  .shell-nav .icon-label-icon {
+  .shell-menu-user {
     display: none;
   }
 
-  .shell-nav a {
-    overflow-wrap: normal;
-    white-space: nowrap;
-  }
-
-  .shell-nav-group {
-    gap: var(--space-3);
+  .shell-menu-toggle {
+    padding-inline: var(--space-2);
   }
 }

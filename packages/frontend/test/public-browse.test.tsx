@@ -540,6 +540,33 @@ describe("the directory's filters", () => {
     expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/");
   });
 
+  it("keeps related advanced controls in named groups with one explanation per range", async () => {
+    navigation.params = new URLSearchParams("organization=acme");
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const listingDetails = screen.getByRole("group", { name: "Listing details" });
+    expect(within(listingDetails).getByLabelText("Ecosystem")).toBeTruthy();
+    expect(within(listingDetails).getByLabelText("Category")).toBeTruthy();
+    const organization = within(listingDetails).getByLabelText("Organization");
+    expect(organization.getAttribute("aria-describedby")).toBe("directory-organization-hint");
+
+    const awardRange = screen.getByRole("group", { name: "Award range" });
+    expect(within(awardRange).getByLabelText("Min award/budget")).toBeTruthy();
+    expect(within(awardRange).getByLabelText("Max award/budget")).toBeTruthy();
+    expect(awardRange.getAttribute("aria-describedby")).toBe("directory-award-hint");
+    expect(screen.getAllByText(/Both bounds compare a listing’s award amount/)).toHaveLength(1);
+
+    const deadlineRange = screen.getByRole("group", { name: "Deadline range" });
+    expect(within(deadlineRange).getByLabelText("Next fixed deadline after")).toBeTruthy();
+    expect(within(deadlineRange).getByLabelText("Next fixed deadline before")).toBeTruthy();
+    expect(deadlineRange.getAttribute("aria-describedby")).toBe("directory-deadline-hint");
+    expect(
+      screen.getAllByText(/Both bounds compare the earliest upcoming fixed deadline/),
+    ).toHaveLength(1);
+  });
+
   it("renders what the URL says, so a shared link and a reload both work", async () => {
     navigation.params = new URLSearchParams("q=zk&type=grant&status=closed&ecosystem=Optimism");
     const { client, list } = stub();

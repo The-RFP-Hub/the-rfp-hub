@@ -28,6 +28,7 @@ test("the sign-in modal releases the page and opens again after logout", async (
     // Seeing the banner again proves successful sign-in released the browser top layer.
     await expect(page.getByRole("banner")).toBeVisible();
 
+    await page.getByRole("button", { name: /navigation menu/i }).click();
     await page.getByRole("button", { name: "Log out" }).click();
     const logInAgain = page.getByRole("button", { name: "Log in" }).first();
     await expect(logInAgain).toBeVisible();
