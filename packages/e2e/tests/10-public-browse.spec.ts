@@ -255,9 +255,12 @@ test.describe("M3-7 the public entry page", () => {
       await expect(page).toHaveTitle(`${replacedTitle} | RFP Hub`);
 
       await expect(page.getByRole("heading", { name: new RegExp(replacedTitle) })).toBeVisible();
-      // The id and the description reach the page as text.
-      await expect(page.getByText(id, { exact: false }).first()).toBeVisible();
+      // The description reaches the page as text. So does the id, inside the collapsed developer
+      // details — opened first, for the same reason the history is below.
       await expect(page.getByText(`Public description ${stamp}`, { exact: false })).toBeVisible();
+      const machine = page.locator("details", { has: page.getByText("Machine-readable details") });
+      await machine.getByText("Machine-readable details").click();
+      await expect(machine.getByText(id, { exact: false }).first()).toBeVisible();
 
       // Every entry here is text somebody else wrote, and this page is served to strangers. If any
       // of it can execute, a publisher has a script-injection primitive against every visitor.
