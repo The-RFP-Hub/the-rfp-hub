@@ -100,6 +100,19 @@ describe("the guard as the workflow runs it", () => {
     );
   });
 
+  it("says which variables the pull carried, and never their values, when production names no URL", () => {
+    const { code, stderr } = runGuard(
+      'VERCEL="1"\nVERCEL_ENV="production"\nVERCEL_TARGET_ENV="production"\nNEXT_PUBLIC_API_URL="https://api.ethrfps.app"\nNEXT_PUBLIC_GA_ID="G-SECRET"\n',
+    );
+    expect(code).toBe(1);
+    expect(stderr).toContain("VERCEL_PROJECT_PRODUCTION_URL is absent");
+    expect(stderr).toContain(
+      "The pulled file names: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_GA_ID, VERCEL, VERCEL_ENV, VERCEL_TARGET_ENV (values withheld)",
+    );
+    expect(stderr).not.toContain("G-SECRET");
+    expect(stderr).not.toContain("api.ethrfps.app");
+  });
+
   it("fails the production build when the system variables were never exposed", () => {
     const { code, stderr } = runGuard('NEXT_PUBLIC_API_URL="https://api.ethrfps.app"\n');
     expect(code).toBe(1);

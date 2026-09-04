@@ -61,6 +61,16 @@ export function resolveCanonicalOrigin(env) {
       };
 }
 
+/** Which variables the pull carried, so the log says whether Vercel sent the one that is missing. */
+export function pulledNames(env) {
+  const names = Object.keys(env)
+    .filter(
+      (name) => name === "VERCEL" || name.startsWith("VERCEL_") || name.startsWith("NEXT_PUBLIC_"),
+    )
+    .sort();
+  return names.length > 0 ? names.join(", ") : "(none of VERCEL*, NEXT_PUBLIC_*)";
+}
+
 function toOrigin(value) {
   try {
     const { origin } = new URL(value);
@@ -93,7 +103,8 @@ function main(argv) {
     process.exit(2);
   }
 
-  const result = resolveCanonicalOrigin(parseEnv(text));
+  const env = parseEnv(text);
+  const result = resolveCanonicalOrigin(env);
 
   if (expect === "none") {
     if (result.origin) {
@@ -108,7 +119,7 @@ function main(argv) {
 
   if (!result.origin) {
     console.error(
-      `::error::this build would ship a production frontend that asks search engines not to index it. ${result.reason} Fix it by turning on ${EXPOSE_SETTING}, or by setting NEXT_PUBLIC_SITE_ORIGIN on the Production environment to this deployment's own public origin.`,
+      `::error::this build would ship a production frontend that asks search engines not to index it. ${result.reason} Fix it by turning on ${EXPOSE_SETTING}, or by setting NEXT_PUBLIC_SITE_ORIGIN on the Production environment to this deployment's own public origin. The pulled file names: ${pulledNames(env)} (values withheld).`,
     );
     process.exit(1);
   }
