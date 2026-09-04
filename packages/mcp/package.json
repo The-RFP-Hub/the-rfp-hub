@@ -23,12 +23,7 @@
       }
     }
   },
-  "files": [
-    "dist",
-    "server.json",
-    "README.md",
-    "LICENSE"
-  ],
+  "files": ["dist", "server.json", "README.md", "LICENSE"],
   "sideEffects": false,
   "engines": {
     "node": ">=20.19"
@@ -49,14 +44,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
   },
-  "keywords": [
-    "rfp-hub",
-    "mcp",
-    "model-context-protocol",
-    "funding",
-    "grants",
-    "ethereum"
-  ],
+  "keywords": ["rfp-hub", "mcp", "model-context-protocol", "funding", "grants", "ethereum"],
   "repository": {
     "type": "git",
     "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
