@@ -1354,6 +1354,19 @@ caption {
   border: 2px solid var(--ink);
 }
 
+/* A short handoff from credentials to one integration, numbered in the order it must happen. */
+.integration-steps {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 72ch;
+  margin: var(--space-4) 0;
+  padding-left: var(--space-6);
+}
+
+.integration-steps li {
+  padding-left: var(--space-1);
+}
+
 .duplicate-filter {
   display: grid;
   grid-template-columns: max-content minmax(12rem, 24rem) max-content;

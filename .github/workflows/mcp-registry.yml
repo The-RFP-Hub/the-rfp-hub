@@ -83,5 +83,6 @@ jobs:
           name=$(jq -r .name server.json)
           version=$(jq -r .version server.json)
           url="https://registry.modelcontextprotocol.io/v0/servers/$(jq -rn --arg n "$name" '$n | @uri')/versions/${version}"
-          curl -sSf "$url" | jq -e --arg n "$name" --arg v "$version" '.server.name == $n and .server.version == $v' > /dev/null
+          curl --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 60 -sSf "$url" \
+            | jq -e --arg n "$name" --arg v "$version" '.server.name == $n and .server.version == $v' > /dev/null
           echo "$url"

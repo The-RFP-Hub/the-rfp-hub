@@ -91,6 +91,23 @@ describe("tool descriptions have not drifted from the manifest", () => {
 });
 
 describe("the README's own mitigation", () => {
+  it("leads with one client-neutral connection contract before naming client adapters", () => {
+    const neutral = readme.indexOf("### Client-neutral connection");
+    const adapters = readme.indexOf("### Equivalent client examples");
+
+    expect(neutral).toBeGreaterThan(-1);
+    expect(adapters).toBeGreaterThan(neutral);
+
+    const contract = readme.slice(neutral, adapters);
+    expect(contract).toContain("| Transport | `stdio` |");
+    expect(contract).toContain("| Command | `npx` |");
+    expect(contract).toContain("RFPHUB_API_BASE");
+    expect(contract).toContain("RFPHUB_API_KEY");
+    for (const provider of ["Codex", "Claude", "Cursor", "VS Code"]) {
+      expect(contract).not.toContain(provider);
+    }
+  });
+
   it("pins an exact version in every configuration example — never a moving tag", () => {
     expect(readme).not.toContain("@the-rfp-hub/mcp@latest");
     // Every version-bearing mention carries an explicit `x.y.z`. A bare mention of the package

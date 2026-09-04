@@ -10,6 +10,7 @@ import type { ToolContext } from "../src/tools/context.js";
 import {
   deriveFacts,
   explainDuplicateCheck,
+  explainPublicVisibility,
   inputSchema,
   outputSchema,
   rejectEmbeddedCredential,
@@ -169,6 +170,25 @@ describe("the submission result", () => {
   it("says a pending entry is not on the public site and names the owner route", () => {
     expect(renderSubmission(result).text).toContain("/v1/me/opportunities");
   });
+
+  it.each([
+    ["pending", true, false, "will appear if a reviewer approves"],
+    ["pending", false, false, "listing preference is hidden"],
+    ["approved", true, true, "visible on the public site"],
+    ["approved", false, false, "approved but NOT visible"],
+    ["rejected", true, false, "review decision is rejected"],
+    ["rejected", false, false, "review decision is rejected"],
+  ] as const)(
+    "derives public visibility for %s + isListed=%s",
+    (reviewStatus, isListed, isPubliclyVisible, expectedCopy) => {
+      const out = renderSubmission({ ...result, reviewStatus, isListed });
+      expect(out.structured.isPubliclyVisible).toBe(isPubliclyVisible);
+      expect(out.structured.publicVisibilityExplanation).toContain(expectedCopy);
+      expect(out.text).toContain(expectedCopy);
+      expect(explainPublicVisibility(reviewStatus, isListed)).toContain(expectedCopy);
+      expect(outputSchema.safeParse(out.structured).success).toBe(true);
+    },
+  );
 });
 
 /**

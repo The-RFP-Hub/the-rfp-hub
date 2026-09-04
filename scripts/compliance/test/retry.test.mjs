@@ -106,11 +106,21 @@ describe("the behavior this replaces", () => {
 });
 
 describe("isRetryable", () => {
-  it("covers the two hosts that serve this project's published documents", () => {
-    expect(RETRY_HOSTS).toEqual(["github.com", "raw.githubusercontent.com"]);
+  it("covers the hosts that serve this project's published documents and MCP registration", () => {
+    expect(RETRY_HOSTS).toEqual([
+      "github.com",
+      "raw.githubusercontent.com",
+      "registry.modelcontextprotocol.io",
+    ]);
     expect(RETRY_BACKOFF_MS).toBe(2000);
     expect(isRetryable("https://github.com/x", { ok: true, status: 502 })).toBe(true);
     expect(isRetryable("https://raw.githubusercontent.com/x", { ok: false })).toBe(true);
+    expect(
+      isRetryable("https://registry.modelcontextprotocol.io/v0/servers/x", {
+        ok: true,
+        status: 503,
+      }),
+    ).toBe(true);
   });
 
   it("is false for a 4xx, a 2xx, another host and an unparseable URL", () => {

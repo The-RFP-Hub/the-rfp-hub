@@ -10,12 +10,60 @@ A credential is needed only to submit, and only when submitting is explicitly tu
 
 ---
 
+## Submit from an agent
+
+If the agent only needs to search and fetch, skip this section: install the server below with no
+credential. To let it submit:
+
+1. Sign in to the deployment's **API keys** page —
+   [`https://ethrfps.app/keys`](https://ethrfps.app/keys) for the hosted Hub, or `/keys` on a local
+   or staging frontend. Its MCP card prepares the safe scopes below.
+2. Choose `read` and `write`, leave `publish` off, and mint the key. This is the safe path: a
+   submission is stored but waits for review instead of appearing immediately.
+3. Copy the secret when it appears. It is shown once. The page also shows the exact API origin that
+   belongs in `RFPHUB_API_BASE`.
+4. Configure the client-neutral `stdio` connection below, then put the origin in `RFPHUB_API_BASE`
+   and the secret in `RFPHUB_API_KEY` inside the client's private MCP environment. Never put the
+   secret in a prompt, tool argument or shell command.
+5. Restart the client. `tools/list` now includes `submit_opportunity`; its first call only previews,
+   and a separate terminal approval is still required before the second call writes.
+
+The API keys page is the handoff: it creates the credential and links back here in a new tab, so
+the one-time secret remains visible while you configure the client.
+
+---
+
 ## Install
 
-Every example below pins an **exact version**. An npm version is immutable; `@latest` is not, and
+### Client-neutral connection
+
+RFP Hub MCP is model-provider and client agnostic. It is a local `stdio` server: the client launches
+one process, sends MCP messages on standard input and reads them on standard output. The server does
+not know which model, vendor or host launched it.
+
+Every compatible client receives the same connection contract:
+
+| Setting | Value |
+|---|---|
+| Transport | `stdio` |
+| Command | `npx` |
+| Arguments | `-y`, `@the-rfp-hub/mcp@0.1.2` |
+| Search and fetch | No environment variables; two anonymous read tools are exposed. |
+| Submission | Add `RFPHUB_API_BASE` and `RFPHUB_API_KEY` to the server process's private environment; the write tool is then exposed. |
+
+The names a client gives these fields may vary, but the process and environment do not. Prefer a
+user-private configuration or secret input; never commit the key to a repository. Restart the client
+after adding or rotating it.
+
+The exact package version above is intentional. An npm version is immutable; `@latest` is not, and
 an MCP server is code your agent runs with your permissions. Pin it, and bump it deliberately.
 
-### Claude Code
+### Equivalent client examples
+
+These are adapters for the same contract, not separate integrations. Omit the environment block for
+anonymous search and fetch.
+
+#### Claude Code
 
 ```sh
 claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
@@ -24,7 +72,11 @@ claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
 claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
 ```
 
-### Claude Desktop and Cursor
+Those commands install anonymous search and fetch. For submission, add `RFPHUB_API_BASE` and
+`RFPHUB_API_KEY` to the server's private environment using Claude's local or user configuration;
+keep a shared project `.mcp.json` secret-free.
+
+#### Claude Desktop and Cursor
 
 Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
 
@@ -33,13 +85,17 @@ Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "env": {
+        "RFPHUB_API_BASE": "https://api.ethrfps.app",
+        "RFPHUB_API_KEY": "rfph_…"
+      }
     }
   }
 }
 ```
 
-### VS Code
+#### VS Code
 
 Root key `servers`, in `.vscode/mcp.json`:
 
@@ -49,16 +105,44 @@ Root key `servers`, in `.vscode/mcp.json`:
     "rfp-hub": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "env": {
+        "RFPHUB_API_BASE": "https://api.ethrfps.app",
+        "RFPHUB_API_KEY": "${input:rfphub-key}"
+      }
     }
-  }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "rfphub-key",
+      "description": "RFP Hub API key",
+      "password": true
+    }
+  ]
 }
 ```
 
-### Codex CLI
+#### Codex CLI
 
 ```sh
 codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+```
+
+That command installs anonymous search and fetch. For submission, edit `~/.codex/config.toml` (or a
+trusted project's `.codex/config.toml`) and add the private environment table below to the server
+entry. Replace both values with the exact origin and one-time key shown by the API keys page, then
+restart Codex. This follows the
+[official Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp#connect-codex-to-an-mcp-server).
+
+```toml
+[mcp_servers.rfp-hub]
+command = "npx"
+args = ["-y", "@the-rfp-hub/mcp@0.1.2"]
+
+[mcp_servers.rfp-hub.env]
+RFPHUB_API_BASE = "https://api.ethrfps.app"
+RFPHUB_API_KEY = "rfph_…"
 ```
 
 ---
@@ -171,6 +255,11 @@ through, so key order and whitespace are the transport's business.
 ### `submit_opportunity` *(write — registered only when a key is configured)*
 
 Two calls with a person in between. See the next section.
+
+The submission result keeps the API's `isListed` value as an editorial preference and adds
+`isPubliclyVisible` as the actual visibility signal. A record is publicly visible only when
+`reviewStatus` is `approved` **and** `isListed` is `true`; a pending record with `isListed: true`
+still waits for review.
 
 ---
 

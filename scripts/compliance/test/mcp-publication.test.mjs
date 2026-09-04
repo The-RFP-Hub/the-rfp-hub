@@ -5,7 +5,11 @@
  * `pnpm --filter @the-rfp-hub/mcp build` is not a configuration snippet and must not be flagged.
  */
 import { describe, expect, it } from "vitest";
-import { unpinnedReadmeSpecs } from "../checks/mcp-publication.mjs";
+import {
+  MCP_REGISTRY_TIMEOUT_FLOOR_MS,
+  mcpRegistryTimeout,
+  unpinnedReadmeSpecs,
+} from "../checks/mcp-publication.mjs";
 import { mcpApiBase, schemaErrors } from "../checks/mcp.mjs";
 
 const fenced = (...lines) => ["```json", ...lines, "```"].join("\n");
@@ -44,6 +48,14 @@ describe("unpinnedReadmeSpecs", () => {
       "The `@the-rfp-hub/mcp` package speaks MCP over stdio.",
     ].join("\n");
     expect(unpinnedReadmeSpecs(readme)).toEqual([]);
+  });
+});
+
+describe("the official Registry timeout", () => {
+  it("has its own 60 second floor without lowering an explicit larger timeout", () => {
+    expect(MCP_REGISTRY_TIMEOUT_FLOOR_MS).toBe(60000);
+    expect(mcpRegistryTimeout(15000)).toBe(60000);
+    expect(mcpRegistryTimeout(90000)).toBe(90000);
   });
 });
 

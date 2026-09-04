@@ -387,8 +387,10 @@ explicitly. Exact defaults and the companion agent skill are in
 `rfphub-mcp approve <approvalId>` in their own terminal, which prints the destination, the
 credential fingerprint, the operation and the whole document before asking for confirmation; the
 second call claims that single-use approval and posts. `rfphub-mcp pending` lists what is waiting
-and `rfphub-mcp revoke <id>` deletes one. An agent cannot approve its own write, because approving
-is not something the protocol can reach. The reasoning is in
+and `rfphub-mcp revoke <id>` deletes one. Approval is absent from the MCP tool channel, so a model
+cannot obtain and spend an approval from the tool response itself. It is not a security boundary
+against an agent that can use the same operating-system user's shell and filesystem; such an agent
+can operate the terminal helper directly. The reasoning is in
 [`adr/0012`](../adr/0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md).
 
 Pin the exact version in any configuration snippet — never `@latest`. An example that floats hands
