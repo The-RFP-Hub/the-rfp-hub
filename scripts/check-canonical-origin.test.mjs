@@ -28,7 +28,10 @@ function runGuard(envFileText, args = []) {
   const path = join(dir, ".env.local");
   writeFileSync(path, envFileText);
   try {
-    const stdout = execFileSync(process.execPath, [script, path, ...args], { encoding: "utf8" });
+    const stdout = execFileSync(process.execPath, [script, path, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return { code: 0, stdout, stderr: "" };
   } catch (error) {
     return { code: error.status, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
@@ -122,15 +125,19 @@ describe("the guard as the workflow runs it", () => {
 
   it("exits 2, distinctly from a failed assertion, when `vercel pull` left no file", () => {
     let code;
+    let stderr = "";
     try {
       execFileSync(process.execPath, [script, join(tmpdir(), "definitely-absent.env")], {
         encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
       });
       code = 0;
     } catch (error) {
       code = error.status;
+      stderr = error.stderr ?? "";
     }
     expect(code).toBe(2);
+    expect(stderr).toContain("::error::cannot read");
   });
 });
 
