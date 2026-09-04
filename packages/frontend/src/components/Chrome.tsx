@@ -1,18 +1,22 @@
 "use client";
 
 import { BrandMark } from "@/components/BrandMark";
-import { type HeroIcon, IconLabel } from "@/components/IconLabel";
+import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
 import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
- * THE NAVIGATION IS GROUPED, NOT LISTED. There are three kinds of destination here and a flat row
- * of links says they are peers: what anybody may read (the directory, and the page explaining
- * who does what), what THIS ACCOUNT owns (its listings, its traffic, its keys), and what a HUB
- * STAFF ROLE may do (the review queues, accounts and roles). The last group grants power — a click
- * in it publishes somebody's listing or changes what an account may do — so it is separated by a
- * rule rather than by a comma. Duplicates left the top level with the same reasoning: it is a view
- * of your own listings, reached from `/listings`, not a seventh destination competing with them.
+ * THE HEADER IS AN ORIENTATION STRIP, NOT A SITEMAP. Directory discovery, the signed-in dashboard
+ * and (when granted) review queues stay one click away because they are the high-frequency jobs.
+ * The complete information architecture lives in one disclosure, explicitly grouped as Browse,
+ * My work, Administration, Account and Help. That keeps the distinction between ordinary account
+ * work and staff power without asking eleven links to wrap into an accidental grid. Duplicates
+ * remains a view of listings reached from `/listings`, not another destination competing here.
+ *
+ * THE SAME ORDER SURVIVES EVERY WIDTH. At the content-driven compact breakpoint, the short primary
+ * row moves into the disclosure, Browse becomes a full group and the panel adapts from two columns
+ * to one on a phone. Nothing disappears; only the amount shown before the reader asks for it
+ * changes. The panel overlays content so opening navigation never moves the page underneath it.
  *
  * THE ACCOUNT GROUP IS RENDERED FROM `GET /v1/me`, not from anything this client decided.
  * `canReview` and `canAdmin` come back with the account, so the staff links appear for the people
@@ -44,6 +48,7 @@ import {
   BuildingOffice2Icon,
   ChartBarSquareIcon,
   CheckBadgeIcon,
+  ChevronDownIcon,
   ClipboardDocumentCheckIcon,
   DocumentTextIcon,
   KeyIcon,
@@ -53,7 +58,7 @@ import {
 } from "@heroicons/react/20/solid";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface NavItem {
   href: string;
@@ -162,32 +167,77 @@ export function isCurrent(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string; me: Me | null }) {
+function NavLinks({
+  items,
+  pathname,
+  me,
+  className,
+  showIcons = true,
+}: {
+  items: NavItem[];
+  pathname: string;
+  me: Me | null;
+  className: string;
+  showIcons?: boolean;
+}) {
   const visible = items.filter((item) => !item.requires || (me !== null && item.requires(me)));
   if (visible.length === 0) return null;
   return (
-    <ul className="shell-nav-group">
+    <ul className={className}>
       {visible.map((item) => (
         <li key={item.href}>
           <GuardedLink
             href={item.href}
             aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
           >
-            <IconLabel icon={item.icon}>
-              {item.label}
-              {item.badge ? (
-                <span
-                  className="shell-nav-count"
-                  aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
-                >
-                  {item.badge}
-                </span>
-              ) : null}
-            </IconLabel>
+            {showIcons ? (
+              <IconLabel icon={item.icon}>
+                {item.label}
+                {item.badge ? (
+                  <span
+                    className="shell-nav-count"
+                    aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+              </IconLabel>
+            ) : (
+              item.label
+            )}
           </GuardedLink>
         </li>
       ))}
     </ul>
+  );
+}
+
+function NavSection({
+  label,
+  items,
+  pathname,
+  me,
+  className,
+}: {
+  label: string;
+  items: NavItem[];
+  pathname: string;
+  me: Me;
+  className?: string;
+}) {
+  const visible = items.some((item) => !item.requires || item.requires(me));
+  if (!visible) return null;
+  const headingId = `shell-nav-${label.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`;
+  return (
+    <section
+      className={["shell-nav-section", className].filter(Boolean).join(" ")}
+      aria-labelledby={headingId}
+    >
+      <h2 id={headingId} className="shell-nav-heading">
+        {label}
+      </h2>
+      <NavLinks items={items} pathname={pathname} me={me} className="shell-nav-group" />
+    </section>
   );
 }
 
@@ -197,6 +247,8 @@ export function Chrome({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const accountMenuButtonRef = useRef<HTMLButtonElement>(null);
   const { confirmNavigation } = useNavigationBlocker();
   // Mount + route changes only. This package deliberately has no polling layer; a mutation made in
   // this tab dispatches the local event below so the count can settle immediately.
@@ -219,12 +271,56 @@ export function Chrome({ children }: { children: ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname intentionally closes the menu on navigation
   useEffect(() => setAccountMenuOpen(false), [pathname]);
 
+  // This is a disclosure, not a modal: the page remains usable, while Escape and an outside click
+  // provide the two conventional ways to dismiss it without choosing a destination. Returning
+  // focus on Escape preserves the keyboard reader's place in the header.
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+
+    const closeFromOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAccountMenuOpen(false);
+      accountMenuButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeFromKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromKeyboard);
+    };
+  }, [accountMenuOpen]);
+
+  const accountItems = me ? accountNav(me, unreadCount) : [];
+  const dashboard = accountItems.find((item) => item.href === "/dashboard");
+  const listings = accountItems.find((item) => item.href === "/listings");
+  const notifications = accountItems.find((item) => item.href === "/notifications");
+  const organization = accountItems.find((item) => item.href.startsWith("/organizations"));
+  const account = accountItems.find((item) => item.href === "/account");
+  const keys = accountItems.find((item) => item.href === "/keys");
+
+  const primaryItems = session.authenticated
+    ? [PUBLIC_NAV[0], PUBLIC_NAV[1], dashboard, STAFF_NAV[0]].filter(
+        (item): item is NavItem => item !== undefined,
+      )
+    : PUBLIC_NAV;
+  const identity = me ? (me.handle ?? `account ${me.accountId}`) : "your account";
+
   return (
     <div className="shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="shell-header" data-account-open={accountMenuOpen ? "true" : "false"}>
+      <header
+        ref={headerRef}
+        className="shell-header"
+        data-authenticated={session.authenticated ? "true" : "false"}
+      >
         <GuardedLink href="/" className="brand">
           <BrandMark className="brand-mark" />
           <span className="brand-text">
@@ -233,49 +329,129 @@ export function Chrome({ children }: { children: ReactNode }) {
           </span>
         </GuardedLink>
 
-        {session.authenticated ? (
-          <button
-            type="button"
-            className="shell-menu-toggle"
-            aria-expanded={accountMenuOpen}
-            aria-controls="account-navigation"
-            onClick={() => setAccountMenuOpen((open) => !open)}
-          >
-            <IconLabel icon={UserCircleIcon}>Account</IconLabel>
-          </button>
-        ) : null}
+        <nav className="shell-nav" aria-label="Sections">
+          <NavLinks
+            items={primaryItems}
+            pathname={pathname}
+            me={me}
+            className="shell-nav-primary"
+            showIcons={false}
+          />
 
-        <nav className="shell-nav" aria-label="Sections" id="account-navigation">
-          <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
-          {me ? <NavGroup items={accountNav(me, unreadCount)} pathname={pathname} me={me} /> : null}
-          {me ? <NavGroup items={STAFF_NAV} pathname={pathname} me={me} /> : null}
-        </nav>
-
-        <div
-          className={`shell-session${session.authenticated ? " shell-session-authenticated" : ""}`}
-        >
           {session.error ? (
             <span className="muted">sign-in unavailable</span>
           ) : !session.ready ? (
             <span className="muted">restoring session…</span>
           ) : session.authenticated ? (
             <>
-              <span className="muted">{me ? (me.handle ?? `account ${me.accountId}`) : "…"}</span>
+              {notifications ? (
+                <GuardedLink
+                  href={notifications.href}
+                  className="shell-notifications"
+                  aria-current={isCurrent(pathname, notifications.href) ? "page" : undefined}
+                  aria-label={`Notifications${
+                    notifications.badge
+                      ? ` ${notifications.badge} unread notification${notifications.badge === 1 ? "" : "s"}`
+                      : ""
+                  }`}
+                >
+                  <IconLabel icon={BellIcon}>
+                    <span className="shell-notifications-label">Notifications</span>
+                    {notifications.badge ? (
+                      <span className="shell-nav-count" aria-hidden="true">
+                        {notifications.badge}
+                      </span>
+                    ) : null}
+                  </IconLabel>
+                </GuardedLink>
+              ) : null}
               <button
                 type="button"
-                onClick={() => {
-                  if (confirmNavigation()) void session.logout();
-                }}
+                ref={accountMenuButtonRef}
+                className="shell-menu-toggle"
+                aria-expanded={accountMenuOpen}
+                aria-controls="account-navigation"
+                aria-label={`${accountMenuOpen ? "Close" : "Open"} navigation menu for ${identity}`}
+                onClick={() => setAccountMenuOpen((open) => !open)}
               >
-                <IconLabel icon={ArrowLeftOnRectangleIcon}>Log out</IconLabel>
+                <DecorativeIcon icon={UserCircleIcon} className="shell-menu-user" />
+                <span className="shell-menu-label shell-menu-label-wide">{identity}</span>
+                <span className="shell-menu-label shell-menu-label-compact">Menu</span>
+                <DecorativeIcon icon={ChevronDownIcon} className="shell-menu-caret" />
               </button>
             </>
           ) : (
-            <button type="button" onClick={session.login}>
+            <button type="button" className="shell-login" onClick={session.login}>
               <IconLabel icon={ArrowRightOnRectangleIcon}>Log in</IconLabel>
             </button>
           )}
-        </div>
+
+          {session.authenticated ? (
+            <div className="shell-account-panel" id="account-navigation" hidden={!accountMenuOpen}>
+              {me ? (
+                <>
+                  <NavSection
+                    label="Browse"
+                    items={PUBLIC_NAV}
+                    pathname={pathname}
+                    me={me}
+                    className="shell-nav-section-compact"
+                  />
+                  <div className="shell-account-columns">
+                    <div className="shell-account-column">
+                      <NavSection
+                        label="My work"
+                        items={[dashboard, listings, organization].filter(
+                          (item): item is NavItem => item !== undefined,
+                        )}
+                        pathname={pathname}
+                        me={me}
+                      />
+                      <NavSection
+                        label="Administration"
+                        items={STAFF_NAV}
+                        pathname={pathname}
+                        me={me}
+                      />
+                    </div>
+                    <div className="shell-account-column">
+                      <NavSection
+                        label="Account"
+                        items={[notifications, account, keys].filter(
+                          (item): item is NavItem => item !== undefined,
+                        )}
+                        pathname={pathname}
+                        me={me}
+                      />
+                      <NavSection
+                        label="Help"
+                        items={[PUBLIC_NAV[2]].filter(
+                          (item): item is NavItem => item !== undefined,
+                        )}
+                        pathname={pathname}
+                        me={me}
+                        className="shell-nav-section-wide"
+                      />
+                    </div>
+                  </div>
+                  <div className="shell-account-session">
+                    <span className="muted">Signed in as {identity}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirmNavigation()) void session.logout();
+                      }}
+                    >
+                      <IconLabel icon={ArrowLeftOnRectangleIcon}>Log out</IconLabel>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <span className="muted">loading account…</span>
+              )}
+            </div>
+          ) : null}
+        </nav>
       </header>
 
       <main id="main-content" className="shell-main" tabIndex={-1}>

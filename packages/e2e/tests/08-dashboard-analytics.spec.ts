@@ -41,9 +41,12 @@ test.describe("M3-5 the signed-in dashboard", () => {
   }) => {
     await page.goto(stack.urls.frontend);
 
-    // `Log out` is the product's own signal that a session was restored — waiting for it is waiting
-    // for the thing the criterion is about, rather than for a timeout to expire.
-    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    // The account disclosure exists only after the session has been restored. It replaces the old
+    // permanently-visible identity/logout row, so waiting for it is the product's own signed-in
+    // signal rather than a timeout proxy.
+    const accountMenu = page.getByRole("button", { name: /navigation menu/i });
+    await expect(accountMenu).toBeVisible();
+    await accountMenu.click();
 
     // THE NAVIGATION IS GROUPED NOW, and this list follows the grouping rather than the old flat
     // row. `Directory` and `How it works` are the public pair — present for a stranger too;
