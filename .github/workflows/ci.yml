@@ -17,7 +17,7 @@ on:
         description: "packed (build validate from this checkout) or published (use the npm registry)"
         type: choice
         options: [packed, published]
-        default: packed
+        default: published
       clean-room-api-url:
         description: "API origin the built frontend is checked against"
         type: string
@@ -458,8 +458,8 @@ jobs:
           fi
 
   # `scripts/frontend-clean-room.mjs` against a real API: a copy of ONLY packages/frontend has to
-  # install, build and serve. `packed` builds rfphub-validate from this checkout and is the default
-  # until 0.3.1 ships `humanizeIssues`; `published` takes it from the registry.
+  # install, build and serve. `published` takes rfphub-validate from the registry and is the
+  # dispatch default; every push and pull request runs `packed`, which builds it from this checkout.
   clean-room:
     name: Clean-room build + standalone smoke test
     needs: [changes]
@@ -525,7 +525,7 @@ jobs:
             specs+=(--validate-spec "$VALIDATE_SPEC_INPUT")
             echo "published mode: --validate-spec $VALIDATE_SPEC_INPUT"
           else
-            echo "published mode: using the script's own default range (currently fails — see this job's header)"
+            echo "published mode: using the script's own default range"
           fi
           node scripts/frontend-clean-room.mjs --browser "${specs[@]}"
 

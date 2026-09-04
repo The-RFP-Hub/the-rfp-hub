@@ -562,8 +562,8 @@ grep -rl humanizeIssues /tmp/rfphub-pack/   # the export the frontend imports mu
 
 The last check is the one that matters. `rfphub-validate` 0.3.0 shipped without `humanizeIssues`
 while the source exported it, and an external copy of the frontend failed to typecheck against the
-published package as a result — the failure that makes deploy path B need a local tarball until
-0.3.1 is out.
+published package as a result — the failure that kept deploy path B on a local tarball until
+0.3.1 shipped.
 
 ### 7.5 Publish
 
@@ -606,18 +606,16 @@ pnpm frontend:clean-room --browser --standard-spec '^3.1.0' --validate-spec '^0.
 ```
 
 **Green here is what licenses the last step of the release: flip the script's defaults.**
-`scripts/frontend-clean-room.mjs` hard-codes the fallback ranges (`^3.0.0` / `^0.3.0`) that
-`--standard-spec` and `--validate-spec` override, and they are only correct while those are the
-newest published versions. In one change:
+`scripts/frontend-clean-room.mjs` hard-codes the fallback ranges that `--standard-spec` and
+`--validate-spec` override, and they are only correct while those are the newest published
+versions. In one change:
 
-* `scripts/frontend-clean-room.mjs` — the two fallback defaults, to `^3.1.0` and `^0.3.1`;
-* the `clean-room` job in `.github/workflows/ci.yml` — its `clean-room-mode` dispatch input
-  defaults to `packed` (build the validator from the checkout) precisely because `published` could
-  not work; flip that default to `published`. Its `standard-spec` / `validate-spec` inputs are
-  empty strings that fall through to the script's own defaults (passed through as
-  `--standard-spec`/`--validate-spec` when set), so the previous bullet is what fixes them;
+* `scripts/frontend-clean-room.mjs` — the two fallback defaults, to the ranges just published;
 * `packages/frontend/README.md` and [§9](#9-the-frontend-three-ways-to-deploy-a-copy) of this guide
-  — delete the local-tarball workaround from both, and the ranges quoted alongside it.
+  — the same ranges, quoted in both;
+* then dispatch the `clean-room` job in `.github/workflows/ci.yml` once with its default
+  `clean-room-mode=published`: its `standard-spec` / `validate-spec` inputs are empty strings that
+  fall through to the script's own defaults, so green there is the proof the flip is right.
 
 Leaving the defaults behind is not cosmetic: it is what keeps the next person's bare
 `pnpm frontend:clean-room` proving the current release rather than the previous one.
@@ -862,36 +860,14 @@ whenever the copied source carries that route, a `404` on it is a failure rather
 with no flag and no workflow input to turn on.
 
 Two flags select the dependency specs, one per package. **The script's own defaults are
-`--standard-spec ^3.0.0` and `--validate-spec ^0.3.0`** — the versions that resolve on the registry
-today, so a bare `pnpm frontend:clean-room` needs no arguments to reach the install step. Override
-either to test a range that is not published yet; an absolute path ending in `.tgz` is used as a
-local tarball instead of a registry range.
+`--standard-spec ^3.1.0` and `--validate-spec ^0.3.1`** — the newest versions on the registry, so a
+bare `pnpm frontend:clean-room` needs no arguments to reach the install step. Override either to
+test a range that is not published yet; an absolute path ending in `.tgz` is used as a local tarball
+instead of a registry range — built with `pnpm pack`, never `npm pack`
+([§7.4](#74-inspect-the-tarball-before-every-publish--with-pnpm-pack-never-npm-pack)).
 
 The defaults are a fact about the registry, not a preference, so they move when the registry does:
-publishing 3.1.0 and 0.3.1 is what makes `^3.1.0` / `^0.3.1` the right defaults, and flipping them
-is a step of the release ([§7.6](#76-prove-the-next-tag-then-promote)). Until then, passing the
-newer ranges by hand is how you test them.
-
-**And until `rfphub-validate` 0.3.1 is published, the default `^0.3.0` fails the build** with a
-`TS2305`: the published 0.3.0 tarball predates the `humanizeIssues` export the frontend imports.
-That is the one case where the default cannot work, and the way through is a locally built tarball:
-
-```sh no-run
-# The Standard FIRST — `rfphub-validate` imports it, and resolves it through its dist. Without
-# this line the build fails with TS2307 (cannot find module '@the-rfp-hub/standard').
-pnpm --filter @the-rfp-hub/standard build
-pnpm --filter rfphub-validate build
-pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
-pnpm frontend:clean-room --browser --validate-spec /tmp/rfphub-pack/rfphub-validate-0.3.0.tgz
-```
-
-`pnpm -r build` does the same thing with one line, if you would rather not think about the order.
-The dependency direction is why `packages/validate` declares `prepublishOnly: pnpm -w build` — the
-same trap, closed for the publish path only.
-
-`pnpm pack`, not `npm pack` — see
-[§7.4](#74-inspect-the-tarball-before-every-publish--with-pnpm-pack-never-npm-pack). This whole
-note goes away with the release in [§7](#7-npm-release-runbook-manual).
+flipping them is a step of the release ([§7.6](#76-prove-the-next-tag-then-promote)).
 
 Three things had to change in the package for any of this to work, and all three are in place: the
 `tsconfig.json` no longer `extends` a file outside the package, `@types/node` is a declared

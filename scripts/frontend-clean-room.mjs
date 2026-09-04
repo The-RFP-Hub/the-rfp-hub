@@ -12,8 +12,7 @@
 // Env: NEXT_PUBLIC_API_URL (the frontend's own build variable; --api-url wins).
 //   A spec is a registry range, or an absolute .tgz path used as `file:`. Build such a tarball with
 //   `pnpm pack`, NEVER `npm pack`: only pnpm rewrites the tarball's own `workspace:*` dependency,
-//   and `npm install` cannot resolve what `npm pack` leaves. rfphub-validate needs one until 0.3.1
-//   publishes `humanizeIssues`, which the frontend imports.
+//   and `npm install` cannot resolve what `npm pack` leaves.
 //
 // Exit: 0 every check passed; 1 a check failed; 2 install or build itself failed.
 import { spawn, spawnSync } from "node:child_process";
@@ -396,8 +395,8 @@ function checkSearchNarrows(all, filtered) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apiUrl = args.apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? "https://api.ethrfps.app";
-  const standardSpec = resolveSpec(args.standardSpec ?? "^3.0.0");
-  const validateSpec = resolveSpec(args.validateSpec ?? "^0.3.0");
+  const standardSpec = resolveSpec(args.standardSpec ?? "^3.1.0");
+  const validateSpec = resolveSpec(args.validateSpec ?? "^0.3.1");
   const port = args.port ?? (await freePort());
 
   console.log("frontend-clean-room: copying packages/frontend, then building against");

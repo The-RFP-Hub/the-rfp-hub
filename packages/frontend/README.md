@@ -323,30 +323,19 @@ here and is what lets the build see `pnpm-lock.yaml` and the two workspace depen
 > would change the deployment that is live. The button's parameters only configure the new project.
 
 **B — Copy only this package**, against the npm-published versions of its two workspace
-dependencies (`@the-rfp-hub/standard@^3.0.0`, `rfphub-validate@^0.3.0`+ — see the note below). This
+dependencies (`@the-rfp-hub/standard@^3.1.0`, `rfphub-validate@^0.3.1`). This
 is the "spin it up separately, as plainly as possible" path, and it is proven mechanically —
 `scripts/frontend-clean-room.mjs` at the repository root does exactly this: copies
 `packages/frontend` on its own, rewrites the two `workspace:*` dependencies to published ranges,
 `npm install`s and `npm run build`s it with no monorepo present, then starts the standalone server
 it produces and requests `/`, `/publishers`, a filtered `/` and every file in `public/`. Read that script's own header
 before running it — it documents both a "published" mode and a "local tarball" mode (selected with
-`--standard-spec` / `--validate-spec`), and today only the tarball mode succeeds (see the note
-below). That HTTP request is only a fast pre-check, though:
+`--standard-spec` / `--validate-spec`). That HTTP request is only a fast pre-check, though:
 `DirectoryList` fetches its data from a `useEffect` after hydration, so a build whose client-side
 fetch cannot actually reach the API would still return a 200 shell and pass it. **`--browser`
 is the real proof** — it drives a real headless Chromium through `/` and `/?q=<term>` and waits for
 an opportunity row to actually render from a live request, and is what
 the `clean-room` job in `.github/workflows/ci.yml` runs whenever a change touches this package.
-
-> **`rfphub-validate` note.** `packages/frontend/src/lib/validate-client.ts` imports
-> `humanizeIssues` from `rfphub-validate`, which is exported by the package's source but missing
-> from the published `0.3.0` tarball. A patch (`0.3.1`) is queued
-> (`.changeset/validate-humanize-issues-export.md`) but not yet released. Until it is, path B needs
-> a locally built tarball in place of the npm range —
-> `pnpm --filter rfphub-validate build && pnpm --filter rfphub-validate pack` (NOT `npm pack`,
-> which does not rewrite the tarball's own `workspace:*` dependency on `@the-rfp-hub/standard` to a
-> real version) — pointed at with `--validate-spec <path-to-tgz>`. Once `0.3.1` ships this
-> note, and the flag, go away.
 
 **C — Docker (optional, do this last).** A minimal Dockerfile over `output: "standalone"`: build
 with `npm run build` after an `npm install` with the same dependency rewrite as path B, then run
