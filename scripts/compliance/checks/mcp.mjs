@@ -66,12 +66,15 @@ export function resolveCommand(ctx, extraArgs = []) {
  * package fails here with npm's own 404 in one clearly-named check, rather than as a raw error
  * inside "tools/list succeeds" — a message shaped for a protocol bug, not a missing package.
  */
+/** A cold `npx` install pulls the package and three dependencies; 30 s was tight on a slow link. */
+const PREFLIGHT_FLOOR_MS = 60000;
+
 async function probeRegistryInstall(spec, ctx) {
   const args = ["-y", `@the-rfp-hub/mcp@${spec}`, "--version"];
   try {
     const { stdout } = await execFileAsync("npx", args, {
       cwd: ctx.repoRoot,
-      timeout: Math.max(ctx.timeoutMs, 30000),
+      timeout: Math.max(ctx.timeoutMs, PREFLIGHT_FLOOR_MS),
     });
     const printed = stdout.trim();
     if (!/\d+\.\d+\.\d+/.test(printed)) {
@@ -82,6 +85,12 @@ async function probeRegistryInstall(spec, ctx) {
     }
     return { ok: true, detail: printed.slice(0, 200) };
   } catch (err) {
+    if (err.killed) {
+      return {
+        ok: false,
+        detail: `npx did not finish within ${Math.max(ctx.timeoutMs, PREFLIGHT_FLOOR_MS)} ms — a cold install on a slow network, or a registry fetch that hung; retry, or raise --timeout`,
+      };
+    }
     const stderr = (err.stderr ?? "").toString().trim();
     return { ok: false, detail: (stderr || err.message).slice(0, 800) };
   }
