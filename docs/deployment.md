@@ -624,34 +624,65 @@ Leaving the defaults behind is not cosmetic: it is what keeps the next person's 
 
 ### 7.7 The MCP Registry
 
-The Registry does not follow npm: every version needs its own publish, and it is done by the
-**MCP Registry** workflow (`.github/workflows/mcp-registry.yml`), dispatched by hand on the release
-tag once the npm package of §7.5–7.6 is on the registry. It is a workflow rather than a laptop
-command for one reason: the registry grants `io.github.<org>/*` to a person's GitHub token only
-when that person is an **Owner** of the organization — a member gets a 403 that names only their
-personal namespace, whatever its hint about public membership says — while a workflow's OIDC token
-gets the namespace from the repository's owner, with no role involved.
+The Registry does not follow npm: every version needs its own publish. It is done by the
+**MCP Registry** workflow (`.github/workflows/mcp-registry.yml`), never from a laptop, because the
+registry grants `io.github.<org>/*` to a person's GitHub token only when that person is an
+**Owner** of the organization — a member gets a 403 that names only their personal namespace,
+whatever its hint about public membership says — while the workflow's OIDC token gets the
+namespace from the repository's owner, with no role involved.
+
+Four steps, once the npm package of §7.5–7.6 is on the registry under the new version.
+
+**1. The release commit carries the version everywhere.** `changeset version` bumps `package.json`
+only; the same commit must move `packages/mcp/server.json` (`version` and `packages[0].version`)
+and every pinned snippet in `packages/mcp/README.md` to the new number. `pnpm --filter
+@the-rfp-hub/mcp test` fails until it does. The server reports `package.json`'s version, so
+nothing in `src/` needs touching.
+
+**2. Tag that commit and push the tag.** The workflow accepts only a tag — a branch or a bare SHA
+is refused — so every Registry entry traces back to a release. Package tags take the
+`<name>@<version>` form the other packages already use:
 
 ```sh no-run
-gh workflow run mcp-registry.yml -f ref=<the release tag>
+git tag @the-rfp-hub/mcp@0.1.2            # on the commit whose server.json says 0.1.2
+git push origin @the-rfp-hub/mcp@0.1.2
+```
+
+A `prod-*` tag on the same commit (§7.8) serves just as well. Tag **after** the npm publish of
+that version, never before: the workflow reads `server.json` from the tag and refuses while npm
+does not yet carry that version under that name. A tag pushed too early is not fixed by
+publishing — delete it and push it again from the release commit:
+
+```sh no-run
+git push origin :refs/tags/@the-rfp-hub/mcp@0.1.2
+git tag -f @the-rfp-hub/mcp@0.1.2 <release commit>
+git push origin @the-rfp-hub/mcp@0.1.2
+```
+
+**3. Dispatch the workflow on the tag**, from the CLI or from Actions → MCP Registry → Run
+workflow with `ref` set to the tag:
+
+```sh no-run
+gh workflow run mcp-registry.yml -f ref=@the-rfp-hub/mcp@0.1.2
 gh run watch
 ```
 
-The workflow refuses to publish when the npm package `server.json` names is not on the registry
-yet, or carries a different `mcpName`, and fails if the Registry does not serve the version
-afterwards. An Owner can still do the same by hand: `mcp-publisher login github` and
-`mcp-publisher publish`, from `packages/mcp`.
+It checks the tag out, refuses unless the npm package `server.json` names is on the registry at
+that version with the same `mcpName`, logs in with the job's OIDC identity, publishes, and fails
+unless the Registry serves the version afterwards.
+
+**4. Confirm from the outside.** The `mcp-publication` criterion of `pnpm check:deployment
+--milestone m4` reads the same Registry URL and compares it with the manifest in the checkout.
+
+An Owner can still do the same by hand — `mcp-publisher login github`, then `mcp-publisher publish`,
+from `packages/mcp` — but the tag and the checks above are what the workflow adds, and they are the
+reason it exists.
 
 **The namespace is `io.github.The-RFP-Hub`, in the organization's own case.** The registry grants
 `io.github.<login>/*` spelled exactly as the GitHub login and matches it as a case-sensitive prefix,
 and it compares the published npm package's `mcpName` to the server name character for character.
 `mcpName` in `package.json` and `name` in `server.json` must be that exact string; the lowercase
 name 0.1.0 and 0.1.1 shipped with could be published by nobody.
-
-`changeset version` bumps `package.json` only. The same release commit must move
-`packages/mcp/server.json` (`version` and `packages[0].version`) and every pinned snippet in
-`packages/mcp/README.md` to the new number — `pnpm --filter @the-rfp-hub/mcp test` fails until it
-does. The server reports `package.json`'s version, so nothing in `src/` needs touching.
 
 **Every configuration example in every README pins an exact version.** Never `@latest` in a snippet
 somebody will paste into an agent's configuration: an example that floats hands whoever controls
