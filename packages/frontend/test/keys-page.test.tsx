@@ -104,6 +104,46 @@ describe("the key page's action hierarchy", () => {
       (await screen.findByRole("link", { name: "Mint your first key" })).className,
     ).not.toContain("button-primary");
   });
+
+  it("makes the MCP path explicit and prepares the least-powerful submission key", async () => {
+    mount();
+
+    expect(await screen.findByRole("heading", { name: "Connect the RFP Hub MCP" })).toBeTruthy();
+    expect(screen.getByText(/Search and fetch work anonymously/)).toBeTruthy();
+    expect(screen.getByText(/model-provider agnostic/).textContent).toContain("stdio");
+    for (const provider of ["Codex", "Claude", "Cursor", "VS Code"]) {
+      expect(screen.queryByText(new RegExp(provider))).toBeNull();
+    }
+    expect(screen.getByText(/leave/).textContent).toContain("publish off");
+
+    const guide = screen.getAllByRole("link", { name: "Open MCP setup guide (new tab)" })[0];
+    expect(guide?.getAttribute("href")).toBe(
+      "https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/mcp/README.md#submit-from-an-agent",
+    );
+    expect(guide?.getAttribute("target")).toBe("_blank");
+    expect(guide?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.getByText("https://api.example.com")).toBeTruthy();
+    const deploymentStep = screen.getByText("Point it at this deployment.").closest("li");
+    expect(deploymentStep?.textContent).toContain("RFPHUB_API_BASE");
+
+    fireEvent.click(screen.getByRole("button", { name: "Prepare an MCP key" }));
+    const label = screen.getByLabelText("Label") as HTMLInputElement;
+    expect(label.value).toBe("RFP Hub MCP");
+    expect(document.activeElement).toBe(label);
+    expect((screen.getByRole("checkbox", { name: /read/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: /write/ }) as HTMLInputElement).checked).toBe(
+      true,
+    );
+    expect((screen.getByRole("checkbox", { name: /publish/ }) as HTMLInputElement).checked).toBe(
+      false,
+    );
+    expect(create).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mint" }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({ name: "RFP Hub MCP", scopes: ["read", "write"] }),
+    );
+  });
 });
 
 describe("revoking a key", () => {
@@ -150,7 +190,9 @@ describe("revoking a key", () => {
     mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
-    expect(await screen.findByText("Key created. The secret above is shown once.")).toBeTruthy();
+    expect(
+      await screen.findByText("Key created. Copy it now; it will not be shown again."),
+    ).toBeTruthy();
 
     const row = await productionRow();
     fireEvent.click(within(row).getByRole("button", { name: "Revoke…" }));
@@ -160,7 +202,7 @@ describe("revoking a key", () => {
       "Revoked Production ingest. Audit rows naming it still resolve.",
     );
     expect(result.closest("tr")?.previousElementSibling).toBe(row);
-    expect(screen.getByText("Key created. The secret above is shown once.")).toBeTruthy();
+    expect(screen.getByText("Key created. Copy it now; it will not be shown again.")).toBeTruthy();
     expect(screen.queryByText(/Revoked 11/)).toBeNull();
   });
 
@@ -194,6 +236,20 @@ describe("revoking a key", () => {
 });
 
 describe("copying a newly minted secret", () => {
+  it("keeps the next MCP step beside the one-time secret without navigating away", async () => {
+    mount();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
+
+    expect(await screen.findByText("rfp_secret_one")).toBeTruthy();
+    expect(screen.getByText(/Using this key with the MCP/).textContent).toContain("RFPHUB_API_KEY");
+    expect(screen.getByText(/Using this key with the MCP/).textContent).toContain(
+      "Keep this page open",
+    );
+    const guide = screen.getAllByRole("link", { name: "Open MCP setup guide (new tab)" })[0];
+    expect(guide?.getAttribute("target")).toBe("_blank");
+  });
+
   it("reports a successful clipboard write and resets it for the next secret", async () => {
     create
       .mockResolvedValueOnce({ key: key({ id: 33 }), token: "rfp_secret_one" })
@@ -202,7 +258,7 @@ describe("copying a newly minted secret", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
     expect(await screen.findByText("rfp_secret_one")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy key" }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("rfp_secret_one"));
     expect(await screen.findByText("Copied to the clipboard.")).toBeTruthy();
@@ -218,7 +274,7 @@ describe("copying a newly minted secret", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
     expect(await screen.findByText("rfp_secret_one")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy key" }));
 
     expect(
       await screen.findByText("Could not copy to the clipboard. Copy the secret manually."),
@@ -231,7 +287,7 @@ describe("copying a newly minted secret", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
     expect(await screen.findByText("rfp_secret_one")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy key" }));
 
     expect(
       await screen.findByText("Clipboard access is unavailable. Copy the secret manually."),

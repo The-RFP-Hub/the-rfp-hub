@@ -17,6 +17,7 @@ import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
+import { MCP_GUIDE } from "@/lib/links";
 import { CAPABILITY_DENIAL_COPY, ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
@@ -30,7 +31,7 @@ const SCOPES: { value: ApiKeyScope; label: string; detail: string }[] = [
     value: "publish",
     label: "publish",
     detail:
-      "Required for ANY path that publishes immediately — including on an account that could otherwise publish. Without it, an auto-approving submission lands pending instead.",
+      "Allows immediate publication when the account also has that authority. Leave this off for the MCP's reviewed submission flow.",
   },
 ];
 
@@ -82,7 +83,10 @@ function Keys() {
       setSecret(created.token);
       setCopyResult(null);
       setName("");
-      setCreateNote({ kind: "ok", message: "Key created. The secret above is shown once." });
+      setCreateNote({
+        kind: "ok",
+        message: "Key created. Copy it now; it will not be shown again.",
+      });
       reload();
     } catch (error) {
       setCreateNote(actionErrorNote(error, "Could not mint a key."));
@@ -135,13 +139,19 @@ function Keys() {
     }
   };
 
+  const prepareMcpKey = () => {
+    setName((current) => current || "RFP Hub MCP");
+    setScopes(["read", "write"]);
+    document.getElementById("key-name")?.focus();
+  };
+
   return (
     <section>
       <h1>API keys</h1>
       <p className="muted footnote">
-        A key authenticates a machine — an ingestion job, a data partner&rsquo;s pipeline. It can
-        never mint another key, change this account&rsquo;s identity, review anything or grant a
-        role: those need a signed-in session, which is what you are using right now.
+        API keys let integrations submit listings on your behalf. The RFP Hub MCP searches without a
+        key; give it a <code>write</code> key only when you want it to submit. A key cannot manage
+        your account, review a submission or grant a role.
       </p>
 
       {secret ? (
@@ -153,10 +163,20 @@ function Keys() {
             recovered.
           </p>
           <p className="secret">{secret}</p>
+          <p>
+            Using this key with the MCP? Set <code>RFPHUB_API_BASE</code> to{" "}
+            <code className="wrap-anywhere">{api.baseUrl}</code> and store the key as{" "}
+            <code>RFPHUB_API_KEY</code> in your MCP client&rsquo;s private environment. Then restart
+            the client. Keep this page open while you continue. Never paste the key into a prompt,
+            tool argument or terminal command.
+          </p>
           <div className="row">
-            <button type="button" onClick={() => void copySecret()}>
-              Copy
+            <button type="button" className="button-primary" onClick={() => void copySecret()}>
+              Copy key
             </button>
+            <a href={MCP_GUIDE} target="_blank" rel="noopener noreferrer">
+              Open MCP setup guide (new tab)
+            </a>
             <button
               type="button"
               onClick={() => {
@@ -170,6 +190,39 @@ function Keys() {
           </div>
         </div>
       ) : null}
+
+      <section className="card card-strong" aria-labelledby="mcp-setup-heading">
+        <h2 id="mcp-setup-heading">Connect the RFP Hub MCP</h2>
+        <p className="prose">
+          This page is the first step only when an AI client should submit. Search and fetch work
+          anonymously, without an account or key. The server is model-provider agnostic: any MCP
+          client that can launch a local <code>stdio</code> server can use it.
+        </p>
+        <ol className="integration-steps">
+          <li>
+            <strong>Mint safely.</strong> Use <code>read</code> and <code>write</code>; leave{" "}
+            <code>publish</code> off so new submissions wait for review.
+          </li>
+          <li>
+            <strong>Point it at this deployment.</strong> Set <code>RFPHUB_API_BASE</code> to{" "}
+            <code className="wrap-anywhere">{api.baseUrl}</code>, then store the one-time secret as{" "}
+            <code>RFPHUB_API_KEY</code> in the client&rsquo;s private environment.
+          </li>
+          <li>
+            <strong>Install and restart.</strong> Add the client-neutral <code>stdio</code>{" "}
+            connection from the guide to your MCP client. The server will then expose{" "}
+            <code>submit_opportunity</code> and ask for a separate terminal approval before writing.
+          </li>
+        </ol>
+        <div className="row">
+          <button type="button" onClick={prepareMcpKey}>
+            Prepare an MCP key
+          </button>
+          <a href={MCP_GUIDE} target="_blank" rel="noopener noreferrer">
+            Open MCP setup guide (new tab)
+          </a>
+        </div>
+      </section>
 
       <div className="card" id="mint-key">
         <h2>Mint a key</h2>

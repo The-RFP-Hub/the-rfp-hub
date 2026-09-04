@@ -8,13 +8,19 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { request } from "../http.mjs";
+import { requestPublished } from "../retry.mjs";
 
 const execFileAsync = promisify(execFile);
 
 const REGISTRY_BASE = "https://registry.modelcontextprotocol.io/v0";
 const PACKAGE_NAME = "@the-rfp-hub/mcp";
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+export const MCP_REGISTRY_TIMEOUT_FLOOR_MS = 60000;
+
+/** The Registry is an external release channel; its latency must not redefine every other probe. */
+export function mcpRegistryTimeout(timeoutMs) {
+  return Math.max(timeoutMs, MCP_REGISTRY_TIMEOUT_FLOOR_MS);
+}
 
 async function npmView(fields, spec, ctx) {
   try {
@@ -119,7 +125,10 @@ export async function checkMcpPublication(report, ctx) {
   );
 
   const url = `${REGISTRY_BASE}/servers/${encodeURIComponent(expectedName ?? "")}/versions/${encodeURIComponent(version)}`;
-  const res = await request(url, { timeoutMs: ctx.timeoutMs, follow: true });
+  const res = await requestPublished(url, {
+    timeoutMs: mcpRegistryTimeout(ctx.timeoutMs),
+    follow: true,
+  });
   if (!res.ok || res.status !== 200) {
     c.fail(
       `the official MCP Registry carries ${expectedName}@${version}`,

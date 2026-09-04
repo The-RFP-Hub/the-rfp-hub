@@ -216,22 +216,24 @@ document points at itself with an atom `link rel="self"`.
 ## Local development
 
 ```bash
+# Run this block from the repository root.
 # Something may already hold 5432 — a system Postgres, another checkout. Check first:
 #   docker ps --format 'table {{.Names}}\t{{.Ports}}'
 #   lsof -iTCP:5432 -sTCP:LISTEN
 # If it does, `docker compose up -d` fails with "port is already allocated" — the fix is to edit
 # the published port in docker-compose.yml AND the DATABASE_URL below TOGETHER, since they name
 # the same port twice.
-docker compose up -d                     # Postgres 15 + pgvector (see docker-compose.yml)
+docker compose -f packages/api/docker-compose.yml up -d  # Postgres 15 + pgvector
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 
-cp .env-example .env
+cp packages/api/.env-example packages/api/.env
 # Give BETTER_AUTH_SECRET a value that survives a restart: `openssl rand -base64 48` into .env.
 # .env-example explains why an unset one doesn't — a random per-boot secret is generated, so every
 # restart signs every local session out, which presents as "login broke".
 
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
 pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # the committed corpus, offline; --strict reports how many loaded
+pnpm --filter @the-rfp-hub/api jobs embedding-backfill  # local lexical embeddings; a healthy run ends remaining=0
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
 

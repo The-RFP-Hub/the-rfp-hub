@@ -24,6 +24,9 @@ export const REVIEW_CRITERIA = `${REPOSITORY}/blob/main/REVIEW-CRITERIA.md`;
 
 export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md#rfc-process`;
 
+/** Client-specific install and private-environment setup for the RFP Hub MCP server. */
+export const MCP_GUIDE = `${REPOSITORY}/blob/main/packages/mcp/README.md#submit-from-an-agent`;
+
 /** The API's interactive documentation, on whichever API this build talks to. */
 export function apiDocsUrl(apiBaseUrl: string): string {
   return `${apiBaseUrl.replace(/\/+$/, "")}/v1/docs`;

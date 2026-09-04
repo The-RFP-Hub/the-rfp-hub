@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Do API key ao MCP — percurso observado</title>
+    <meta
+      name="description"
+      content="Comparação entre o percurso encontrado durante o teste do RFP Hub MCP e o fluxo corrigido."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&amp;family=Public+Sans:wght@400;500;650;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #fcfcfa;
+        --ink: #1a1917;
+        --ink-soft: #57534e;
+        --line: #d6d3ce;
+        --panel: #f4f3f0;
+        --accent: #6d7123;
+        --accent-soft: #eef1de;
+        --warn: #865700;
+        --warn-soft: #f8edd6;
+        --space-1: 0.25rem;
+        --space-2: 0.5rem;
+        --space-3: 0.75rem;
+        --space-4: 1rem;
+        --space-6: 1.5rem;
+        --space-8: 2rem;
+        --space-12: 3rem;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Public Sans", sans-serif;
+        line-height: 1.5;
+      }
+
+      main {
+        width: min(74rem, calc(100% - 2rem));
+        margin: 0 auto;
+        padding: clamp(2rem, 6vw, 5rem) 0;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
+        align-items: end;
+        gap: var(--space-8);
+        padding-bottom: var(--space-6);
+        border-bottom: 2px solid var(--ink);
+      }
+
+      h1,
+      h2 {
+        font-family: "Archivo", sans-serif;
+        line-height: 1.1;
+        letter-spacing: -0.025em;
+      }
+
+      h1 {
+        max-width: 18ch;
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4.5rem);
+        font-weight: 800;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+      }
+
+      p {
+        max-width: 70ch;
+      }
+
+      .kicker,
+      .meta,
+      .lane-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin: 0 0 var(--space-3);
+        color: var(--accent);
+      }
+
+      .meta {
+        margin: 0;
+        color: var(--ink-soft);
+        text-align: right;
+      }
+
+      .lane {
+        padding: var(--space-12) 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .lane-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(16rem, 34rem);
+        gap: var(--space-8);
+        align-items: start;
+        margin-bottom: var(--space-8);
+      }
+
+      .lane-head p {
+        margin: 0;
+        color: var(--ink-soft);
+      }
+
+      .lane-label {
+        display: block;
+        margin-bottom: var(--space-2);
+        color: var(--ink-soft);
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(8.5rem, 1fr));
+        gap: var(--space-6) var(--space-4);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+
+      .flow li {
+        position: relative;
+        min-height: 9.5rem;
+        padding: var(--space-6) var(--space-4) var(--space-4);
+        border: 1px solid var(--line);
+        background: var(--paper);
+        counter-increment: step;
+      }
+
+      .flow li::before {
+        content: counter(step, decimal-leading-zero);
+        display: block;
+        margin-bottom: var(--space-4);
+        font-family: "Archivo", sans-serif;
+        font-size: 1.35rem;
+        font-weight: 800;
+      }
+
+      .flow li:not(:nth-child(5n))::after {
+        content: "→";
+        position: absolute;
+        top: 50%;
+        right: calc(var(--space-4) * -1 - 0.45rem);
+        z-index: 1;
+        color: var(--ink-soft);
+        font-size: 1.25rem;
+        transform: translateY(-50%);
+      }
+
+      .flow strong {
+        display: block;
+        margin-bottom: var(--space-2);
+        font-size: 0.94rem;
+      }
+
+      .flow span {
+        display: block;
+        color: var(--ink-soft);
+        font-size: 0.82rem;
+      }
+
+      .flow .dead-end {
+        border: 2px solid var(--warn);
+        background: var(--warn-soft);
+      }
+
+      .flow .dead-end::before {
+        color: var(--warn);
+      }
+
+      .flow-fixed {
+        grid-template-columns: repeat(6, minmax(8.5rem, 1fr));
+      }
+
+      .flow-fixed li {
+        min-height: 10rem;
+      }
+
+      .flow-fixed li:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        top: 50%;
+        right: calc(var(--space-4) * -1 - 0.45rem);
+        z-index: 1;
+        color: var(--accent);
+        font-size: 1.25rem;
+        transform: translateY(-50%);
+      }
+
+      .flow-fixed li:nth-child(5)::after {
+        content: "→";
+      }
+
+      .flow-fixed li:last-child::after {
+        content: none;
+      }
+
+      .flow-fixed li::before {
+        color: var(--accent);
+      }
+
+      .verdict {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-8);
+        padding-top: var(--space-12);
+      }
+
+      .verdict section {
+        padding-top: var(--space-4);
+        border-top: 2px solid var(--ink);
+      }
+
+      .verdict h2 {
+        font-size: 1.15rem;
+      }
+
+      .verdict p {
+        margin: var(--space-2) 0 0;
+        color: var(--ink-soft);
+      }
+
+      .verdict strong {
+        color: var(--ink);
+      }
+
+      @media (max-width: 70rem) {
+        .flow,
+        .flow-fixed {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .flow li:not(:nth-child(5n))::after,
+        .flow-fixed li:not(:last-child)::after {
+          content: none;
+        }
+      }
+
+      @media (max-width: 42rem) {
+        header,
+        .lane-head,
+        .verdict {
+          grid-template-columns: 1fr;
+          gap: var(--space-4);
+        }
+
+        .meta {
+          text-align: left;
+        }
+
+        .flow,
+        .flow-fixed {
+          grid-template-columns: 1fr;
+        }
+
+        .flow li,
+        .flow-fixed li {
+          min-height: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="kicker">RFP Hub · auditoria de onboarding</p>
+          <h1>Do API key ao MCP</h1>
+        </div>
+        <p class="meta">Percurso observado<br />ambiente local · 4 set 2026</p>
+      </header>
+
+      <section class="lane" aria-labelledby="before-title">
+        <div class="lane-head">
+          <div>
+            <span class="lane-label">Antes da correção</span>
+            <h2 id="before-title">O caminho que precisei percorrer</h2>
+          </div>
+          <p>
+            A criação da chave era clara. A relação com o MCP desaparecia exatamente quando o
+            segredo surgia e a próxima ação era mais importante.
+          </p>
+        </div>
+        <ol class="flow" aria-label="Percurso original em dez etapas">
+          <li><strong>Entrar na conta</strong><span>Login por código enviado ao e-mail.</span></li>
+          <li><strong>Abrir API keys</strong><span>A navegação leva corretamente à credencial.</span></li>
+          <li><strong>Interpretar escopos</strong><span>Nenhuma orientação dizia qual servia ao MCP.</span></li>
+          <li><strong>Gerar e copiar</strong><span>O segredo aparece uma única vez.</span></li>
+          <li class="dead-end"><strong>Chegar a um beco sem saída</strong><span>Não havia MCP, link ou próxima etapa na tela.</span></li>
+          <li><strong>Vasculhar o rodapé</strong><span>“API &amp; data” abre Swagger; “GitHub” é genérico.</span></li>
+          <li><strong>Abrir o repositório</strong><span>Primeira troca de contexto sem indicação.</span></li>
+          <li><strong>Achar o pacote MCP</strong><span>Foi preciso reconhecer o pacote na tabela raiz.</span></li>
+          <li><strong>Inferir a configuração</strong><span>Descobrir API base, chave, cliente e reinício.</span></li>
+          <li><strong>Testar a submissão</strong><span>Preview, aprovação no terminal e segundo chamado.</span></li>
+        </ol>
+      </section>
+
+      <section class="lane" aria-labelledby="after-title">
+        <div class="lane-head">
+          <div>
+            <span class="lane-label">Depois da correção</span>
+            <h2 id="after-title">O percurso que a interface passa a ensinar</h2>
+          </div>
+          <p>
+            A tela separa pesquisa anônima de submissão, prepara a chave mínima e mantém o segredo
+            aberto enquanto o guia versionado aparece em outra aba.
+          </p>
+        </div>
+        <ol class="flow flow-fixed" aria-label="Percurso corrigido em seis etapas">
+          <li><strong>Abrir API keys</strong><span>A própria introdução apresenta o MCP.</span></li>
+          <li><strong>Escolher o objetivo</strong><span>Pesquisar sem chave ou permitir submissão.</span></li>
+          <li><strong>Preparar chave MCP</strong><span><code>read</code> + <code>write</code>; <code>publish</code> desligado.</span></li>
+          <li><strong>Copiar uma vez</strong><span>A tela mostra também o API base exato.</span></li>
+          <li><strong>Abrir o guia</strong><span>Nova aba; o segredo continua visível na primeira.</span></li>
+          <li><strong>Reiniciar e submeter</strong><span>Preview → aprovação → escrita pendente de revisão.</span></li>
+        </ol>
+      </section>
+
+      <div class="verdict" aria-label="Comparação resumida">
+        <section>
+          <h2>Antes: não era simples</h2>
+          <p><strong>10 etapas, três mudanças de contexto e um link ausente.</strong> Só chegava ao MCP quem já sabia que ele existia e onde procurar.</p>
+        </section>
+        <section>
+          <h2>Depois: linear e verificável</h2>
+          <p><strong>6 etapas e uma mudança de contexto intencional.</strong> A próxima ação permanece visível e nenhuma etapa exige adivinhação.</p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

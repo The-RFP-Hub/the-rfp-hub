@@ -283,8 +283,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         description:
           "True for a create, including an identical repeat of one (which returns 200 with the original result rather than a conflict).",
       },
-      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
-      isListed: { type: "boolean" },
+      reviewStatus: {
+        type: "string",
+        enum: ["pending", "approved", "rejected"],
+        description: "The review decision. Only `approved` entries can reach public reads.",
+      },
+      isListed: {
+        type: "boolean",
+        description:
+          "The stored listing preference, not current public visibility. The entry is public only when this is true and `reviewStatus` is `approved`.",
+      },
       warnings: {
         type: "array",
         items: { type: "string" },

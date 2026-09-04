@@ -89,8 +89,20 @@ const submittedSchema = z.object({
   status: z.literal("submitted"),
   id: z.string().describe("Promoted here from `opportunity.id` in the API's reply."),
   created: z.boolean(),
-  reviewStatus: z.string(),
-  isListed: z.boolean(),
+  reviewStatus: z
+    .enum(["pending", "approved", "rejected"])
+    .describe("The review decision. Only `approved` can be publicly visible."),
+  isListed: z
+    .boolean()
+    .describe(
+      "The stored listing preference, not current public visibility. A listing is public only when this is true and `reviewStatus` is `approved`.",
+    ),
+  isPubliclyVisible: z
+    .boolean()
+    .describe("Derived from `reviewStatus === approved && isListed === true`."),
+  publicVisibilityExplanation: z
+    .string()
+    .describe("Human-readable reason the submitted entry is or is not publicly visible."),
   warnings: z.array(z.string()),
   duplicateCheck: z.enum(["ok", "unavailable", "disabled"]),
   duplicateCheckExplanation: z.string(),
@@ -137,6 +149,26 @@ export function explainDuplicateCheck(
       throw new Error(`unhandled duplicateCheck: ${String(unhandled)}`);
     }
   }
+}
+
+/** `isListed` is a preference; public reads apply the review gate as well. */
+export function explainPublicVisibility(
+  reviewStatus: SubmissionResult["reviewStatus"],
+  isListed: boolean,
+): string {
+  if (reviewStatus === "approved" && isListed) {
+    return "It is visible on the public site.";
+  }
+  if (reviewStatus === "approved") {
+    return "It is approved but NOT visible on the public site because its listing preference is hidden.";
+  }
+  if (reviewStatus === "pending" && isListed) {
+    return "It is NOT on the public site yet. Its listing preference is public, so it will appear if a reviewer approves it.";
+  }
+  if (reviewStatus === "pending") {
+    return "It is NOT on the public site yet. It is awaiting review and its listing preference is hidden.";
+  }
+  return "It is NOT on the public site because the review decision is rejected.";
 }
 
 /**
@@ -473,12 +505,19 @@ export function renderSubmission(submission: SubmissionResult): ToolSuccess {
     submission.duplicateCheck,
     duplicates.length,
   );
+  const isPubliclyVisible = submission.reviewStatus === "approved" && submission.isListed;
+  const publicVisibilityExplanation = explainPublicVisibility(
+    submission.reviewStatus,
+    submission.isListed,
+  );
   const structured = {
     status: "submitted" as const,
     id,
     created: submission.created,
     reviewStatus: submission.reviewStatus,
     isListed: submission.isListed,
+    isPubliclyVisible,
+    publicVisibilityExplanation,
     warnings: submission.warnings ?? [],
     duplicateCheck: submission.duplicateCheck,
     duplicateCheckExplanation,
@@ -489,15 +528,13 @@ export function renderSubmission(submission: SubmissionResult): ToolSuccess {
       "object has no top-level id field.",
   };
 
-  const listing = submission.isListed
-    ? "It is listed on the public site."
-    : "It is NOT on the public site yet — an entry awaiting review is visible only through " +
-      "`GET /v1/me/opportunities`.";
-
   const text = [
     `Submitted. id: ${id}`,
     `  ${submission.created ? "Created a new entry." : "Replaced an existing entry."}`,
-    `  Review status: ${submission.reviewStatus}. ${listing}`,
+    `  Review status: ${submission.reviewStatus}. ${publicVisibilityExplanation}`,
+    ...(!isPubliclyVisible
+      ? ["  The owner can inspect it through `GET /v1/me/opportunities`."]
+      : []),
     "",
     duplicateCheckExplanation,
     ...(duplicates.length > 0 ? [DUPLICATES_NOTICE] : []),
