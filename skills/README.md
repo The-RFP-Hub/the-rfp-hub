@@ -52,7 +52,7 @@ cp -R skills/funding-search ~/.claude/skills/
 
 # Codex CLI — project-local or global
 cp -R skills/funding-search .agents/skills/
-cp -R skills/funding-search ~/.agents/skills/
+cp -R skills/funding-search ~/.codex/skills/
 
 # Cursor — project-local or global (cursor.com/docs/skills confirms both; also honors .claude/skills
 # and .codex/skills for compatibility, so the Claude Code and Codex copies above work too)

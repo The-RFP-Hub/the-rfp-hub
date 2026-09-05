@@ -30,7 +30,10 @@ import {
   HOW_IT_WORKS,
   HOW_IT_WORKS_ROLES,
   PUBLISHERS,
+  PUBLISHERS_DOC,
   REPOSITORY,
+  REVIEW_CRITERIA,
+  RFC_PROCESS,
   STANDARD,
   apiDocsUrl,
 } from "@/lib/links";
@@ -487,6 +490,15 @@ export function Chrome({ children }: { children: ReactNode }) {
         </a>
         <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
           Governance
+        </a>
+        <a href={REVIEW_CRITERIA} target="_blank" rel="noopener noreferrer">
+          Review criteria
+        </a>
+        <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
+          Publisher program
+        </a>
+        <a href={RFC_PROCESS} target="_blank" rel="noopener noreferrer">
+          RFC process
         </a>
         <GuardedLink href="/privacy">Privacy</GuardedLink>
         <GuardedLink href="/terms">Terms</GuardedLink>

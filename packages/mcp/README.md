@@ -76,6 +76,10 @@ Those commands install anonymous search and fetch. For submission, add `RFPHUB_A
 `RFPHUB_API_KEY` to the server's private environment using Claude's local or user configuration;
 keep a shared project `.mcp.json` secret-free.
 
+A project-scoped server (`--scope project`) shows as "Pending approval" until `claude` is run
+interactively once in that directory. Headless use — CI, scripts, `claude -p` — needs `claude -p
+... --mcp-config .mcp.json --strict-mcp-config` to load it without that interactive step.
+
 #### Claude Desktop and Cursor
 
 Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
@@ -249,8 +253,10 @@ context window. Ask for a full record by id when you actually need the prose.
 
 One record in full, as an RFP Hub Standard document, inside an envelope of
 `{ notice, opportunity, links }`. The document is **structurally unmodified** — no field removed,
-none added, no value changed. Not byte-identical: it is parsed and re-serialized on the way
-through, so key order and whitespace are the transport's business.
+none added, no value changed — except that any value shaped like an API key is replaced with a
+redaction marker on every outbound message, this one included. Not byte-identical otherwise: it is
+parsed and re-serialized on the way through, so key order and whitespace are the transport's
+business.
 
 ### `submit_opportunity` *(write — registered only when a key is configured)*
 
@@ -295,13 +301,14 @@ An approval is not merely "this document was approved". Its id is a hash over **
 | **document** | SHA-256 over the document's canonical form |
 
 Change any one of them and the approval no longer applies, and the refusal names which one moved.
-An approval granted against staging cannot be spent against production; one granted under a key
-you have since rotated cannot be spent under the new one.
+An approval granted against staging cannot be spent against production. One granted under a key
+is refused after that key is rotated, because the binding is the key's fingerprint.
 
 The approval is **single-use**, claimed by an atomic rename *before* the request goes out, and it
 is **never restored** — including after a timeout. If a submission's outcome is ambiguous, check
 `GET /v1/me/opportunities` (the public read hides entries awaiting review) before doing anything
-else. Approvals expire 15 minutes after the preview.
+else. A pending preview expires 15 minutes after it is taken; approving it opens a fresh 15-minute
+window for the submission.
 
 ### What this does — and what it does not
 
