@@ -597,9 +597,11 @@ gh workflow run npm-publish.yml -f ref=@the-rfp-hub/mcp@0.1.3 -f package=@the-rf
 ### 7.6 Prove the `next` tag, then promote
 
 ```sh no-run
-pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser \
-  --only mcp --only mcp-publication --mcp-spec next
-npm dist-tag add @the-rfp-hub/mcp@<version> latest    # only after the M4 profile is green
+pnpm check:deployment --site https://example.org --api https://api.example.org --browser \
+  --only mcp --mcp-spec next                        # --only and --milestone do not combine
+npm dist-tag add @the-rfp-hub/mcp@<version> latest    # only after the mcp criterion is green
+pnpm check:deployment --site https://example.org --api https://api.example.org --browser \
+  --only mcp-publication                            # after §7.7: npm latest AND the Registry
 ```
 
 `--mcp-spec next` is what makes the `mcp` check spawn `npx -y @the-rfp-hub/mcp@next` — the
