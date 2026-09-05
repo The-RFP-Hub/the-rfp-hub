@@ -61,6 +61,13 @@ describe("server.json agrees with the package", () => {
     if (pkg.version !== "0.0.0") expect(pkg.version).toBe(manifest.version);
   });
 
+  /** `server.json` ships INSIDE the tarball, so a manifest left behind is published as part of the
+   * release it disagrees with — 0.1.2 did exactly that. Both fields, checked unconditionally. */
+  it("carries package.json's version in both of its version fields", () => {
+    expect(manifest.version).toBe(pkg.version);
+    expect(manifest.packages[0]?.version).toBe(pkg.version);
+  });
+
   it("declares stdio, which is the only transport this build serves", () => {
     expect(manifest.packages[0]?.transport.type).toBe("stdio");
   });

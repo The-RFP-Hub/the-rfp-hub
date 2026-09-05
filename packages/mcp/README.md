@@ -47,7 +47,7 @@ Every compatible client receives the same connection contract:
 |---|---|
 | Transport | `stdio` |
 | Command | `npx` |
-| Arguments | `-y`, `@the-rfp-hub/mcp@0.1.2` |
+| Arguments | `-y`, `@the-rfp-hub/mcp@0.1.3` |
 | Search and fetch | No environment variables; two anonymous read tools are exposed. |
 | Submission | Add `RFPHUB_API_BASE` and `RFPHUB_API_KEY` to the server process's private environment; the write tool is then exposed. |
 
@@ -66,10 +66,10 @@ anonymous search and fetch.
 #### Claude Code
 
 ```sh
-claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 
 # project-scoped instead of user-scoped — writes .mcp.json in the repo
-claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 ```
 
 Those commands install anonymous search and fetch. For submission, add `RFPHUB_API_BASE` and
@@ -85,7 +85,7 @@ Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_BASE": "https://api.ethrfps.app",
         "RFPHUB_API_KEY": "rfph_…"
@@ -105,7 +105,7 @@ Root key `servers`, in `.vscode/mcp.json`:
     "rfp-hub": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_BASE": "https://api.ethrfps.app",
         "RFPHUB_API_KEY": "${input:rfphub-key}"
@@ -126,7 +126,7 @@ Root key `servers`, in `.vscode/mcp.json`:
 #### Codex CLI
 
 ```sh
-codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 ```
 
 That command installs anonymous search and fetch. For submission, edit `~/.codex/config.toml` (or a
@@ -138,7 +138,7 @@ restart Codex. This follows the
 ```toml
 [mcp_servers.rfp-hub]
 command = "npx"
-args = ["-y", "@the-rfp-hub/mcp@0.1.2"]
+args = ["-y", "@the-rfp-hub/mcp@0.1.3"]
 
 [mcp_servers.rfp-hub.env]
 RFPHUB_API_BASE = "https://api.ethrfps.app"
@@ -215,7 +215,7 @@ there is no parameter on any tool through which one could be passed, and a test 
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_KEY": "rfph_…"
       }
@@ -271,7 +271,7 @@ still waits for review.
        { status: "pending", approvalId: "<64 hex>", preview: {...}, instruction: "..." }
 
 2. a person runs, in their own terminal:
-     npx @the-rfp-hub/mcp@0.1.2 approve <approvalId>
+     npx @the-rfp-hub/mcp@0.1.3 approve <approvalId>
      → prints the destination, the credential fingerprint, the operation, the protocol
        revision and the whole document, then asks for confirmation
 
@@ -383,7 +383,7 @@ another identity. This server refuses rather than guesses — see below.
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2", "--state-dir", "/var/lib/rfphub"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3", "--state-dir", "/var/lib/rfphub"]
     }
   }
 }
