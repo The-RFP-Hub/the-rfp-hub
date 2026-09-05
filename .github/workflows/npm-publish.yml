@@ -1,6 +1,6 @@
-# Publishes one workspace package to npm with provenance. A workflow, not a laptop command:
-# provenance is an attestation signed for an OIDC identity, and a laptop has none. See
-# docs/deployment.md §7.5.
+# Publishes one workspace package to npm with provenance, through npm trusted publishing: the job's
+# OIDC identity is the credential, so there is no token to store or rotate. A laptop has no such
+# identity, which is why this is a workflow. See docs/deployment.md §7.5.
 name: npm Publish
 
 on:
@@ -68,7 +68,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5 or newer; the npm bundled with Node 22 is older.
+      - run: npm install -g npm@latest && npm --version
 
       - run: pnpm install --frozen-lockfile
 
@@ -102,11 +104,12 @@ jobs:
             exit 1
           fi
           echo "VERSION=${expected}" >> "$GITHUB_ENV"
+          echo "TARBALL=${tarball}" >> "$GITHUB_ENV"
 
+      # The tarball pnpm packed (workspace:* already rewritten), published by npm itself: npm is what
+      # exchanges the OIDC token for the trusted-publishing credential.
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm --filter "${PKG}" publish --access public --tag "${TAG}" --provenance --no-git-checks
+        run: npm publish "${TARBALL}" --access public --tag "${TAG}" --provenance
 
       - name: The registry serves an attestation
         run: |
