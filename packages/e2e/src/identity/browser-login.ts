@@ -100,22 +100,21 @@ export async function login(input: BrowserLoginInput): Promise<BrowserLoginResul
     await codeField.fill(otp);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
-    // `Log out` is the product's own signal that the session was established.
-    await page.getByRole("button", { name: "Log out" }).waitFor({ state: "visible", timeout });
+    // The disclosure button renders only for an authenticated session, so waiting for it is the
+    // sign-in signal; opening it is what exposes `Log out` and the account-scoped `Your listings`,
+    // proof the API accepted this browser's token rather than merely that the code was correct.
+    // Escape closes the panel again so `storageState` — and whatever reads it next — starts closed.
+    const menu = page.getByRole("button", { name: /navigation menu/i });
+    await menu.waitFor({ state: "visible", timeout });
+    await menu.click();
 
-    // …and the sections navigation renders only after `/v1/me` resolves, so waiting for a
-    // capability-gated link is what proves the API accepted this browser's token — not merely that
-    // the code was correct. `Directory` would not do: it is public and present for a stranger; nor
-    // would `How it works`, which joined it in the public group.
-    //
-    // THE LABEL IS `Your listings`, NOT `Listings`. The navigation is grouped now — what anybody may
-    // read, what this account owns, what a staff role may do — and the account group says whose
-    // things these are. The assertion is unchanged in meaning: an account-scoped link, rendered only
-    // from what `GET /v1/me` answered.
-    await page.getByRole("link", { name: "Your listings", exact: true }).waitFor({
+    const sections = page.getByRole("navigation", { name: "Sections" });
+    await sections.getByRole("link", { name: "Your listings", exact: true }).waitFor({
       state: "visible",
       timeout,
     });
+    await page.getByRole("button", { name: "Log out" }).waitFor({ state: "visible", timeout });
+    await page.keyboard.press("Escape");
 
     const stored = await page.evaluate(
       (key) => globalThis.localStorage?.getItem(key) ?? null,
