@@ -188,6 +188,18 @@ export function apiErrorToToolError(
   );
 }
 
+/**
+ * The write path's scope rule, worded once. `write` alone is what makes a submission wait for a
+ * reviewer; `publish` would make an approved one live at once. Names the variable, never the value.
+ */
+export function keyScopeError(reason: string): ToolError {
+  return new ToolError(
+    "policy_denied",
+    `${reason} Submitting needs a key that carries \`write\` and does not carry \`publish\`. Mint a \`write\`-only key on the deployment's API keys page, put it in RFPHUB_API_KEY in the MCP client's env block, and restart the server. Nothing was validated, previewed or sent, so no approval was spent and the key is never echoed here.`,
+    { scopeCheck: true },
+  );
+}
+
 /** A proxy page, a truncated stream — not the API's JSON envelope. */
 export function nonJsonResponseError(status: number, operation: string): ToolError {
   return new ToolError(

@@ -29,7 +29,12 @@ export class RecordingServer {
           receivedAt: new Date().toISOString(),
         });
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ items: [], total: 0 }));
+        // The write tool's scope preflight asks what the credential may do before phase 1 runs,
+        // and refuses a key that is not scoped for review. This mock answers as one that is.
+        const body = (req.url ?? "").startsWith("/v1/me")
+          ? { credentialKind: "api_key", scopes: ["read", "write"] }
+          : { items: [], total: 0 };
+        res.end(JSON.stringify(body));
       });
     });
     await new Promise((resolve, reject) => {

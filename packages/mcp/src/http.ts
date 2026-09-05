@@ -27,6 +27,9 @@ export const MAX_RETRY_AFTER_MS = 5_000;
 /** How much of a redirect's `Location` is reported back. It is attacker-controlled text. */
 export const MAX_LOCATION_CHARS = 200;
 
+/** Named in the transport diagnostics of the one authenticated read. */
+const CREDENTIAL_OPERATION = "the credential scope check";
+
 export interface Paginated<T> {
   items: T[];
   page: number;
@@ -232,6 +235,42 @@ export class ApiClient {
     return body as Opportunity;
   }
 
+  /** `GET /v1/me` — the ONE read that carries the credential, because it is a question ABOUT the
+   * credential. The status is handed back rather than mapped: `src/scope.ts` words what it means. */
+  async describeCredential(): Promise<{ status: number; body: unknown }> {
+    if (this.config.apiKey === null) {
+      throw new ToolError(
+        "policy_denied",
+        "No credential is configured. Set RFPHUB_API_KEY in the MCP client's env block; it is never accepted as a tool argument.",
+      );
+    }
+    const { res, deadline } = await this.attempt(
+      `${this.config.apiBase}/v1/me`,
+      CREDENTIAL_OPERATION,
+      { authorization: `Bearer ${this.config.apiKey}` },
+    );
+    let raw: string;
+    try {
+      raw = await readCapped(res);
+    } catch (err) {
+      if (err instanceof ResponseTooLargeError)
+        throw this.tooLarge(err.bytes, CREDENTIAL_OPERATION);
+      if (deadline.expired()) throw this.timedOut(CREDENTIAL_OPERATION);
+      throw new ToolError(
+        "exec_failed",
+        `The API's response to ${CREDENTIAL_OPERATION} ended before it could be read. Nothing was returned.`,
+        { cause: err instanceof Error ? err.message : String(err) },
+      );
+    } finally {
+      deadline.done();
+    }
+    try {
+      return { status: res.status, body: raw.length ? JSON.parse(raw) : undefined };
+    } catch {
+      throw nonJsonResponseError(res.status, CREDENTIAL_OPERATION);
+    }
+  }
+
   /** `POST /v1/opportunities`. NO retry at any status; every failure in flight is ambiguous. */
   async submitOpportunity(document: unknown): Promise<SubmissionResult> {
     if (this.config.apiKey === null) {
@@ -362,13 +401,17 @@ export class ApiClient {
   }
 
   /** The deadline stays armed through the body: a peer that stalls mid-body is the same hang. */
-  private async attempt(url: string, operation: string): Promise<InFlight> {
+  private async attempt(
+    url: string,
+    operation: string,
+    // Empty for every public read: see the file header, rule 1. Only `/v1/me` passes one.
+    extraHeaders: Record<string, string> = {},
+  ): Promise<InFlight> {
     const deadline = newDeadline(this.config.timeoutMs);
     try {
-      // Deliberately no `authorization` header: see the file header, rule 1.
       const res = await this.fetchImpl(url, {
         method: "GET",
-        headers: { accept: "application/json" },
+        headers: { accept: "application/json", ...extraHeaders },
         signal: deadline.signal,
       });
       return { res, deadline };

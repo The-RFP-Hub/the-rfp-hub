@@ -14,7 +14,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FAKE_KEY, listPage, summaryItem, tempHome } from "./helpers.js";
+import { FAKE_KEY, WRITE_ONLY_CREDENTIAL, listPage, summaryItem, tempHome } from "./helpers.js";
 
 const CLI = path.resolve(import.meta.dirname, "../dist/cli.js");
 
@@ -33,6 +33,11 @@ beforeAll(async () => {
       authorization: req.headers.authorization,
     });
     res.writeHead(200, { "content-type": "application/json" });
+    if ((req.url ?? "").startsWith("/v1/me")) {
+      // The write tool's scope preflight. A key scoped for review is what this suite exercises.
+      res.end(JSON.stringify(WRITE_ONLY_CREDENTIAL));
+      return;
+    }
     res.end(
       JSON.stringify(
         listPage([
@@ -245,8 +250,9 @@ describe("the edges of the stdio boundary", () => {
     return `${'{"deeper":'.repeat(depth)}{"leaf":true}${"}".repeat(depth)}`;
   }
 
-  it("answers a pathologically nested document with a code, and sends nothing to the API", async () => {
-    const before = requests.length;
+  it("answers a pathologically nested document with a code, and writes nothing to the API", async () => {
+    const writes = () => requests.filter((r) => r.method !== "GET" && r.method !== "HEAD").length;
+    const before = writes();
     const s = session({ RFPHUB_API_KEY: FAKE_KEY });
     try {
       const document = `{"id":"example-org:x","nested":${nested(5_000)}}`;
@@ -256,7 +262,7 @@ describe("the edges of the stdio boundary", () => {
       const text = JSON.stringify(reply);
       expect(text).toMatch(/\[(invalid_input|exec_failed)\]/);
       expect(text).not.toContain(FAKE_KEY);
-      expect(requests.length).toBe(before);
+      expect(writes()).toBe(before);
     } finally {
       s.stop();
     }

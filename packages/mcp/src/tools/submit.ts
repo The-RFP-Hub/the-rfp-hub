@@ -3,6 +3,7 @@
  *
  * PHASE 0 refuses a credential inside the document before a request exists: the API stores the text
  * it is given, so a key in `description` would be persisted and only then redacted out of the reply.
+ * It then proves the configured key's scope, once per process, before anything else runs.
  * PHASE 1 validates locally, writes a 0600 pending record and returns `status: "pending"` plus a
  * public digest — NO SECRET, because a token returned in the tool's own response is spendable by
  * the same model in the same turn. PHASE 2 happens at a person's terminal, outside this file.
@@ -29,6 +30,7 @@ import { cliCommand } from "../config.js";
 import { ToolError } from "../errors.js";
 import type { SubmissionResult } from "../http.js";
 import { findSecretPaths } from "../redact.js";
+import { assertKeyMaySubmit } from "../scope.js";
 import { DUPLICATES_NOTICE, SUBMIT_NOTICE, delimit, truncate } from "../untrusted.js";
 import type { ToolContext, ToolSuccess } from "./context.js";
 
@@ -329,6 +331,10 @@ export async function run(input: SubmitInput, ctx: ToolContext): Promise<ToolSuc
         "cannot succeed.",
     );
   }
+
+  // Still phase 0: what the key may do decides whether a submission can wait for review at all, so
+  // it is settled before local validation and before any pending record exists.
+  await assertKeyMaySubmit(ctx.api);
 
   const result = validateOpportunity(input.document);
   if (!result.valid) {

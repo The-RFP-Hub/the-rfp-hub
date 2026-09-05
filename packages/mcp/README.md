@@ -25,8 +25,8 @@ credential. To let it submit:
 4. Configure the client-neutral `stdio` connection below, then put the origin in `RFPHUB_API_BASE`
    and the secret in `RFPHUB_API_KEY` inside the client's private MCP environment. Never put the
    secret in a prompt, tool argument or shell command.
-5. Restart the client. `tools/list` now includes `submit_opportunity`; its first call only previews,
-   and a separate terminal approval is still required before the second call writes.
+5. Restart the client. `tools/list` now includes `submit_opportunity`; its first call checks the
+   key's scope and only previews, and a terminal approval is still required before a call writes.
 
 The API keys page is the handoff: it creates the credential and links back here in a new tab, so
 the one-time secret remains visible while you configure the client.
@@ -224,8 +224,8 @@ there is no parameter on any tool through which one could be passed, and a test 
 }
 ```
 
-Use a **`write`-scoped** key, not a `publish`-scoped one. With `write` alone, a submission lands
-pending a reviewer's decision by construction — the safe mode needs no extra configuration.
+The key must carry `write` and must not carry `publish`, and this server checks that before its
+first submission. A `publish` key is refused, because an approved submission would go live at once.
 
 ---
 
@@ -267,7 +267,7 @@ still waits for review.
 
 ```
 1. call submit_opportunity { document }
-     → validates locally, writes nothing, returns:
+     → checks the key's scope, validates locally, writes nothing, returns:
        { status: "pending", approvalId: "<64 hex>", preview: {...}, instruction: "..." }
 
 2. a person runs, in their own terminal:
@@ -331,7 +331,7 @@ Every failure carries one of seven codes.
 |---|---|
 | `tool_not_found` | No such tool. With submitting disabled, the write tool is genuinely not registered. |
 | `invalid_input` | The arguments or the document did not validate. A schema failure is reported field by field. |
-| `policy_denied` | Refused by configuration or by the API's authorization: no credential, a missing scope, or the pending-submission ceiling. |
+| `policy_denied` | Refused by configuration or by the API's authorization: no credential, a key that lacks `write` or carries `publish`, or the pending-submission ceiling. |
 | `rate_limited` | A local per-kind budget, or the API's own limiter. |
 | `confirmation_required` | The document was previewed but not approved. Nothing was sent. |
 | `confirmation_invalid` | The approval does not apply: expired, already used, or bound to a different destination, credential, protocol or document. Nothing was sent. |

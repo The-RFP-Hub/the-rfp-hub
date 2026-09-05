@@ -26,7 +26,7 @@
         },
         {
           "name": "RFPHUB_API_KEY",
-          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. A write-scoped key is recommended: its submissions land pending a reviewer's decision.",
+          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. The key must carry the write scope and must not carry publish; the server checks that before its first submission, so a submission waits for a reviewer's decision.",
           "isRequired": false,
           "isSecret": true
         }

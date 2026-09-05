@@ -89,32 +89,52 @@ export interface StubCall {
   init: RequestInit | undefined;
 }
 
+export interface StubResponse {
+  status?: number;
+  body?: unknown;
+  headers?: Record<string, string>;
+  raw?: string;
+}
+
 export interface Stub {
   calls: StubCall[];
+  /** The scope preflight's `GET /v1/me`, kept OUT of `calls` and the queue so every "nothing was
+   * sent" assertion still speaks about the search, fetch and submission paths alone. */
+  meCalls: StubCall[];
   fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
 }
 
+/** What `GET /v1/me` says about a key scoped exactly as the write path needs. */
+export const WRITE_ONLY_CREDENTIAL = { credentialKind: "api_key", scopes: ["read", "write"] };
+
 /** A `fetch` stand-in that answers from a queue and records what it was asked. */
-export function stubFetch(
-  responses: { status?: number; body?: unknown; headers?: Record<string, string>; raw?: string }[],
-): Stub {
+export function stubFetch(responses: StubResponse[], options: { me?: StubResponse } = {}): Stub {
   const calls: StubCall[] = [];
+  const meCalls: StubCall[] = [];
   let index = 0;
+  const respond = (spec: StubResponse | undefined): Response => {
+    if (spec === undefined) throw new Error("stubFetch: no response configured");
+    const body = spec.raw ?? (spec.body === undefined ? "" : JSON.stringify(spec.body));
+    const status = spec.status ?? 200;
+    // 204/205/304 may carry no body at all — the `Response` constructor refuses even "".
+    const nullBody = status === 204 || status === 205 || status === 304;
+    return new Response(nullBody ? null : body, {
+      status,
+      headers: { "content-type": "application/json", ...(spec.headers ?? {}) },
+    });
+  };
   return {
     calls,
+    meCalls,
     fetchImpl: async (url, init) => {
+      if (new URL(url).pathname === "/v1/me") {
+        meCalls.push({ url, init });
+        return respond(options.me ?? { body: WRITE_ONLY_CREDENTIAL });
+      }
       calls.push({ url, init });
       const spec = responses[Math.min(index, responses.length - 1)];
       index += 1;
-      if (spec === undefined) throw new Error("stubFetch: no response configured");
-      const body = spec.raw ?? (spec.body === undefined ? "" : JSON.stringify(spec.body));
-      const status = spec.status ?? 200;
-      // 204/205/304 may carry no body at all — the `Response` constructor refuses even "".
-      const nullBody = status === 204 || status === 205 || status === 304;
-      return new Response(nullBody ? null : body, {
-        status,
-        headers: { "content-type": "application/json", ...(spec.headers ?? {}) },
-      });
+      return respond(spec);
     },
   };
 }
