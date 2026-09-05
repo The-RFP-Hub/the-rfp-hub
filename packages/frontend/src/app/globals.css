@@ -501,9 +501,11 @@ caption {
   color: var(--ink);
 }
 
+/* Seven characters, and never two lines: a wrapped wordmark turns the header into two rows. */
 .brand-text {
   display: flex;
   flex-direction: column;
+  white-space: nowrap;
 }
 
 .brand-tagline {
@@ -2293,11 +2295,22 @@ pre.untrusted-block {
 }
 
 /* At the narrowest supported width the utility row yields one redundant account icon, while the
- * bell and both text labels remain unambiguous and every target remains 44px. */
+ * bell and both text labels remain unambiguous and every target remains 44px. Signed in it still
+ * did not fit — wordmark, bell and "Menu" asked ~300px of the 288 available, wrapping "RFP Hub"
+ * onto a second row — so the wordmark steps down a size and two gaps tighten to buy that back. */
 @media (max-width: 22rem) {
   .brand-tagline,
   .shell-menu-user {
     display: none;
+  }
+
+  .shell-header {
+    gap: var(--space-2);
+  }
+
+  .brand {
+    gap: var(--space-2);
+    font-size: var(--text-h3);
   }
 
   .shell-menu-toggle {

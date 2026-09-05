@@ -70,6 +70,14 @@ interface NavItem {
   requires?: (me: Me) => boolean;
 }
 
+/**
+ * The count a reader SEES, capped at three characters so a busy inbox cannot reflow a header that
+ * has 288px to spend at 320px. The `aria-label` beside it still announces the exact number.
+ */
+function badgeText(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
 /** Readable to everybody, session or not. */
 const PUBLIC_NAV: NavItem[] = [
   { href: "/", label: "Directory", icon: ListBulletIcon },
@@ -198,7 +206,7 @@ function NavLinks({
                     className="shell-nav-count"
                     aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
                   >
-                    {item.badge}
+                    {badgeText(item.badge)}
                   </span>
                 ) : null}
               </IconLabel>
@@ -359,7 +367,7 @@ export function Chrome({ children }: { children: ReactNode }) {
                     <span className="shell-notifications-label">Notifications</span>
                     {notifications.badge ? (
                       <span className="shell-nav-count" aria-hidden="true">
-                        {notifications.badge}
+                        {badgeText(notifications.badge)}
                       </span>
                     ) : null}
                   </IconLabel>
