@@ -37,6 +37,7 @@ import { run } from "../src/tools/submit.js";
 import {
   FAKE_KEY,
   OTHER_FAKE_KEY,
+  WRITE_ONLY_CREDENTIAL,
   rejection,
   stubFetch,
   tempHome,
@@ -247,7 +248,14 @@ describe("phase 3 — commit", () => {
     const ctx: ToolContext = {
       config,
       api: new ApiClient(config, {
-        fetchImpl: async () => {
+        // Everything but the scope preflight drops the connection: it is the WRITE whose outcome
+        // this test is about.
+        fetchImpl: async (url) => {
+          if (new URL(url).pathname === "/v1/me") {
+            return new Response(JSON.stringify(WRITE_ONLY_CREDENTIAL), {
+              headers: { "content-type": "application/json" },
+            });
+          }
           throw new Error("ECONNRESET");
         },
       }),

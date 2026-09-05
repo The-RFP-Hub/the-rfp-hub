@@ -112,11 +112,26 @@ describe("a key the write path may use", () => {
     expect(headers.authorization).toBe(`Bearer ${FAKE_KEY}`);
   });
 
-  it("asks once for the life of the process", async () => {
+  it("asks once for the life of the client", async () => {
     const { ctx, stub } = context();
     await run({ document: validDocument() }, ctx);
     await run({ document: validDocument({ title: "A Second Program" }) }, ctx);
     expect(stub.meCalls).toHaveLength(1);
+  });
+
+  /** One process can hold two servers on two credentials, and a verdict about one key says
+   * nothing about the other. */
+  it("does not lend its verdict to a second client in the same process", async () => {
+    const allowed = context();
+    await run({ document: validDocument() }, allowed.ctx);
+    expect(allowed.stub.meCalls).toHaveLength(1);
+
+    const refused = context({
+      body: { credentialKind: "api_key", scopes: ["read", "publish"] },
+    });
+    const error = await rejection(run({ document: validDocument() }, refused.ctx));
+    expect(error.code).toBe("policy_denied");
+    expect(refused.stub.meCalls).toHaveLength(1);
   });
 });
 
@@ -165,9 +180,11 @@ describe("the facts are read off the body rather than trusted", () => {
     expect(scopeRefusal({ credentialKind: "api_key", scopes: ["read", "write"] })).toBeNull();
   });
 
-  it("names both faults when a key has neither property right", () => {
-    const refusal = scopeRefusal({ credentialKind: "api_key", scopes: ["publish"] }) ?? "";
-    expect(refusal).toContain("does not carry `write`");
-    expect(refusal).toContain("carries `publish`");
+  /** The API's `canWriteWith` accepts `write` OR `publish`, so a `publish` key is not ALSO
+   * missing `write` — saying so would send someone to mint the scope they already outrank. */
+  it("refuses a `publish` key for publishing, never for a missing `write`", () => {
+    const refusal = scopeRefusal({ credentialKind: "api_key", scopes: ["read", "publish"] }) ?? "";
+    expect(refusal).toContain("it carries `publish`");
+    expect(refusal).not.toContain("does not carry `write`");
   });
 });

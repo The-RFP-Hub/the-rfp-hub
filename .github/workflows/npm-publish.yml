@@ -41,17 +41,25 @@ jobs:
     env:
       PKG: ${{ inputs.package }}
       REF: ${{ inputs.ref }}
+      TAG: ${{ inputs.tag }}
     steps:
-      - name: Require the dispatched ref to be a tag
+      - name: Require a tag, and `next` for the MCP server
         run: |
           if ! git ls-remote --exit-code "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${REF}" > /dev/null; then
             echo "::error::'${REF}' is not a tag on this repository. Publish from the release tag."
             exit 1
           fi
+          # `latest` is what an unpinned install resolves to, and the MCP server earns it only once
+          # the M4 profile is green against the published tarball. See docs/deployment.md §7.6.
+          if [ "${PKG}" = "@the-rfp-hub/mcp" ] && [ "${TAG}" = "latest" ]; then
+            echo "::error::${PKG} publishes to 'next'; promote it with 'npm dist-tag add' once the M4 check is green."
+            exit 1
+          fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
+          # Qualified: an unqualified ref lets a branch of the same name win over the tag.
+          ref: refs/tags/${{ inputs.ref }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -64,9 +72,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter "${PKG}" build
+      # `...` selects the package AND its workspace dependencies: on a clean runner nothing has
+      # built @the-rfp-hub/standard yet, so rfphub-validate cannot resolve it and the MCP server
+      # cannot resolve either of them.
+      - run: pnpm --filter "${PKG}..." build
 
-      - run: pnpm --filter "${PKG}" test
+      - run: pnpm --filter "${PKG}..." test
 
       # The tag names the version being released, so the tarball must agree with it — and a
       # `workspace:*` that survived the pack is a package nobody outside this repo can install.
@@ -95,7 +106,7 @@ jobs:
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm --filter "${PKG}" publish --access public --tag "${{ inputs.tag }}" --provenance --no-git-checks
+        run: pnpm --filter "${PKG}" publish --access public --tag "${TAG}" --provenance --no-git-checks
 
       - name: The registry serves an attestation
         run: |

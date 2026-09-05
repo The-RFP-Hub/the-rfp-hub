@@ -4,7 +4,7 @@
  * refused by the API only after a person has already spent a single-use approval.
  *
  * NOT at startup: `initialize` stays network-free. The question is asked on the first write call
- * and the ANSWER is cached for the life of the process; a preflight that got no answer is not.
+ * and the ANSWER is cached against the client that asked; a preflight that got no answer is not.
  */
 import { ToolError, keyScopeError } from "./errors.js";
 import type { ApiClient } from "./http.js";
@@ -19,11 +19,15 @@ export interface CredentialFacts {
   scopes: string[] | null;
 }
 
-let verdict: Promise<void> | null = null;
+/**
+ * Keyed by client, not by module: one process can hold two servers on two credentials, and a
+ * verdict about one key says nothing about the other.
+ */
+let verdicts = new WeakMap<ApiClient, Promise<void>>();
 
-/** Test-only: forget the cached verdict so the next call asks again. */
+/** Test-only: forget every cached verdict so the next call asks again. */
 export function resetKeyScopeCache(): void {
-  verdict = null;
+  verdicts = new WeakMap();
 }
 
 /** Shape-checked rather than trusted: this is a network body. */
@@ -49,30 +53,33 @@ export function scopeRefusal(facts: CredentialFacts): string | null {
     return "The API returned no list of scopes for the configured credential, so what it may do cannot be established.";
   }
 
-  const faults: string[] = [];
-  if (!facts.scopes.includes("write")) {
-    faults.push(
-      "it does not carry `write`, so the API would refuse the submission after a person had already spent a single-use approval",
-    );
-  }
+  // `publish` is the STRICTLY STRONGER scope on the API's side — it implies `write` — so a key
+  // carrying it is not also missing one. It is refused for publishing, which is the real fault.
+  let fault: string;
   if (facts.scopes.includes("publish")) {
-    faults.push(
-      "it carries `publish`, so an approved submission would go live immediately instead of waiting for a reviewer",
-    );
+    fault =
+      "it carries `publish`, so an approved submission would go live immediately instead of waiting for a reviewer";
+  } else if (!facts.scopes.includes("write")) {
+    fault =
+      "it does not carry `write`, so the API would refuse the submission after a person had already spent a single-use approval";
+  } else {
+    return null;
   }
-  if (faults.length === 0) return null;
 
   const listed = truncate(facts.scopes.join(", "), MAX_SCOPES_CHARS);
-  return `The configured credential has scopes [${listed}] and ${faults.join("; and ")}.`;
+  return `The configured credential has scopes [${listed}] and ${fault}.`;
 }
 
 /** Resolves when the key may submit; throws the coded refusal when it may not. */
 export async function assertKeyMaySubmit(api: ApiClient): Promise<void> {
-  verdict ??= check(api).catch((err: unknown) => {
-    if (!(err instanceof ToolError) || err.code !== "policy_denied") verdict = null;
+  const cached = verdicts.get(api);
+  if (cached !== undefined) return cached;
+  const asked = check(api).catch((err: unknown) => {
+    if (!(err instanceof ToolError) || err.code !== "policy_denied") verdicts.delete(api);
     throw err;
   });
-  return verdict;
+  verdicts.set(api, asked);
+  return asked;
 }
 
 async function check(api: ApiClient): Promise<void> {
