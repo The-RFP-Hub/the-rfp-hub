@@ -581,11 +581,14 @@ dirty.
 dispatch per package, in the order above. It refuses a ref that is not a tag, builds and tests the
 package, packs it and refuses a tarball whose version disagrees with the tag or that still declares
 `workspace:*`, publishes with `--provenance`, then fails unless the registry serves an attestation
-for what it just published. Its prerequisite is an `NPM_TOKEN` repository secret — a granular
-automation token with publish rights on `@the-rfp-hub/standard`, `rfphub-validate` and
-`@the-rfp-hub/mcp`. Provenance is an attestation signed for the job's OIDC identity, which is why
-publishing by hand cannot produce one: the commands above remain the fallback, and a release cut
-that way must not claim provenance in a README.
+for what it just published. It holds no npm credential. Each package trusts the workflow through
+npm's trusted publishing: on the package's settings page on npmjs.com, under *Trusted Publisher*,
+register GitHub Actions with organization `The-RFP-Hub`, repository `the-rfp-hub`, workflow
+filename `npm-publish.yml`, no environment, and *Allow `npm publish`* checked. Do this once per
+package; a package without it fails the publish step with a 404 from the registry. Provenance is
+an attestation signed for the job's OIDC identity, which is why publishing by hand cannot produce
+one: the commands above remain the fallback, and a release cut that way must not claim provenance
+in a README.
 
 ```sh no-run
 gh workflow run npm-publish.yml -f ref=@the-rfp-hub/mcp@0.1.3 -f package=@the-rfp-hub/mcp -f tag=next
