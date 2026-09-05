@@ -25,8 +25,8 @@ credential. To let it submit:
 4. Configure the client-neutral `stdio` connection below, then put the origin in `RFPHUB_API_BASE`
    and the secret in `RFPHUB_API_KEY` inside the client's private MCP environment. Never put the
    secret in a prompt, tool argument or shell command.
-5. Restart the client. `tools/list` now includes `submit_opportunity`; its first call only previews,
-   and a separate terminal approval is still required before the second call writes.
+5. Restart the client. `tools/list` now includes `submit_opportunity`; its first call checks the
+   key's scope and only previews, and a terminal approval is still required before a call writes.
 
 The API keys page is the handoff: it creates the credential and links back here in a new tab, so
 the one-time secret remains visible while you configure the client.
@@ -47,7 +47,7 @@ Every compatible client receives the same connection contract:
 |---|---|
 | Transport | `stdio` |
 | Command | `npx` |
-| Arguments | `-y`, `@the-rfp-hub/mcp@0.1.2` |
+| Arguments | `-y`, `@the-rfp-hub/mcp@0.1.3` |
 | Search and fetch | No environment variables; two anonymous read tools are exposed. |
 | Submission | Add `RFPHUB_API_BASE` and `RFPHUB_API_KEY` to the server process's private environment; the write tool is then exposed. |
 
@@ -66,10 +66,10 @@ anonymous search and fetch.
 #### Claude Code
 
 ```sh
-claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 
 # project-scoped instead of user-scoped — writes .mcp.json in the repo
-claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 ```
 
 Those commands install anonymous search and fetch. For submission, add `RFPHUB_API_BASE` and
@@ -89,7 +89,7 @@ Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_BASE": "https://api.ethrfps.app",
         "RFPHUB_API_KEY": "rfph_…"
@@ -109,7 +109,7 @@ Root key `servers`, in `.vscode/mcp.json`:
     "rfp-hub": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_BASE": "https://api.ethrfps.app",
         "RFPHUB_API_KEY": "${input:rfphub-key}"
@@ -130,7 +130,7 @@ Root key `servers`, in `.vscode/mcp.json`:
 #### Codex CLI
 
 ```sh
-codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.2
+codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.3
 ```
 
 That command installs anonymous search and fetch. For submission, edit `~/.codex/config.toml` (or a
@@ -142,7 +142,7 @@ restart Codex. This follows the
 ```toml
 [mcp_servers.rfp-hub]
 command = "npx"
-args = ["-y", "@the-rfp-hub/mcp@0.1.2"]
+args = ["-y", "@the-rfp-hub/mcp@0.1.3"]
 
 [mcp_servers.rfp-hub.env]
 RFPHUB_API_BASE = "https://api.ethrfps.app"
@@ -219,7 +219,7 @@ there is no parameter on any tool through which one could be passed, and a test 
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
         "RFPHUB_API_KEY": "rfph_…"
       }
@@ -228,8 +228,8 @@ there is no parameter on any tool through which one could be passed, and a test 
 }
 ```
 
-Use a **`write`-scoped** key, not a `publish`-scoped one. With `write` alone, a submission lands
-pending a reviewer's decision by construction — the safe mode needs no extra configuration.
+The key must carry `write` and must not carry `publish`, and this server checks that before its
+first submission. A `publish` key is refused, because an approved submission would go live at once.
 
 ---
 
@@ -273,11 +273,11 @@ still waits for review.
 
 ```
 1. call submit_opportunity { document }
-     → validates locally, writes nothing, returns:
+     → checks the key's scope, validates locally, writes nothing, returns:
        { status: "pending", approvalId: "<64 hex>", preview: {...}, instruction: "..." }
 
 2. a person runs, in their own terminal:
-     npx @the-rfp-hub/mcp@0.1.2 approve <approvalId>
+     npx @the-rfp-hub/mcp@0.1.3 approve <approvalId>
      → prints the destination, the credential fingerprint, the operation, the protocol
        revision and the whole document, then asks for confirmation
 
@@ -338,7 +338,7 @@ Every failure carries one of seven codes.
 |---|---|
 | `tool_not_found` | No such tool. With submitting disabled, the write tool is genuinely not registered. |
 | `invalid_input` | The arguments or the document did not validate. A schema failure is reported field by field. |
-| `policy_denied` | Refused by configuration or by the API's authorization: no credential, a missing scope, or the pending-submission ceiling. |
+| `policy_denied` | Refused by configuration or by the API's authorization: no credential, a key that lacks `write` or carries `publish`, or the pending-submission ceiling. |
 | `rate_limited` | A local per-kind budget, or the API's own limiter. |
 | `confirmation_required` | The document was previewed but not approved. Nothing was sent. |
 | `confirmation_invalid` | The approval does not apply: expired, already used, or bound to a different destination, credential, protocol or document. Nothing was sent. |
@@ -390,7 +390,7 @@ another identity. This server refuses rather than guesses — see below.
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.2", "--state-dir", "/var/lib/rfphub"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.3", "--state-dir", "/var/lib/rfphub"]
     }
   }
 }

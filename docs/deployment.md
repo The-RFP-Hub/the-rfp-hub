@@ -577,9 +577,19 @@ out. It also runs its own git checks — a release cut from a tagged, clean chec
 reaching for `--no-git-checks` to get past one is a reason to stop and look at why the tree is
 dirty.
 
-Add `--provenance` to each command **if** the publish runs from a CI job with an OIDC identity
-registered with the registry. Publishing by hand from a laptop cannot produce provenance — do not
-pass the flag there, and do not claim provenance in a README on a release cut that way.
+**The primary path is the `npm Publish` workflow** (`.github/workflows/npm-publish.yml`), one
+dispatch per package, in the order above. It refuses a ref that is not a tag, builds and tests the
+package, packs it and refuses a tarball whose version disagrees with the tag or that still declares
+`workspace:*`, publishes with `--provenance`, then fails unless the registry serves an attestation
+for what it just published. Its prerequisite is an `NPM_TOKEN` repository secret — a granular
+automation token with publish rights on `@the-rfp-hub/standard`, `rfphub-validate` and
+`@the-rfp-hub/mcp`. Provenance is an attestation signed for the job's OIDC identity, which is why
+publishing by hand cannot produce one: the commands above remain the fallback, and a release cut
+that way must not claim provenance in a README.
+
+```sh no-run
+gh workflow run npm-publish.yml -f ref=@the-rfp-hub/mcp@0.1.3 -f package=@the-rfp-hub/mcp -f tag=next
+```
 
 ### 7.6 Prove the `next` tag, then promote
 
