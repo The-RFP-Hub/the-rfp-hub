@@ -301,8 +301,8 @@ An approval is not merely "this document was approved". Its id is a hash over **
 | **document** | SHA-256 over the document's canonical form |
 
 Change any one of them and the approval no longer applies, and the refusal names which one moved.
-An approval granted against staging cannot be spent against production; one granted under a key's
-fingerprint is refused under the new one once that key is rotated.
+An approval granted against staging cannot be spent against production. One granted under a key
+is refused after that key is rotated, because the binding is the key's fingerprint.
 
 The approval is **single-use**, claimed by an atomic rename *before* the request goes out, and it
 is **never restored** — including after a timeout. If a submission's outcome is ambiguous, check
