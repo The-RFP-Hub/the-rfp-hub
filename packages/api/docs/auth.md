@@ -19,7 +19,7 @@ Authorization: Bearer <credential>
 
 One header carries either kind, and **which kind it is decides real authority**:
 
-| | What it is | How it is recognised |
+| | What it is | How it is recognized |
 |---|---|---|
 | **Session** | An opaque, signed session token, held by a signed-in human | Anything that does **not** start with `rfph_` |
 | **API key** | A long-lived, scoped delegation of one account | Starts with `rfph_` |
@@ -177,7 +177,7 @@ one answer, and whichever it picked would be wrong somewhere.
 
 ### What a T2 verified publisher may do
 
-Within **their own namespace** (`source.publisher` — never merely an organisation they co-operate
+Within **their own namespace** (`source.publisher` — never merely an organization they co-operate
 or sponsor):
 
 * **write and auto-publish**, when the credential also permits it (`publish` on a key, any session);
@@ -190,19 +190,19 @@ or sponsor):
 
 **Verified members decide within their own namespace; Hub reviewers (T3) decide anywhere.** A
 rejection here **requires a written reason**, and that is the counterweight to the obvious conflict
-of interest: anyone may submit an entry *about* an organisation, so the organisation refusing a
-third party's account of its own programme is the decision that most needs a name against it. The
+of interest: anyone may submit an entry *about* an organization, so the organization refusing a
+third party's account of its own program is the decision that most needs a name against it. The
 trail attributes both verbs to the deciding member **by handle** — never coarsened to `reviewer`,
 which is the anonymity a neutral reviewer gets and a self-interested party should not — carries
 `via: "operating_org"` so a reader can tell the two apart, and the reason is shown to the submitter
 on their own listing (`lastDecision`).
 
-The scope is the **namespace**, not "any organisation named in `operatingOrganizations`". Widening it
+The scope is the **namespace**, not "any organization named in `operatingOrganizations`". Widening it
 was considered and rejected: an entry may name several operators, approving publishes it in the
 namespace's name, and a co-operator could then publish under somebody else's banner — the same
 cross-org hazard the write path's containment rule exists to close. An entry filed under a namespace
 you do not publish for answers `404`, not `403`, so these routes cannot enumerate another
-organisation's pending queue.
+organization's pending queue.
 
 ### What limits an account with no verified membership
 
@@ -274,7 +274,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 |---|---|---|
 | `GET /v1/opportunities`, `/:id`, `/schema` | none | public read surface, unchanged |
 | `GET /v1/stats`, `/v1/health`, `/v1/feeds/*`, `/v1/export/*` | none | unchanged |
-| `GET /v1/publishers` | none | verified organisations only |
+| `GET /v1/publishers` | none | verified organizations only |
 | `GET /v1/r/:id/apply`, `/v1/r/:id/source` | none | `302` for approved **and** listed entries only; `404` otherwise |
 | `GET /v1/opportunities/:id/audit` | optional | redacted for the public; full patch for the owner and T3+ |
 | `GET /v1/opportunities/:id/duplicates` | optional | an unprivileged caller never sees a non-public other side |
@@ -285,7 +285,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | Route | Credential | Notes |
 |---|---|---|
 | `POST /v1/opportunities` | T1 + `write` | auto-approves only via `canPublishImmediately` |
-| `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. Once publisher ownership has been **granted** away by a claim, the submitter keeps `PUT` only as a member of the organisation that publishes it now; otherwise it takes T2 of that namespace, or T3+ |
+| `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. Once publisher ownership has been **granted** away by a claim, the submitter keeps `PUT` only as a member of the organization that publishes it now; otherwise it takes T2 of that namespace, or T3+ |
 | `POST /v1/opportunities/:id/claim` | membership on the claiming org, + `write` | filing needs `write` on a key; an **immediate grant** needs `publish`. Either absence is a 403 naming the scope, never a silent queue |
 | `GET /v1/me`, `/v1/me/opportunities`, `/v1/me/opportunities/:id`, `/v1/me/duplicates` | T1 | `/me/opportunities/:id` is the owner-visible full detail for a pending or rejected entry the public route 404s |
 | `GET /v1/insights/opportunities/:id` | owner or T3+ | 403 for anyone else — a publisher's numbers are not public |
@@ -445,7 +445,7 @@ cross-system unique key.
 | Field | Set to |
 |---|---|
 | `source.publisher` | the resolved namespace |
-| `source.submittedBy` | the publishing organisation's slug when the account holds a verified membership on the namespace; else the account's public handle; else `"community"` |
+| `source.submittedBy` | the publishing organization's slug when the account holds a verified membership on the namespace; else the account's public handle; else `"community"` |
 | `source.submittedAt` | server `now()` on create, **preserved** on update |
 | `source.ingestedVia` | `publisher_api` for a key, `submission` for a session |
 | `source.originalId` | accepted **only** from a credential that could publish here; otherwise forced null |
@@ -454,11 +454,11 @@ cross-system unique key.
 The namespace is `source.publisher ?? operatingOrganizations[0].slug`, and the public id **must** be
 `<namespace>:<local>` — the same derivation `source_system` uses, so an entry cannot be filed under a
 system it was not authorized for. The namespace **must also appear in `operatingOrganizations[].slug`**:
-you may only publish under an organisation that operates the programme, so a stated `source.publisher`
-that names an org which does not run the programme is a `400` `publisher_not_operating`. When
+you may only publish under an organization that operates the program, so a stated `source.publisher`
+that names an org which does not run the program is a `400` `publisher_not_operating`. When
 `source.publisher` is absent the namespace *is* `operatingOrganizations[0].slug`, so the rule holds
 trivially. A `PUT` is held to the same containment against the entry's **stored** publisher — a
-replacement may not strip out the operating org that authorises the entry. The one exemption is
+replacement may not strip out the operating org that authorizes the entry. The one exemption is
 **import-provenance-scoped**: a row that both entered through a legacy ingest route
 (`ingestedVia ∈ {import, scrape, outbox}`) **and** never conformed (its stored publisher was never
 one of its operating orgs) is grandfathered and stays editable. A row created through the
@@ -595,21 +595,21 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/jso
 
 Two outcomes, and the status code is the whole answer:
 
-* **`200 {"outcome":"granted"}`** — your organisation is **verified** *and* its slug appears in the
+* **`200 {"outcome":"granted"}`** — your organization is **verified** *and* its slug appears in the
   entry's `operatingOrganizations`. Publisher ownership transfers immediately.
   *Sponsorship is not operation:* appearing only in `sponsoringOrganizations` does not grant, or a
   sponsor could seize an entry it merely funds.
 * **`202 {"outcome":"queued","claimId":…}`** — anything else. A reviewer decides.
 
-`409` when the entry is already owned by a **different** verified organisation;
-`200 {"outcome":"unchanged"}` when your organisation already owns it. On an API key, filing a claim
+`409` when the entry is already owned by a **different** verified organization;
+`200 {"outcome":"unchanged"}` when your organization already owns it. On an API key, filing a claim
 at all needs the `write` scope, and a claim that *would* be granted immediately needs `publish` —
 each absence is a 403 naming the scope, never a quiet downgrade to a queued claim.
 
 **A granted claim moves `PUT` with it.** Ownership is the row's `source.publisher`, not who first
 typed the entry in, so once a claim is granted the original submitter's account no longer holds
-`PUT` on it — unless they are a member of the claiming organisation, which is the ordinary case of
-somebody submitting on their own organisation's behalf and then claiming. A refused replacement is
+`PUT` on it — unless they are a member of the claiming organization, which is the ordinary case of
+somebody submitting on their own organization's behalf and then claiming. A refused replacement is
 the same `403 not_your_entry`, with a message saying ownership moved by claim rather than the
 misleading "submitted by another account".
 
@@ -638,11 +638,11 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/
 ```
 
 > **`verifyOrganization: false` transfers ownership but does *not* unlock auto-approval.**
-> Auto-approval requires a **verified** organisation, so that publisher's later writes keep landing
+> Auto-approval requires a **verified** organization, so that publisher's later writes keep landing
 > `pending`. The response says so, and this paragraph exists because "the claim was approved, why is
 > my next submission still in review" is otherwise a support ticket rather than a documented rule.
 
-Verifying an organisation is what actually flips a namespace to T2, and revoking a membership takes
+Verifying an organization is what actually flips a namespace to T2, and revoking a membership takes
 it back on the very next request:
 
 ```sh

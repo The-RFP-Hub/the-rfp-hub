@@ -58,7 +58,7 @@ The package version may run well ahead of the spec version. That is the point of
 **What counts as breaking.** Operationally: *a document valid under version N is invalid under
 N+1* — **or the reverse**. Loosening a constraint is breaking too, because data that used to be
 rejected now validates and every consumer relying on the rejection has silently changed
-behaviour. Breaking changes take a **new spec version in a new directory**; the previous
+behavior. Breaking changes take a **new spec version in a new directory**; the previous
 directory stays published and unedited. Non-breaking changes go into the current version.
 
 **Which stage a field is at** matters as much as the version. Fields move

@@ -679,7 +679,7 @@ Three properties are load-bearing:
 * **Append-only is enforced in the database.** Migration `0004_audit_immutability` installs a
   `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE` statement trigger that raise. That
   holds on a laptop, in CI and in production alike — unlike a `REVOKE`, which holds only where an
-  operator ran it. The `REVOKE UPDATE, DELETE` in `scripts/sql/harden-audit.sql` is defence in
+  operator ran it. The `REVOKE UPDATE, DELETE` in `scripts/sql/harden-audit.sql` is defense in
   depth on top, and is not a migration because it names a deployment-specific role.
 
 **The import path is audited too, and it is the reason the trail is complete.** The seed loader
@@ -801,12 +801,12 @@ be `<namespace>:<local>` — an id with no `:`, or with a different prefix, is a
 required form. That keeps `source_system` derivable exactly as `scripts/seed.ts` derives it, and
 keeps `ux_opp_source` meaningful. See `src/modules/shared/namespace.ts`.
 
-The namespace **must also be one of the entry's operating organisations** —
+The namespace **must also be one of the entry's operating organizations** —
 `namespace ∈ operatingOrganizations[].slug`, the write-side twin of the claim rule below: you may
-only publish under an org that operates the programme, never one it merely sponsors. A `source.publisher`
+only publish under an org that operates the program, never one it merely sponsors. A `source.publisher`
 naming a non-operating org is a `400` `publisher_not_operating`; on a `PUT` the same containment is
 checked against the **stored** `source_publisher`, so an edit cannot strip the operating org that
-authorises the entry. The one exemption is **import-provenance-scoped**: a row that both entered
+authorizes the entry. The one exemption is **import-provenance-scoped**: a row that both entered
 through a legacy ingest route (`ingested_via ∈ {import, scrape, outbox}`) **and** never conformed
 (its stored publisher was never one of its operating orgs) is grandfathered and stays editable under
 its stored namespace. A `publisher_api`/`submission` row went through the create-time gate, so it is
@@ -838,7 +838,7 @@ held to containment on replace — a foreign-operated one is still rejected.
   - **Granted immediately (200)** when the org is `verified` **and** its slug appears in
     `operatingOrganizations[].slug`. Operating, **not** `org_slugs`: that column is the union
     *including sponsors*, and matching on it would let a sponsoring organization seize publisher
-    ownership of someone else's programme. Sponsorship is not operation.
+    ownership of someone else's program. Sponsorship is not operation.
   - Membership, `verified` state and the operating-org match are re-checked **inside the granting
     transaction**, with `SELECT … FOR UPDATE` on the opportunity row, so a revocation racing the
     request cannot be won.
@@ -859,7 +859,7 @@ held to containment on replace — a foreign-operated one is still rejected.
   `servername` still from the hostname) — resolving twice would leave the DNS-rebinding gap open.
   Selection predicate, no queue table: `application_url IS NOT NULL AND (verified_at IS NULL OR
   verified_at < updated_at)`. `matched` is a **low-bar anti-spam signal, not a fact-check**: the page
-  exists and its title is about the same programme. An admin still approves.
+  exists and its title is about the same program. An admin still approves.
 - **Dedup (M3):** after commit and outside the submission transaction, embed the entry, ANN-search
   `opportunity_embeddings`, and record matches in `opportunity_duplicates`. Each new pair and its
   owner notifications share one transaction; `RETURNING` prevents re-detection from emitting again,
@@ -895,12 +895,12 @@ held to containment on replace — a foreign-operated one is still rejected.
   best-effort, and both the docs and the dashboard say so.
 - **Staleness (M3):** two passes, both audited, both recomputing `next_deadline_at` in the same walk.
   1. **Past due** — `status='open' AND isPastDue(deadlines)`: the latest `fixed` entry is in the past
-     **and** there is no `rolling` entry, so a rolling programme never closes on this rule.
+     **and** there is no `rolling` entry, so a rolling program never closes on this rule.
   2. **Inactive** — `status='open' AND next_deadline_at IS NULL AND coalesce(last_seen_at,
      updated_at) < now() - STALENESS_INACTIVE_DAYS`.
 
   **Rolling-only entries have `next_deadline_at = NULL` and therefore ARE eligible for the
-  inactivity close.** That is intended: a rolling programme nobody has touched or re-verified for
+  inactivity close.** That is intended: a rolling program nobody has touched or re-verified for
   ninety days is exactly the stale listing this rule exists to close, and any publisher write,
   granted claim or successful verification resets `last_seen_at`. The `next_deadline_at IS NULL`
   clause is load-bearing for the opposite reason — an entry with a known future deadline is never
@@ -983,7 +983,7 @@ held to containment on replace — a foreign-operated one is still rejected.
   to 1.543 on a cherry-picked stub and 1.223 on an honest 40 % truncation of a real corpus entry.
   Values above 1 are normal and are not clamped; the threshold is a lower bound, which is why that
   is harmless. Nothing in the code, the API or these docs calls it a probability, a percentage or a
-  containment. Cosine cannot do this job on its own for a structural reason: normalisation has
+  containment. Cosine cannot do this job on its own for a structural reason: normalization has
   already erased the difference in length that IS the signal.
 
   | | full corpus | held out (idf from one half, scored on the other) |
@@ -1021,7 +1021,7 @@ held to containment on replace — a foreign-operated one is still rejected.
 
   The corpus's four genuinely hard funder families are named in the harness so a new one arrives as
   a regression with a name attached: the Arbitrum DDA tracks, the Rocket Pool GMC rounds, the Road
-  to Devcon regional programmes, and the SSV grant/bounty pair.
+  to Devcon regional programs, and the SSV grant/bounty pair.
 
   **The stub attack, and a pre-existing exposure it revealed.** An attacker who wants somebody's
   entry flagged as *their* duplicate builds a listing from the target's rarest terms. Measured over

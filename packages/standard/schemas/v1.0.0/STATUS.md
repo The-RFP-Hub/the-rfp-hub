@@ -59,7 +59,7 @@ external consumer had adopted it, and the milestone that would have declared it 
 not closed. A version bump would have invented a migration story with nobody on the other end
 of it.
 
-**The draft was then revised in place a second time, on 2026-08-05.** The organisation arrays
+**The draft was then revised in place a second time, on 2026-08-05.** The organization arrays
 swapped roles (`operatingOrganizations` is now the required primary array), `networks`, `tags`
 and `extensions` were removed (the top level is fully closed, with no extension mechanism),
 `eligibility` became free text and its registry was retired, and `resourceLinks`, `funding`,

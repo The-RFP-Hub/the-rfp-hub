@@ -13,7 +13,7 @@ must not hold the values.
 > context and the Dockerfile copies no `.env`; configuration is assembled into the ECS task
 > definition by the deploy job instead. §2 describes both where that stands today — every value in
 > the container's `environment` array, readable in-account — and where it is going, the `secrets:`
-> array, which needs AWS-side wiring. Every value that travelled the old baked-`.env` path must
+> array, which needs AWS-side wiring. Every value that traveled the old baked-`.env` path must
 > still be **rotated** (§7): the layer cache it passed through is readable history.
 
 ---
@@ -149,7 +149,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `VERIFY_NIGHTLY_LIMIT` | `500` | Entries one `verification-backfill` **invocation** checks — not one pass: the job always reports `remaining: 0` so `--passes` cannot multiply it, and to drain a backlog you raise `--limit`. The TTL means the selection never drains, so this cap, not the predicate, is what bounds the nightly run |
 | `VERIFY_HOST_MIN_GAP_MS` | `1000` | Minimum gap between two backfill fetches to the **same host**. A corpus clusters by publisher, so without it a serial pass is dozens of requests to one domain in the seconds it takes that domain to answer them, and a block reads back as "every entry from this publisher stopped matching". It is also what makes one pass minutes long: `POST /v1/admin/jobs/{job}/run` therefore defaults to a 10-entry slice (§4c of `jobs.md`) rather than `VERIFY_NIGHTLY_LIMIT`. **Leave it at the default in every deployment** — `0` disables pacing and exists for the e2e stack, whose only source host is a fixture server the runner itself started |
 | `VERIFICATION_RUNS_KEEP` | `5` | Runs kept per entry. Pruned on every run insertion — manual and submit-time checks included — and again over the backfill's whole selection. Each run carries up to 200 KB of `snapshot_text`, so this is what bounds the table |
-| `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set in ANY deployed task definition** — service or maintenance, staging or production | A deliberate SSRF escape hatch that exists so one integration test can drive the real fetcher against a loopback server. Setting it in a deployment would let a submitted `applicationUrl` reach the instance metadata endpoint and the private network. The process **refuses to boot** with it enabled under `NODE_ENV=production`, so this row is defence in depth rather than the only control |
+| `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set in ANY deployed task definition** — service or maintenance, staging or production | A deliberate SSRF escape hatch that exists so one integration test can drive the real fetcher against a loopback server. Setting it in a deployment would let a submitted `applicationUrl` reach the instance metadata endpoint and the private network. The process **refuses to boot** with it enabled under `NODE_ENV=production`, so this row is defense in depth rather than the only control |
 | `VERIFIER_EGRESS_PROXY` | optional | The network-layer backstop; application-level address validation should not be the only control |
 | `ANALYTICS_ENABLED` | `true` | |
 | `ANALYTICS_RETENTION_DAYS` | `180` | Enforced by the retention sweep, not by the schema |

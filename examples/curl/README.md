@@ -78,7 +78,7 @@ curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities" \
 
 `organization` takes an **organization slug**, and matches **any** entry in either role —
 `operatingOrganizations` (who runs the intake) *or* `sponsoringOrganizations` (who backs it) — not
-only the primary `operatingOrganizations[0]`. Slugs are derived from the organisation's own name
+only the primary `operatingOrganizations[0]`. Slugs are derived from the organization's own name
 (`Ecosystem Grants Collective` → `ecosystem-grants-collective`), not from the ecosystem that lists
 the program. List a page and read the `slug` values a given deployment serves.
 

@@ -74,7 +74,7 @@ Operationally, and in one sentence:
 The second half is the half most schema policies get wrong. **Loosening a constraint is breaking
 too.** If a field's enum gains a value, or a `const` becomes a `pattern`, or a required property
 becomes optional, then data that used to be rejected now validates — and every consumer that
-relied on the rejection has silently changed behaviour. A validator is a contract in both
+relied on the rejection has silently changed behavior. A validator is a contract in both
 directions.
 
 Worked example from this project's own history — **and note how it ended.** During the
@@ -96,13 +96,13 @@ and [`CHANGELOG.md`](./CHANGELOG.md).
 
 ### The indeterminate-state carve-out
 
-There is a third state between valid and invalid: **indeterminate** — behaviour the schema never
+There is a third state between valid and invalid: **indeterminate** — behavior the schema never
 defined. If version N said nothing about a case, and version N+1 defines it, that is **not
 breaking**, because there was no contract to break.
 
 This matters here because much of the 2026-07-27 re-cut is exactly this shape. Enforcing
 one-block-per-funding-type made previously-valid documents invalid — that is straightforwardly
-breaking. But permitting `$schema`, `@context` and `@type` at the top level defined behaviour that
+breaking. But permitting `$schema`, `@context` and `@type` at the top level defined behavior that
 `additionalProperties: false` had left as a flat rejection with no stated intent; the schema had
 never taken a position on self-identification. The carve-out is narrow and it is easy to abuse:
 **"we never thought about it" is not the same as "the schema left it undefined."** If the previous
@@ -265,7 +265,7 @@ A value is registered when it meets all three:
 1. **In use by at least one real publisher.** Not hypothetical, not "we might need it". A link to
    a live listing, a program's own documentation, or an export that carries the value.
 2. **Clearly described.** One paragraph saying what the value means and when a publisher should
-   choose it *over its nearest neighbour*. If the description cannot distinguish it from an
+   choose it *over its nearest neighbor*. If the description cannot distinguish it from an
    existing entry, the existing entry is the answer.
 3. **No vendor lock.** A value that only makes sense inside one platform's product does not
    belong in the standard at all — there is no `extensions` escape hatch to park it in; if the

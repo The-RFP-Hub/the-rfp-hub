@@ -52,7 +52,7 @@ of any one aggregator's branding. Example ids use a neutral `fundingmap:` namesp
 The **30 committed fixtures are the live claim**: 28 of them were converted field-by-field
 through each draft revision (the other two are the hand-transcribed security bounties), and all
 30 validate against the current [`opportunity.schema.json`](./opportunity.schema.json). The
-conversion is not purely mechanical and the claim should be read with that in mind: organisation `slug`s are
+conversion is not purely mechanical and the claim should be read with that in mind: organization `slug`s are
 **invented data** (derived from names, not carried from the source), and the `tags`/`networks`
 values the source did carry were dropped (see below). The third conversion, by contrast, was
 a pure script rewrite and lossless (see below).
@@ -84,10 +84,10 @@ Each move follows a row in one of the
   nothing here.
 - **`organization` → `sponsoringOrganizations[0]`** — a wrap, no data change at the time. The
   2026-08-05 revision made `operatingOrganizations` the required primary array, so **that same
-  wrapped organisation now feeds both arrays**: each example carries it as
+  wrapped organization now feeds both arrays**: each example carries it as
   `operatingOrganizations[0]` (the display/issuing slot) and as `sponsoringOrganizations[0]`
-  (the backer), because the source corpus never distinguished the two roles. Every organisation
-  also gained a now-required `slug` — **invented data**, derived from the organisation's name,
+  (the backer), because the source corpus never distinguished the two roles. Every organization
+  also gained a now-required `slug` — **invented data**, derived from the organization's name,
   not carried from the source.
 - **`source.url` has no successor.** Where a document had no `applicationUrl`, the old source URL
   became the `applicationUrl` — it was the only link-back target left. Where `applicationUrl`
@@ -131,7 +131,7 @@ Each move follows a row in one of the
   `+3` if the application deadline is in the future, `+1` if `opensAt` is in the future,
   `+` recency (up to `+4`, linearly decaying over 1 year from `updatedAt`). *(Computed on the
   pre-re-cut single `closesAt` scalar; under the re-cut shape the same score would read the
-  `application`-labelled entry of `deadlines[]`.)*
+  `application`-labeled entry of `deadlines[]`.)*
 
 Both scores are **ranking heuristics for choosing fixtures**, not quality metrics of the
 standard, and neither is normative.

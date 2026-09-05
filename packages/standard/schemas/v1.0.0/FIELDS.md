@@ -378,8 +378,8 @@ schema-enforced**. Each is stated here because otherwise publishers guess and th
 
 | Convention | Ruling |
 |---|---|
-| **`operatingOrganizations` is the primary array** | Required, `minItems: 1`, and **`[0]` is the primary/display organisation** — the party that runs intake, process and the application funnel, and the issuing organisation of an `rfp`. Operating = who actually runs the process = the entity consumers need first. |
-| **`sponsoringOrganizations` ≠ source of funds** | Optional since the 2026-08-05 revision. It is the **issuer/backer** where one is published, not necessarily where the money comes from — **the money's actual origin is deliberately not modelled.** The party running the process belongs in `operatingOrganizations`. |
+| **`operatingOrganizations` is the primary array** | Required, `minItems: 1`, and **`[0]` is the primary/display organization** — the party that runs intake, process and the application funnel, and the issuing organization of an `rfp`. Operating = who actually runs the process = the entity consumers need first. |
+| **`sponsoringOrganizations` ≠ source of funds** | Optional since the 2026-08-05 revision. It is the **issuer/backer** where one is published, not necessarily where the money comes from — **the money's actual origin is deliberately not modeled.** The party running the process belongs in `operatingOrganizations`. |
 | **`applicationUrl` = whatever the submission channel is** | Including a **forum thread** when no portal exists. Clarifications go in `description`. **There is no submission-channel field** — the URL's *kind* is not typed. |
 | **`prerequisites` vs. `rfp.requirements`** | **`prerequisites` = what a *proposal* must contain** (track record, approach, milestone plan, disclosures). **`rfp.requirements` = what the *work* must deliver.** Application-content vs. work-content. |
 | **The three free-text siblings** | `prerequisites`, `additionalReferences` and `serviceAgreement` are all optional top-level strings and will be used interchangeably unless the boundary is written down — see below. |
@@ -484,7 +484,7 @@ against takes `{"model": "discretionary"}`; a tier nobody has filled in yet is a
 
 **What the table cannot express, by choice.** Real programs also publish step functions over
 funds at risk, tiers that change when protocol TVL crosses a threshold, pool release conditional
-on findings, per-tier vesting and multipliers. None of it is modelled. The test applied was
+on findings, per-tier vesting and multipliers. None of it is modeled. The test applied was
 whether omitting a thing changes the answer to *"which programs pay more than $X for a critical,
 and can I still submit?"* — and none of these do, because every such program still publishes a
 severity tier and a ceiling that the table captures exactly. The arithmetic belongs in
@@ -533,7 +533,7 @@ Known costs, stated plainly:
 ### `fundingInfo.allocated` is committed, not disbursed
 
 `allocated` means money **committed to date** — not money paid out. Disbursement and delivery are
-deliberately not modelled. `remaining` is **derived** as `budget − allocated` at the consumer
+deliberately not modeled. `remaining` is **derived** as `budget − allocated` at the consumer
 layer and never stored.
 
 There is no `raised` field. A donor-crowdfunded opportunity therefore asserts its `budget`
@@ -630,7 +630,7 @@ conformance; a conforming document may raise warnings, which is the point of the
 - **Status granularity** — the four-value enum is the most-questioned part of the standard
   (`in review`, `paused`, `awarded` have all been asked for). It remains open on its own terms;
   the no-`draft` ruling above does not close it.
-- **Level-of-effort / scope-complexity signal** — asked for, not modelled.
+- **Level-of-effort / scope-complexity signal** — asked for, not modeled.
 - **Cross-system dedup** — when the same opportunity is aggregated from more than one upstream
   source, a merge-precedence policy is needed at the read/aggregation layer. The removal of a
-  source URL makes this a judgement call rather than a lookup.
+  source URL makes this a judgment call rather than a lookup.

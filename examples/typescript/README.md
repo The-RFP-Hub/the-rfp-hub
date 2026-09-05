@@ -87,7 +87,7 @@ CI runs `npm ci && npm run typecheck` in this directory. Precisely:
   `package-lock.json`, resolved from the **npm registry** — not from `packages/standard` in this
   repo. So a *published* release that breaks this consumer's usage fails here rather than in
   someone's downstream repo.
-- It **does not** make a single HTTP request, so nothing about the API's runtime behaviour — the
+- It **does not** make a single HTTP request, so nothing about the API's runtime behavior — the
   responses, the strict query contract, the error envelope — is verified by it.
 - It **does not** look at the curl or Python examples at all; those are unchecked prose and are
   kept current by hand.

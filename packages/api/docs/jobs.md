@@ -12,7 +12,7 @@ process; it calls the same dispatcher for the newly inserted row ids without inv
 
 ---
 
-## 1. The catalogue
+## 1. The catalog
 
 The five jobs, **in the order `registry.ts` lists them, which is the order the chain runs them**:
 
@@ -31,8 +31,8 @@ than starting a container task that quietly does nothing. `CHAIN`, exported from
 that list minus the deprecated aliases, and is what `all` runs; `test/unit/jobs.test.ts` pins the
 sequence literally, so a new job joins the night deliberately rather than by being declared.
 
-`all` is not itself a job: it takes no lock of its own, appears in no catalogue, and is refused by
-`POST /v1/admin/jobs/{job}/run`. It is the entry point running the catalogue in order.
+`all` is not itself a job: it takes no lock of its own, appears in no catalog, and is refused by
+`POST /v1/admin/jobs/{job}/run`. It is the entry point running the catalog in order.
 
 ### `retention` is a deprecated alias, for one release
 
@@ -117,7 +117,7 @@ UTC
 ```
 
 Running the five one at a time satisfies that rule; so does running the four together and
-`staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
+`staleness` when the last of them exits. The rule is the contract (§4d); serializing is one way to
 meet it.
 
 **A scheduler should not have to satisfy that rule by hand.** `node packages/api/dist/jobs.js all`
@@ -154,7 +154,7 @@ whatever state it is in.
 
 **What that costs, stated plainly:** a scheduled run can start late, run long or fail, and the
 clock cannot notice. A chain that fails or never starts is not observed by the export, which
-publishes on time regardless; the dataset then advertises programmes the API would have closed. The
+publishes on time regardless; the dataset then advertises programs the API would have closed. The
 snapshot reflects the staleness pass from earlier the same night, so an entry that falls past-due
 after that pass is published as open and corrected the following night. The export is idempotent and
 `workflow_dispatch` on it republishes immediately once the cause is fixed. **Monitor the external
@@ -177,7 +177,7 @@ UTC** daily, `staleness` after everything else, exactly the ordering this sectio
 **first production run was 2026-08-26**, against release `prod-1.3.0`.
 
 **That attestation is about a release older than this branch, and it describes six tasks.**
-`prod-1.3.0` shipped the six-name catalogue, so the DAG names `analytics-rollup`, `retention`,
+`prod-1.3.0` shipped the six-name catalog, so the DAG names `analytics-rollup`, `retention`,
 `embedding-backfill`, `verification-backfill`, `notification-dispatch` and then `staleness`, one
 task each. Nothing has to change for it to keep working: the prune now rides inside
 `analytics-rollup` and `retention` survives as a deprecated alias that prunes alone (§1), so a
@@ -360,7 +360,7 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   a whole pass they do not: `failed > 0 && failed === attemptedWrites` means nothing this run tried
   to write was accepted, so there is no evidence writing works at all. Reporting that as a counter
   and exiting 0 is a green nightly run in which the staleness pass has silently stopped happening,
-  while the export keeps publishing programmes that are over.
+  while the export keeps publishing programs that are over.
 
   The denominator is **attempted writes**, not rows settled, and that is deliberate. Most candidates
   on a given night need no change and open no transaction at all; and a transaction can open, take
@@ -540,7 +540,7 @@ needs to be able to move it without a deploy of new code. And `0` is a legitimat
 whose only source host is its own: the e2e runner points every fixture at a server it started in its
 own process tree and kills in its `finally`, and paying it a real second per entry buys nothing and
 costs the suite more wall clock than the rest of the run. **No deployment sets it to `0`** — the
-pacer's own behaviour is covered by `test/unit/host-pacer.test.ts`, which is where spacing belongs.
+pacer's own behavior is covered by `test/unit/host-pacer.test.ts`, which is where spacing belongs.
 
 **A re-check that finds the page unmoved says so.** The stored digest is over the raw bytes, so an
 equal digest is proof nothing changed since the last check — which is what a monthly re-check finds
@@ -654,7 +654,7 @@ completion behind it, and the retry that follows meets its own advisory lock.
 So a job whose per-row cost is a round trip to somebody else's server declares an **interactive
 limit** — `interactiveLimit` in `src/modules/services/jobs/registry.ts`, `10` for
 `verification-backfill` — and this route uses it **when the caller names no `limit`**. It is a
-default, not a ceiling: a `limit` in the body is honoured exactly as given, because this route is
+default, not a ceiling: a `limit` in the body is honored exactly as given, because this route is
 also how a staging operator asks for a bigger slice, and answering with ten while reporting success
 would be a quieter failure than a slow response. **Draining a real backlog is still (a) or (b)**,
 which have no socket to lose.
@@ -687,10 +687,10 @@ under its own name (§3) — `all` takes no lock of its own, so two overlapping 
 interleave exactly as two overlapping hand-rolled chains would. And **a job that throws does not
 stop the chain**: `staleness` has to run after the others have *exited*, which is not the same as
 after they have *succeeded*, and skipping the pass the 03:17 export reads because an unrelated
-backfill could not reach its provider would publish a dataset advertising programmes that are over.
+backfill could not reach its provider would publish a dataset advertising programs that are over.
 The failure is carried in the result and in the exit code instead.
 
-`<job>` is one of the names in §1 — the catalogue in `src/modules/services/jobs/registry.ts` is the
+`<job>` is one of the names in §1 — the catalog in `src/modules/services/jobs/registry.ts` is the
 one place a name is spelled, and a name that is not in it exits `2` rather than doing nothing.
 `retention` is a deprecated alias kept for one release (§1); drop it from your scheduler. `--limit`
 and `--passes` are available and job-specific; neither is required, and both apply to every job in
@@ -889,7 +889,7 @@ mutation. The patch names the job and its reason:
 { "job": "staleness", "reason": "past_due", "status": { "before": "open", "after": "closed" } }
 ```
 
-`reason` is `past_due` or `inactive`, and it is the difference between "this programme's deadline
+`reason` is `past_due` or `inactive`, and it is the difference between "this program's deadline
 has passed" and "nobody has re-asserted this listing in ninety days" — which are different things to
 tell a publisher. The public trail shows the changed field names and the actor `job`; the entry's
 submitter, its publisher and T3+ see the full patch.
