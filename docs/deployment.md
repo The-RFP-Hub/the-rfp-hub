@@ -510,16 +510,16 @@ checkout of the commit being released.
 ### 7.1 The order is an obligation, not a preference
 
 ```
-@the-rfp-hub/standard  3.1.0   →  publish FIRST
-rfphub-validate        0.3.1   →  publish SECOND
-@the-rfp-hub/mcp       0.1.0   →  publish THIRD, with --tag next
+@the-rfp-hub/standard  3.1.0 (published)  →  publishes FIRST
+rfphub-validate        0.3.1 (published)  →  publishes SECOND
+@the-rfp-hub/mcp       0.1.2 (published)  →  the next version publishes THIRD, with --tag next
 ```
 
 `packages/validate/package.json` declares `@the-rfp-hub/standard` as `workspace:*`, and `npm
 publish` rewrites that to the exact workspace version. Publishing the validator **before** the
-Standard 3.1.0 exists on the registry produces a package that depends on a version nobody can
-install — every consumer's `npm install` breaks, the frontend clean-room job included. Step 7.4 is
-what makes that mistake impossible to miss.
+Standard's new version exists on the registry produces a package that depends on a version nobody
+can install — every consumer's `npm install` breaks, the frontend clean-room job included. Step 7.4
+is what makes that mistake impossible to miss.
 
 ### 7.2 Green first
 
@@ -533,8 +533,7 @@ Every published package that changed needs a changeset in `.changeset/`. `change
 `.changeset/config.json`, so `version` writes no CHANGELOG — the git history is the log.
 
 ```sh no-run
-pnpm changeset version     # takes @the-rfp-hub/standard to 3.1.0 (pending minor changeset)
-                           # and rfphub-validate to 0.3.1
+pnpm changeset version     # bumps every package with a pending changeset
 git diff                   # review every version bump and every rewritten dependency range
 git commit -am "chore: version packages for release"
 ```
@@ -551,11 +550,11 @@ source tree.
 ```sh no-run
 pnpm --filter @the-rfp-hub/standard pack --pack-destination /tmp/rfphub-pack
 tar -xzOf /tmp/rfphub-pack/the-rfp-hub-standard-3.1.0.tgz package/package.json | less
-#   version is 3.1.0; `files` carries schemas/, registries/, meta/, ns/, conformance/
+#   `files` carries schemas/, registries/, meta/, ns/, conformance/
 
 pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
 tar -xzOf /tmp/rfphub-pack/rfphub-validate-0.3.1.tgz package/package.json | less
-#   THE CHECK: "@the-rfp-hub/standard" must read "3.1.0" — never "workspace:*"
+#   THE CHECK: "@the-rfp-hub/standard" must read the version §7.3 produced — never "workspace:*"
 tar -tzf /tmp/rfphub-pack/rfphub-validate-0.3.1.tgz | grep dist
 grep -rl humanizeIssues /tmp/rfphub-pack/   # the export the frontend imports must be IN the build
 ```
@@ -570,7 +569,7 @@ published package as a result — the failure that kept deploy path B on a local
 ```sh no-run
 pnpm --filter @the-rfp-hub/standard publish --access public          # 3.1.0 — FIRST
 pnpm --filter rfphub-validate publish --access public                # 0.3.1 — after the Standard resolves
-pnpm --filter @the-rfp-hub/mcp publish --access public --tag next    # 0.1.0 — never straight to latest
+pnpm --filter @the-rfp-hub/mcp publish --access public --tag next    # the version §7.3 produced — never straight to latest
 ```
 
 `pnpm publish`, for the same reason as `pnpm pack`: it is what rewrites `workspace:*` on the way
@@ -587,7 +586,7 @@ pass the flag there, and do not claim provenance in a README on a release cut th
 ```sh no-run
 pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser \
   --only mcp --only mcp-publication --mcp-spec next
-npm dist-tag add @the-rfp-hub/mcp@0.1.0 latest        # only after the M4 profile is green
+npm dist-tag add @the-rfp-hub/mcp@<version> latest    # only after the M4 profile is green
 ```
 
 `--mcp-spec next` is what makes the `mcp` check spawn `npx -y @the-rfp-hub/mcp@next` — the
