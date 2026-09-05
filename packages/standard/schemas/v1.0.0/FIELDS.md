@@ -127,8 +127,8 @@ where one exists.
 | `description` | string | ✅ | Full description of the opportunity. Markdown is permitted; consumers are advised to treat it as untrusted and sanitise before rendering. | — |
 | `summary` | string\|null, ≤500 |  | Optional short teaser (roughly one or two sentences) for list and card views. | — |
 | `status` | `upcoming` \| `open` \| `closed` \| `archived` | ✅ | Lifecycle status of the opportunity. 'upcoming' = announced but not yet accepting applications, and also the value for a pre-open posting — there is no 'draft' status; 'open' = currently accepting; 'closed' = no longer accepting; 'archived' = withdrawn or retired. Editorial and review state (pending, rejected) is not represented here — it is server-side metadata. | — |
-| `sponsoringOrganizations` | [`organization`](#organization)[] |  | The organisations issuing or backing the opportunity — the issuer or backer, not necessarily the source of funds, because for donor-funded models the money's origin is deliberately not modelled. Optional, and may be absent or empty, when the operator is the only party to name or the backer is not published. The party running the process belongs in operatingOrganizations instead. | — |
-| `operatingOrganizations` | [`organization`](#organization)[], min 1 | ✅ | The organisations that actually run the opportunity — intake, process and the application funnel, whether on their own behalf or a sponsor's. Array order is semantic: entry 0 is the primary organisation and the one to display. | — |
+| `sponsoringOrganizations` | [`organization`](#organization)[] |  | The organizations issuing or backing the opportunity — the issuer or backer, not necessarily the source of funds, because for donor-funded models the money's origin is deliberately not modeled. Optional, and may be absent or empty, when the operator is the only party to name or the backer is not published. The party running the process belongs in operatingOrganizations instead. | — |
+| `operatingOrganizations` | [`organization`](#organization)[], min 1 | ✅ | The organizations that actually run the opportunity — intake, process and the application funnel, whether on their own behalf or a sponsor's. Array order is semantic: entry 0 is the primary organization and the one to display. | — |
 | `source` | [`provenance`](#provenance) | ✅ | Provenance of this entry. Required as an object, but every field inside it is optional, so `"source": {}` validates. Provenance completeness is a data-quality and ingestion-policy concern rather than a schema constraint. | — |
 | `ecosystems` | string[], unique |  | Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped, but this is an open, extensible list — not a closed enum, and deliberately not registry-governed either — so L2s and ETH-adjacent ecosystems are first-class and a newly launched one needs no process. | — |
 | `categories` | string[], unique |  | Topical categories. Free text. | — |
@@ -138,7 +138,7 @@ where one exists.
 | `serviceAgreement` | string\|null |  | Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design. | — |
 | `applicationUrl` | string(uri)\|null |  | URL where applicants submit or apply — the only URL that points at the opportunity itself, and therefore the only link-back target. It may carry whatever the submission channel is, including a forum thread when no portal exists; the URL's kind is not typed. Clarifications go in description. | — |
 | `website` | string(uri)\|null |  | Primary website for the opportunity or program. | — |
-| `logoUrl` | string(uri)\|null |  | URL of the program or organisation logo image. | — |
+| `logoUrl` | string(uri)\|null |  | URL of the program or organization logo image. | — |
 | `bannerUrl` | string(uri)\|null |  | URL of a banner or hero image. | — |
 | `socialLinks` | [`socialLink`](#sociallink)[], unique |  | Social and community links for the opportunity or program, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. | — |
 | `fundingInfo` | [`funding`](#funding) |  | Program-level funding envelope: single currency, total budget, amount committed to date, and the per-award range. | — |
@@ -152,24 +152,24 @@ where one exists.
 
 ### `organization`
 
-An organisation sponsoring or operating the opportunity. Embedded on an opportunity as a descriptive summary; the same shape is the standalone Organization directory record.
+An organization sponsoring or operating the opportunity. Embedded on an opportunity as a descriptive summary; the same shape is the standalone Organization directory record.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `name` | string, ≤256 | ✅ | Display name of the organisation. | — |
-| `slug` | string, `^[a-z0-9-]+$` | ✅ | Lowercase URL-safe identifier, and also the organisation's namespace. | — |
+| `name` | string, ≤256 | ✅ | Display name of the organization. | — |
+| `slug` | string, `^[a-z0-9-]+$` | ✅ | Lowercase URL-safe identifier, and also the organization's namespace. | — |
 | `orgType` | `foundation` \| `dao` \| `company` \| `protocol` \| `program` \| `individual` \| `other` |  | Kind of entity. | — |
-| `description` | string\|null |  | Short description of the organisation. | — |
-| `website` | string(uri)\|null |  | The organisation's primary website. | — |
-| `logoUrl` | string(uri)\|null |  | URL of the organisation's logo image. | — |
-| `bannerUrl` | string(uri)\|null |  | URL of the organisation's banner or hero image. | — |
-| `socialLinks` | [`socialLink`](#sociallink)[], unique |  | Social and community links for the organisation, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. | — |
-| `ecosystems` | string[], unique |  | Ethereum-family ecosystems the organisation operates in. Same open list as the top-level field. | — |
-| `contacts` | [`contact`](#contact)[] |  | Named contact routes into the organisation. Optional, and every field of every entry is optional too. | — |
+| `description` | string\|null |  | Short description of the organization. | — |
+| `website` | string(uri)\|null |  | The organization's primary website. | — |
+| `logoUrl` | string(uri)\|null |  | URL of the organization's logo image. | — |
+| `bannerUrl` | string(uri)\|null |  | URL of the organization's banner or hero image. | — |
+| `socialLinks` | [`socialLink`](#sociallink)[], unique |  | Social and community links for the organization, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. | — |
+| `ecosystems` | string[], unique |  | Ethereum-family ecosystems the organization operates in. Same open list as the top-level field. | — |
+| `contacts` | [`contact`](#contact)[] |  | Named contact routes into the organization. Optional, and every field of every entry is optional too. | — |
 
 ### `contact`
 
-A named contact route into the organisation. Every property is optional and there is no minimum-one-identifier constraint, so `{}` validates — deliberately, because not every publisher can or will name a person.
+A named contact route into the organization. Every property is optional and there is no minimum-one-identifier constraint, so `{}` validates — deliberately, because not every publisher can or will name a person.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
@@ -184,8 +184,8 @@ How this entry reached the Hub and when it was last checked. Every field is opti
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `publisher` | string\|null |  | Namespace — an organisation slug — this entry was published under. Auto-approval requires the publishing account to be a member of this verified org. May differ from the sponsoring organisation. | — |
-| `submittedBy` | string\|null |  | Who submitted or published this entry: a public handle, an organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed. This is the attribution carrier for data-partner credit. | — |
+| `publisher` | string\|null |  | Namespace — an organization slug — this entry was published under. Auto-approval requires the publishing account to be a member of this verified org. May differ from the sponsoring organization. | — |
+| `submittedBy` | string\|null |  | Who submitted or published this entry: a public handle, an organization slug, or 'community' for anonymous community submissions. The internal account identity is never exposed. This is the attribution carrier for data-partner credit. | — |
 | `submittedAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when the entry was submitted or published to the Hub. Pairs with submittedBy. null means unknown. | — |
 | `ingestedVia` | `publisher_api` \| `submission` \| `scrape` \| `import` \| `outbox`\|null |  | How this entry entered the Hub. 'outbox' is a one-way push from an upstream source system's outbox; 'import' is a backfill or seed import. Always set server-side by the ingestion layer. | — |
 | `originalId` | string\|null |  | Identifier of this opportunity in the source system. | — |
@@ -210,7 +210,7 @@ The program-level funding envelope. Single-currency by design, and that rule is 
 |---|---|:--:|---|---|
 | `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol denominating every monetary amount in the document: the amounts below, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. | — |
 | `budget` | number\|null, ≥0 |  | Total program budget in major units. | — |
-| `allocated` | number\|null, ≥0 |  | Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modelled. | — |
+| `allocated` | number\|null, ≥0 |  | Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modeled. | — |
 | `minAward` | number\|null, ≥0 |  | Minimum individual award in major units. | — |
 | `maxAward` | number\|null, ≥0 |  | Maximum individual award in major units. | — |
 
@@ -359,7 +359,7 @@ The fundingDetails payload when fundingType is 'vc_fund': venture-fund-specific 
 
 ### `rfp`
 
-The fundingDetails payload when fundingType is 'rfp': RFP-specific attributes. The issuing organisation is operatingOrganizations[0], the budget is the top-level fundingInfo envelope, and the proposal deadline is a deadlines entry labelled 'application'.
+The fundingDetails payload when fundingType is 'rfp': RFP-specific attributes. The issuing organization is operatingOrganizations[0], the budget is the top-level fundingInfo envelope, and the proposal deadline is a deadlines entry labeled 'application'.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
@@ -378,8 +378,8 @@ schema-enforced**. Each is stated here because otherwise publishers guess and th
 
 | Convention | Ruling |
 |---|---|
-| **`operatingOrganizations` is the primary array** | Required, `minItems: 1`, and **`[0]` is the primary/display organisation** — the party that runs intake, process and the application funnel, and the issuing organisation of an `rfp`. Operating = who actually runs the process = the entity consumers need first. |
-| **`sponsoringOrganizations` ≠ source of funds** | Optional since the 2026-08-05 revision. It is the **issuer/backer** where one is published, not necessarily where the money comes from — **the money's actual origin is deliberately not modelled.** The party running the process belongs in `operatingOrganizations`. |
+| **`operatingOrganizations` is the primary array** | Required, `minItems: 1`, and **`[0]` is the primary/display organization** — the party that runs intake, process and the application funnel, and the issuing organization of an `rfp`. Operating = who actually runs the process = the entity consumers need first. |
+| **`sponsoringOrganizations` ≠ source of funds** | Optional since the 2026-08-05 revision. It is the **issuer/backer** where one is published, not necessarily where the money comes from — **the money's actual origin is deliberately not modeled.** The party running the process belongs in `operatingOrganizations`. |
 | **`applicationUrl` = whatever the submission channel is** | Including a **forum thread** when no portal exists. Clarifications go in `description`. **There is no submission-channel field** — the URL's *kind* is not typed. |
 | **`prerequisites` vs. `rfp.requirements`** | **`prerequisites` = what a *proposal* must contain** (track record, approach, milestone plan, disclosures). **`rfp.requirements` = what the *work* must deliver.** Application-content vs. work-content. |
 | **The three free-text siblings** | `prerequisites`, `additionalReferences` and `serviceAgreement` are all optional top-level strings and will be used interchangeably unless the boundary is written down — see below. |
@@ -484,7 +484,7 @@ against takes `{"model": "discretionary"}`; a tier nobody has filled in yet is a
 
 **What the table cannot express, by choice.** Real programs also publish step functions over
 funds at risk, tiers that change when protocol TVL crosses a threshold, pool release conditional
-on findings, per-tier vesting and multipliers. None of it is modelled. The test applied was
+on findings, per-tier vesting and multipliers. None of it is modeled. The test applied was
 whether omitting a thing changes the answer to *"which programs pay more than $X for a critical,
 and can I still submit?"* — and none of these do, because every such program still publishes a
 severity tier and a ceiling that the table captures exactly. The arithmetic belongs in
@@ -533,7 +533,7 @@ Known costs, stated plainly:
 ### `fundingInfo.allocated` is committed, not disbursed
 
 `allocated` means money **committed to date** — not money paid out. Disbursement and delivery are
-deliberately not modelled. `remaining` is **derived** as `budget − allocated` at the consumer
+deliberately not modeled. `remaining` is **derived** as `budget − allocated` at the consumer
 layer and never stored.
 
 There is no `raised` field. A donor-crowdfunded opportunity therefore asserts its `budget`
@@ -630,7 +630,7 @@ conformance; a conforming document may raise warnings, which is the point of the
 - **Status granularity** — the four-value enum is the most-questioned part of the standard
   (`in review`, `paused`, `awarded` have all been asked for). It remains open on its own terms;
   the no-`draft` ruling above does not close it.
-- **Level-of-effort / scope-complexity signal** — asked for, not modelled.
+- **Level-of-effort / scope-complexity signal** — asked for, not modeled.
 - **Cross-system dedup** — when the same opportunity is aggregated from more than one upstream
   source, a merge-precedence policy is needed at the read/aggregation layer. The removal of a
-  source URL makes this a judgement call rather than a lookup.
+  source URL makes this a judgment call rather than a lookup.

@@ -99,8 +99,8 @@ change the environment every other suite executes in.
 
 | Route | What it does |
 |---|---|
-| `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organisation, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
-| `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organisations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
+| `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organization, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
+| `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organizations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
 | `/publishers` | Every verified organization, from `GET /v1/publishers` — one unauthenticated call, no pagination, ordered deterministically by slug. Each card links to `/?organization=<slug>`, and says so on the card: that filter matches any operating or sponsoring organization on a listing. `logoUrl` is never rendered as an `<img>` (see the CSP section below); it is a link, or nothing. |
 
 ### Signed in — the workbench
@@ -109,12 +109,12 @@ change the environment every other suite executes in.
 |---|---|
 | `/dashboard` | Signed out: what an account is for, and the login button. Signed in: this account's traffic across everything it publishes, most-read first. (This was `/` until the directory took that route.) |
 | `/listings` | Everything this account submitted or publishes, **whatever its review status** — the public reads 404 a pending entry, and its owner still needs to see it. Review status, listing state, and the last source-check verdict per row. |
-| `/listings/[id]` | One entry, with four tabs: **Analytics** (daily reads and link-outs), **Audit** (every mutation, with the full patch for the owner), **Verification** (the last source check, and a reviewer's button to run one), **Duplicates** (suspected matches against published entries). Also where an entry is claimed for an organisation. |
+| `/listings/[id]` | One entry, with four tabs: **Analytics** (daily reads and link-outs), **Audit** (every mutation, with the full patch for the owner), **Verification** (the last source check, and a reviewer's button to run one), **Duplicates** (suspected matches against published entries). Also where an entry is claimed for an organization. |
 | `/listings/new`, `/listings/[id]/edit` | Submit or replace, validated in the browser against the Standard before it is sent. |
 | `/keys` | Mint, list and revoke API keys. The secret is shown exactly once. |
 | `/duplicates` | Suspected duplicates touching this account's entries. Read-only — merging is a reviewer's action. |
-| `/review` | Reviewer only: the pending queue, ownership claims, the duplicate queue including the merge, and organisation verification. |
-| `/admin` | Administrator only: global roles and the direct-create grant, plus the organisation directory. |
+| `/review` | Reviewer only: the pending queue, ownership claims, the duplicate queue including the merge, and organization verification. |
+| `/admin` | Administrator only: global roles and the direct-create grant, plus the organization directory. |
 | `/account` | Handle and display name, and what the API says this account may do. |
 
 Every one of them renders an explicit loading, empty and error state, and an error carries the API's
@@ -146,7 +146,7 @@ is **not** in this cut. `fundingDetails` in particular is the Standard's structu
 half-typed version of it would silently drop fields a publisher had entered.
 
 Editing is a **replace** (`PUT`), so the edit screen loads the stored document and carries every
-field it does not itself render through untouched. That behaviour has its own round-trip unit test:
+field it does not itself render through untouched. That behavior has its own round-trip unit test:
 it is the most damaging bug a form of this shape can have.
 
 Validation runs twice: in the browser against the Standard (`rfphub-validate`, the same package the
@@ -180,7 +180,7 @@ code, and — where the deployment configures it — Google.
   they are. The compensating controls are the CSP above, the no-raw-HTML test, and the fact that
   sessions are now revocable server-side — a compromise is remediable, which it previously was not.
 
-**Untrusted content.** Titles, descriptions, organisation names and URLs are publisher-supplied; the
+**Untrusted content.** Titles, descriptions, organization names and URLs are publisher-supplied; the
 Standard says a `description` must be treated as untrusted. They are rendered as **text**, never as
 markup — no HTML injection API is used anywhere in `src/`, and `test/no-raw-html.test.ts` scans the
 source on every run to keep it that way, including a check that no markdown or sanitiser dependency
@@ -375,8 +375,8 @@ Run against a staging deployment with a real publisher account, after generating
    forward and back. Confirm a **pending** entry is absent, and that the network tab shows no
    `Authorization` header on `/v1/opportunities`.
 2. **A public entry, signed out.** Open one from the directory. `/opportunities/{id}` shows the
-   dates, money, organisations, provenance and change history. Click "Open the application page";
-   confirm it lands on the programme's own site via `/v1/r/{id}/apply`. Then, as that entry's
+   dates, money, organizations, provenance and change history. Click "Open the application page";
+   confirm it lands on the program's own site via `/v1/r/{id}/apply`. Then, as that entry's
    publisher, confirm `detailViews` and `applyClicks` both moved — this is the whole point of the
    public page reading the public route.
 3. **Login.** `/` signed out shows the directory *and* the publisher card with its login button.
@@ -414,7 +414,7 @@ Run against a staging deployment with a real publisher account, after generating
 13. **Keys.** `/keys` mints a key, shows the secret once, and the secret is gone after a reload.
     Revoking it moves the row to revoked.
 14. **Review.** As a reviewer, `/review` approves a pending entry (it appears in the public directory
-    within a reload), approves a claim **without** verifying the organisation and shows the API's
+    within a reload), approves a claim **without** verifying the organization and shows the API's
     sentence about future writes staying pending, and merges a duplicate pair with the survivor
     chosen explicitly.
 15. **Administration.** As an administrator, `/admin` changes an account's role and toggles
@@ -436,7 +436,7 @@ Run against a staging deployment with a real publisher account, after generating
 * The verification badge on `/listings` is fetched **per row** — the list payload does not carry the
   last run. At most 20 rows, each failing soft, but the right fix is a field on the list row.
 * No pagination controls on the review queues; they take the API's first 50–100 rows.
-* Organisation directory editing (`PATCH /v1/review/organizations/{slug}`) has no screen yet;
+* Organization directory editing (`PATCH /v1/review/organizations/{slug}`) has no screen yet;
   verification and membership are the parts a reviewer needs day to day.
 * No dark theme, and no per-funding-type submission form (see above).
 * **The directory is client-fetched, so it is invisible to anything that does not run JavaScript.**

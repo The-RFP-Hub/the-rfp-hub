@@ -32,8 +32,8 @@ data in somebody else's shape, and the draft is a machine's first guess at ours.
 ## Why step 3 is a person
 
 A mapper can only restate what the upstream said. It cannot know that a program closed last month,
-that a budget was announced in a governance post, that a listing labelled `bounty` is really a
-hackathon, or that an organisation renamed itself. Every one of those is a fact about the funder,
+that a budget was announced in a governance post, that a listing labeled `bounty` is really a
+hackathon, or that an organization renamed itself. Every one of those is a fact about the funder,
 published on the funder's own site, and the committed corpus is what it is because a human went and
 read them. Step 2's output is the *starting point* for that pass, never a substitute for it.
 
@@ -49,7 +49,7 @@ file in this repo. `SOURCE_BRAND` (comma-separated) and `CORPUS_SIZE` are its op
 
 Neutralization runs inside the fetch, not after it: vendor-named keys are stripped at every depth
 and any record still naming the vendor is excluded outright rather than rewritten. Real-world data
-— organisation names, ecosystems, the programs' own URLs — is public and kept verbatim.
+— organization names, ecosystems, the programs' own URLs — is public and kept verbatim.
 
 ## The provenance namespace
 

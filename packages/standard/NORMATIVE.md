@@ -59,7 +59,7 @@ These explain the standard. They are corrigible, and correcting them is not a sp
    **normative in intent but not schema-expressible** — the clearest is that
    `milestones[].amount` must be denominated in `fundingInfo.currency`, a dependency that crosses two
    objects. Those are enforced by the validator's advisory tier and by ingestion policy, and each
-   one is labelled as such at the point it is stated. They are requirements on *publishers*, not
+   one is labeled as such at the point it is stated. They are requirements on *publishers*, not
    conditions of schema validity.
 
 2. **Informative content may be corrected outside the release cycle.** A wrong crosswalk row, a

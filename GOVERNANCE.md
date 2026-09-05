@@ -1,7 +1,7 @@
 # Governance
 
 How decisions get made in this project, in one page. It is short on purpose: a governance
-document that describes a larger organisation than the one that exists is worse than none,
+document that describes a larger organization than the one that exists is worse than none,
 because it tells contributors to expect a process nobody will actually run.
 
 - **What counts as a change to the standard, and what has to be true before it ships:**
@@ -51,7 +51,7 @@ versioning policy, or the process itself. See [`adr/`](./adr).
 
 ## Review windows
 
-A minimum time a change stays open before merge, so that "I was travelling" is never how a
+A minimum time a change stays open before merge, so that "I was traveling" is never how a
 decision gets made.
 
 | Change | Minimum open time |
@@ -86,7 +86,7 @@ in a call summary. If the decision stands, the reasoning goes on the record; if 
 already in an ADR, the answer points at it. Decisions that cannot be explained in public are
 decisions that should not have been made.
 
-There is no escalation body above this, because there is no organisation above this.
+There is no escalation body above this, because there is no organization above this.
 
 ## Non-discrimination and ranking
 
@@ -160,14 +160,14 @@ one. How verification is granted, and how it is taken away, is
 Written down so nobody wastes time looking for them, and so nobody proposes adding them without
 arguing for the problem first:
 
-- **No charter.** Chartering exists to bound the scope of a multi-organisation working group. The
+- **No charter.** Chartering exists to bound the scope of a multi-organization working group. The
   scope here is bounded by `PROCESS.md` and the ADRs.
 - **No membership tiers, no seats, no fees, no voting percentages, no vote windows.** These solve
   coordination problems between competing vendors. Two people with a 72-hour comment window carry
   the same signal at this size and cost nothing to run.
 - **No patent policy and no IP working group.** The standard is **CC0 1.0** — the most permissive
   option available, and more permissive than every comparable project. Honest footnote: CC0
-  grants **no patent licence**. If a patent commitment is ever genuinely needed, the cheap
+  grants **no patent license**. If a patent commitment is ever genuinely needed, the cheap
   legitimate wrapper is a W3C Community Group; it is not needed now.
 - **No CLA.** CC0 already covers reuse of the standard, and code is MIT. A CLA is a legal project
   with no problem attached here.
@@ -179,5 +179,5 @@ arguing for the problem first:
   horizontal review, no incorporated foundation.
 
 The second honest footnote on CC0: it **waives attribution**. Data partners who want credit for
-contributing entries cannot get it from the licence — that has to be a *policy* and a *field*
+contributing entries cannot get it from the license — that has to be a *policy* and a *field*
 (`source.submittedBy`, `source.publisher`), and the policy is owed to them separately.

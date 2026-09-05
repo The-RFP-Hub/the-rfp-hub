@@ -40,7 +40,7 @@ outside the release cycle.
 | `status` (4 values) | — | `isOpen` (boolean) — **lossy both ways**: four lifecycle values collapse to one boolean, and `upcoming` vs `open` is unrecoverable |
 | `specVersion` | `schemaVersion` | — |
 
-### Organisations
+### Organizations
 
 | RFP Hub v1.0.0 | schema.org/Grant | DAOIP-5 |
 |---|---|---|
@@ -99,7 +99,7 @@ is lossy, deliberately, and lossier than before.
 | `createdAt` / `updatedAt` | `dateCreated` / `dateModified` | — |
 
 **Cardinality divergence.** DAOIP-5 has one scalar `closeDate`; the RFP Hub has an array of
-labelled deadlines. Exporting takes the earliest future `application` deadline. Importing yields
+labeled deadlines. Exporting takes the earliest future `application` deadline. Importing yields
 a single `{deadlineType: "fixed", date, label: "application"}` entry — every other deadline the source
 had, if it had any, was already lost before it reached us.
 
@@ -198,13 +198,13 @@ not domain fields; they have no crosswalk row.
     which maps only loosely to `schema:citation`.
   - `organization` → `sponsoringOrganizations[]`, which mapped *better* than before: schema.org
     carries `funder` **and** `sponsor`, and both are repeatable.
-  - `closesAt` → `deadlines[]`, which maps *worse* than before: one scalar became a labelled
+  - `closesAt` → `deadlines[]`, which maps *worse* than before: one scalar became a labeled
     array and only the `application` label round-trips to `closeDate`.
 
   The **2026-08-05 second draft revision** reissued mappings again:
-  - the organisation role swap put the loose `schema:sponsor` mapping on the required primary
+  - the organization role swap put the loose `schema:sponsor` mapping on the required primary
     array and the clean `schema:funder` / Grant System mapping on an optional one (see the
-    Organisations section above — an accepted cost, `adr/0004`);
+    Organizations section above — an accepted cost, `adr/0004`);
   - `extensions` (and with it `daoip5:extensions`, the only 1:1 DAOIP-5 mapping) and the
     `tags → schema:keywords` mapping were removed with their fields, and lossy imports lost
     their overflow slot — they now drop data;
@@ -291,7 +291,7 @@ context.
 
 Two processing guarantees and one caveat, all verified against jsonld.js:
 
-- **One term per IRI, per scope.** Keys that share a target IRI (`title` and organisation
+- **One term per IRI, per scope.** Keys that share a target IRI (`title` and organization
   `name` both mean `schema:name`; `id` and `source.originalId` both mean `schema:identifier`;
   `source.submittedAt` and `createdAt` both mean `schema:dateCreated`) are disambiguated with
   property-scoped contexts, so `expand` → `compact` with this context reproduces the original

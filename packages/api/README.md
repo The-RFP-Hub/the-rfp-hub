@@ -116,7 +116,7 @@ from the Standard's own `baseUrl`) and asserted with both `Host` headers in
 independently**: in production the apex resolves to the reference frontend, which proxies exactly
 `/schemas/`, `/meta/`, `/registries/` and `/ns/` to this service and claims none of them as app
 routes — so apex traffic for `/v1` never reaches a task at all. The table above still describes
-this service's behaviour under a `Host: ethrfps.app` header, and that is the point: it is what
+this service's behavior under a `Host: ethrfps.app` header, and that is the point: it is what
 holds if the apex is ever routed here directly. Two layers, because the application rule survives
 an infrastructure edit and the infrastructure rule survives a routing change here.
 
@@ -321,7 +321,7 @@ pointer. The one variable it reads, `SEED_STRICT=1`, only mirrors the `--strict`
 offline tooling and documented with it, under
 [the converter's README](./tools/converter/README.md), rather than as a deployment variable.
 
-### Process behaviour
+### Process behavior
 
 - **CORS**: every response carries `Access-Control-Allow-Origin: *`, for the read verbs and the
   write ones (`GET`, `HEAD`, `OPTIONS`, `POST`, `PUT`, `PATCH`, `DELETE`), allowing `Content-Type`
@@ -673,7 +673,7 @@ that: what the diff shows is what the API serves.
 
 It also makes the data honest in a way a mapper cannot be. A mapper restates what an upstream said;
 it cannot know that a program closed last month, that a budget was announced in a governance post,
-or that a listing labelled `bounty` is really a hackathon. Every entry here was reconciled against
+or that a listing labeled `bounty` is really a hackathon. Every entry here was reconciled against
 the funder's own published pages — their site, docs, blog, governance forum or code host — and
 where the researched value contradicted the converted one, the researched value won. The envelope's
 `note` records that, including the caveat that statuses are a point-in-time reading and go stale.
@@ -726,7 +726,7 @@ bound. A bound is a source date, not a Hub timestamp.
 
 On the converted side the field had been inherited from the upstream snapshot's own row timestamp,
 byte-identical to `createdAt` on 65 of the 66 — an ingestion time, not an announcement. Those were
-re-researched: **26 now carry a date the funder or organiser published** (11 exact, 13 dated launch
+re-researched: **26 now carry a date the funder or organizer published** (11 exact, 13 dated launch
 announcements, 2 archival bounds) and **39 carry no `postedAt` at all**, because that is what the
 Standard has for unknown. Each of the 39 says in its own description what was searched.
 `test/unit/seed-corpus.test.ts` asserts the rule document by document — a date, if present,
