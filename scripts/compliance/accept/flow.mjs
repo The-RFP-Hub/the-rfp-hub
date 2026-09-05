@@ -9,6 +9,7 @@
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -98,6 +99,11 @@ function runApprove(command, args, { cwd, env, timeoutMs }) {
  * so nothing tore the fixture down. Any polling error now rejects this promise instead, which the
  * caller's `finally` turns into a best-effort teardown.
  */
+/** `rfphub-mcp approve` writes the record with a rename, so its presence is the whole fact. */
+export function approvalRecorded(mcpHome, approvalId) {
+  return existsSync(join(mcpHome, "approvals", `${approvalId}.json`));
+}
+
 export function waitForHumanApproval(state, { command, timeoutMs, onPrompt, pollMs = 1000 }) {
   onPrompt(
     [
@@ -257,19 +263,10 @@ export async function runSubmissionCycle(ctx, state, c) {
     state.approvalMode = ctx.interactiveApproval ? "HUMAN" : "SIMULATED (non-interactive)";
     try {
       if (ctx.interactiveApproval) {
-        state.approvalConsumed = async () => {
-          const pending = await client.request(
-            "tools/call",
-            { name: SUBMIT_TOOL, arguments: { document, approvalId } },
-            { timeoutMs: ctx.timeoutMs },
-          );
-          // Only a consumed approval lets the commit through; anything else is "still waiting".
-          const text = JSON.stringify(pending.result ?? pending.error ?? {});
-          if (/confirmation_required|confirmation_invalid/.test(text)) return false;
-          state.commitAttempted = true;
-          state.interactiveCommitResponse = pending;
-          return true;
-        };
+        // Watched on disk, never by calling the commit tool: every refused commit counts against
+        // the server's per-minute attempt budget, so a one-second network poll turned into
+        // `rate_limited` after ~20 s, which is not a refusal and used to read as "approved".
+        state.approvalConsumed = async () => approvalRecorded(mcpHome, approvalId);
         await waitForHumanApproval(state, {
           command: approveCommand,
           timeoutMs: ctx.approveTimeoutMs,
@@ -290,15 +287,12 @@ export async function runSubmissionCycle(ctx, state, c) {
     }
     c.info("approval", `approval: ${state.approvalMode} — ${approveCommand}`);
 
-    let commitResponse = state.interactiveCommitResponse;
-    if (!commitResponse) {
-      state.commitAttempted = true;
-      commitResponse = await client.request(
-        "tools/call",
-        { name: SUBMIT_TOOL, arguments: { document, approvalId } },
-        { timeoutMs: ctx.timeoutMs },
-      );
-    }
+    state.commitAttempted = true;
+    const commitResponse = await client.request(
+      "tools/call",
+      { name: SUBMIT_TOOL, arguments: { document, approvalId } },
+      { timeoutMs: ctx.timeoutMs },
+    );
     if (commitResponse.error) {
       throw new Error(
         `phase 3 (commit) failed: JSON-RPC error ${JSON.stringify(commitResponse.error)}`,

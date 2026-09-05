@@ -19,7 +19,9 @@ const { request } = await import("../http.mjs");
 const { TARGET_SELECTOR, deriveFilterValues, hasNoindexMeta, robotsBlocksAll } = await import(
   "../checks/frontend.mjs"
 );
-const { verifyTornDown, waitForHumanApproval } = await import("../accept/flow.mjs");
+const { approvalRecorded, verifyTornDown, waitForHumanApproval } = await import(
+  "../accept/flow.mjs"
+);
 
 describe("1 — an acceptance run is never a deployment sign-off", () => {
   it("reports signOff false and a scoped result even when every criterion passed", () => {
@@ -68,6 +70,24 @@ describe("2 — a throwing approval poll rejects rather than hanging", () => {
         pollMs: 5,
       }),
     ).rejects.toThrow(/no approval was recorded/);
+  });
+});
+
+describe("2b — the operator's approval is read from disk, not by hammering the commit tool", () => {
+  it("is false until the approve CLI has written the record, then true", async () => {
+    // Polling the commit tool once a second spent the server's attempt budget in ~20 s; the
+    // resulting `rate_limited` reply matched neither refusal pattern and read as "approved".
+    const home = await mkdtemp(join(tmpdir(), "accept-approvals-"));
+    try {
+      const id = "a".repeat(64);
+      expect(approvalRecorded(home, id)).toBe(false);
+      await mkdir(join(home, "approvals"), { recursive: true });
+      await writeFile(join(home, "approvals", `${id}.json`), "{}");
+      expect(approvalRecorded(home, id)).toBe(true);
+      expect(approvalRecorded(home, "b".repeat(64))).toBe(false);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
   });
 });
 
