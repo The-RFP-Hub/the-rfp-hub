@@ -24,8 +24,7 @@ function pageRoutes(directory = appRoot): string[] {
 }
 
 /**
- * The routes this app WANTS a search engine to carry: the set `src/app/sitemap.ts` publishes, plus
- * `/opportunities/[id]`, which a crawler reaches by following a directory link.
+ * What `src/app/sitemap.ts` publishes: five static pages plus `/opportunities/[id]` per entry.
  */
 const PUBLIC_ROUTES = [
   "/",

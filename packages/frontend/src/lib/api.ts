@@ -598,3 +598,46 @@ export async function loadManagedOpportunity(
 
   throw new ApiError(404, "not_found", `No managed opportunity ${JSON.stringify(id)} was found.`);
 }
+
+export interface SitemapOpportunity {
+  id: string;
+  updatedAt?: string;
+}
+
+/**
+ * Every listed opportunity, paginated, for `sitemap.ts` and nothing else. A crawl is the one read
+ * here that must NOT be live, and this client carries no cache — so revalidation is a `fetch`
+ * option injected at the call site. No status filter: a closed entry's page is still a page.
+ */
+export async function listSitemapOpportunities(options: {
+  baseUrl: string;
+  maxUrls: number;
+  revalidateSeconds: number;
+  fetchImpl?: typeof fetch;
+}): Promise<SitemapOpportunity[]> {
+  /** The list route's declared maximum; asking for more is a 400, not a bigger page. */
+  const pageSize = 100;
+  const maxPages = Math.max(1, Math.ceil(options.maxUrls / pageSize));
+  const underlying = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const api = createApiClient({
+    baseUrl: options.baseUrl,
+    fetchImpl: (input, init) =>
+      underlying(input, { ...init, next: { revalidate: options.revalidateSeconds } }),
+  });
+
+  const found: SitemapOpportunity[] = [];
+  for (let page = 1; page <= maxPages && found.length < options.maxUrls; page += 1) {
+    const result = await api.directory.list({ page, limit: pageSize });
+    const items = result?.items;
+    if (!Array.isArray(items)) {
+      throw new ApiError(0, "invalid_response", "The opportunity list carried no items array.");
+    }
+    for (const item of items) {
+      if (typeof item?.id !== "string" || item.id === "") continue;
+      found.push(item.updatedAt ? { id: item.id, updatedAt: item.updatedAt } : { id: item.id });
+      if (found.length >= options.maxUrls) break;
+    }
+    if (items.length < pageSize) break;
+  }
+  return found;
+}

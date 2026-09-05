@@ -94,6 +94,16 @@ describe("the notification navigation badge", () => {
     expect(notifications).toHaveBeenCalledTimes(2);
   });
 
+  it("caps the printed count at three characters without rounding what it announces", async () => {
+    renderChrome(async () => inbox(349));
+
+    const link = await screen.findByRole("link", {
+      name: /Notifications 349 unread notifications/,
+    });
+    expect(link.textContent).toContain("99+");
+    expect(link.textContent).not.toContain("349");
+  });
+
   it("keeps the destination available without a badge at zero or when the count read fails", async () => {
     const zero = renderChrome(async () => inbox(0));
     expect(await screen.findByRole("link", { name: "Notifications" })).toBeTruthy();

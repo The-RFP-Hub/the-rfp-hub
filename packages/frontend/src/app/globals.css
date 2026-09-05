@@ -501,9 +501,11 @@ caption {
   color: var(--ink);
 }
 
+/* Seven characters, and never two lines: a wrapped wordmark turns the header into two rows. */
 .brand-text {
   display: flex;
   flex-direction: column;
+  white-space: nowrap;
 }
 
 .brand-tagline {
@@ -1493,7 +1495,8 @@ caption {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  /* `min(18rem, 100%)`: a bare floor makes the column wider than the padded card holding it. */
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   gap: 0 var(--space-4);
 }
 
@@ -2077,6 +2080,30 @@ pre.untrusted-block {
     gap: 0;
   }
 
+  /* The desktop bar's 16rem + 2 × 10rem floors exceed a tablet's width, so from ~641px to ~771px
+   * the submit ran past the edge. Two flexible columns, at the advanced filters' own breakpoint. */
+  .filters-primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .filters-primary .field-search {
+    grid-column: 1 / -1;
+  }
+
+  /* A tablet in a keyboard case renders this layout with a FINE pointer, so the coarse rule above
+   * left the bar at 40px where `.shell-nav-primary a` is unconditionally 44. Width, not device. */
+  .filters input,
+  .filters select,
+  .filters button,
+  .filters-more > summary {
+    min-block-size: var(--control-touch);
+  }
+
+  .filters-more > summary {
+    align-items: center;
+  }
+
   .filters-advanced {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
@@ -2126,12 +2153,6 @@ pre.untrusted-block {
     padding: var(--space-3);
   }
 
-  .filters-primary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
-  }
-
-  .filters-primary .field-search,
   .filters-primary .field-action {
     grid-column: 1 / -1;
   }
@@ -2274,11 +2295,22 @@ pre.untrusted-block {
 }
 
 /* At the narrowest supported width the utility row yields one redundant account icon, while the
- * bell and both text labels remain unambiguous and every target remains 44px. */
+ * bell and both text labels remain unambiguous and every target remains 44px. Signed in it still
+ * did not fit — wordmark, bell and "Menu" asked ~300px of the 288 available, wrapping "RFP Hub"
+ * onto a second row — so the wordmark steps down a size and two gaps tighten to buy that back. */
 @media (max-width: 22rem) {
   .brand-tagline,
   .shell-menu-user {
     display: none;
+  }
+
+  .shell-header {
+    gap: var(--space-2);
+  }
+
+  .brand {
+    gap: var(--space-2);
+    font-size: var(--text-h3);
   }
 
   .shell-menu-toggle {
