@@ -48,27 +48,19 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await expect(accountMenu).toBeVisible();
     await accountMenu.click();
 
-    // THE NAVIGATION IS GROUPED NOW, and this list follows the grouping rather than the old flat
-    // row. `Directory` and `How it works` are the public pair — present for a stranger too;
-    // `Dashboard`, `Your listings`, `Account` and `API keys` are what THIS ACCOUNT owns, rendered
-    // from what `GET /v1/me` answered, and every session may manage its own keys.
-    //
-    // `Listings` became `Your listings` in the regroup: the account group says whose things these
-    // are. The criterion is unchanged — a capability-gated link that exists only once the API has
-    // answered for this account — so the label is updated rather than the assertion weakened.
+    // THE HEADER HAS TWO SURFACES NOW: an always-visible primary row (`Directory`, `Publishers`,
+    // `Dashboard`) and this disclosure's grouped panel (`My work`, `Account`, `Help`, …). `Dashboard`
+    // renders in both, so each label below is scoped to the one surface that makes it exact — never
+    // to the whole nav, which would resolve two elements and fail Playwright's strict mode.
     const nav = page.getByRole("navigation", { name: "Sections" });
-    for (const label of [
-      "Directory",
-      "How it works",
-      "Dashboard",
-      "Your listings",
-      "Account",
-      "API keys",
-    ]) {
-      // `exact` matters: the brand link's accessible name contains "Directory" as a substring, so a
-      // loose match resolves to two elements and fails strict mode. The nav labels are exact
-      // strings; pinning them is the tighter assertion anyway.
-      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+    const primary = nav.locator(".shell-nav-primary");
+    const panel = nav.locator("#account-navigation");
+    const help = panel.getByRole("region", { name: "Help" });
+
+    await expect(primary.getByRole("link", { name: "Directory", exact: true })).toBeVisible();
+    await expect(help.getByRole("link", { name: "How it works", exact: true })).toBeVisible();
+    for (const label of ["Dashboard", "Your listings", "Account", "API keys"]) {
+      await expect(panel.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
     // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANIZATION ENTRY, beside its listings rather than behind
@@ -90,7 +82,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
       "this actor is a member of at least one organization",
     ).toBeGreaterThan(0);
     const only = memberships.length === 1 ? memberships[0] : undefined;
-    const organization = nav.getByRole("link", {
+    const organization = panel.getByRole("link", {
       name: only ? only.name : "Organizations",
       exact: true,
     });
