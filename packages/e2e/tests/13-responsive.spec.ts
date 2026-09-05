@@ -246,6 +246,10 @@ async function expectUsableNav(page: Page, viewport: Viewport): Promise<void> {
 /** The directory's main filter controls — the ones a thumb actually has to hit on a phone. */
 async function expectDirectoryControlsAreTouchable(page: Page): Promise<void> {
   await expectTouchTarget(page.getByLabel("Search", { exact: true }), "the Search box");
+  await expectTouchTarget(
+    page.getByLabel("Funding type", { exact: true }),
+    "the Funding type select",
+  );
   await expectTouchTarget(page.getByLabel("Status", { exact: true }), "the Status select");
   await expectTouchTarget(page.getByRole("button", { name: "Search" }), "the Search button");
 
@@ -398,6 +402,30 @@ test.describe("M4 responsive layout", () => {
       await expect(panel).toBeHidden();
     }
   });
+
+  /** A keyboard-case tablet reaches this layout with a FINE pointer: the bar measured 40px there. */
+  for (const width of [375, 768]) {
+    test(`${width}px with a fine pointer — the filter bar keeps its 44px targets`, async ({
+      browser,
+      stack,
+    }) => {
+      const { context, page } = await newViewportPage(browser, {
+        name: `fine pointer (${width}px)`,
+        width,
+        height: 900,
+        hasTouch: false,
+      });
+
+      try {
+        await page.goto(stack.urls.frontend);
+        await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+        await expectDirectoryControlsAreTouchable(page);
+        await expectNoHorizontalOverflow(page, `/ at ${width}px with a fine pointer`);
+      } finally {
+        await context.close();
+      }
+    });
+  }
 
   for (const viewport of ADVANCED_FILTER_VIEWPORTS) {
     test(`${viewport.name} — advanced filters keep their composition`, async ({

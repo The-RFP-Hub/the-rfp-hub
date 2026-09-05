@@ -2089,6 +2089,19 @@ pre.untrusted-block {
     grid-column: 1 / -1;
   }
 
+  /* A tablet in a keyboard case renders this layout with a FINE pointer, so the coarse rule above
+   * left the bar at 40px where `.shell-nav-primary a` is unconditionally 44. Width, not device. */
+  .filters input,
+  .filters select,
+  .filters button,
+  .filters-more > summary {
+    min-block-size: var(--control-touch);
+  }
+
+  .filters-more > summary {
+    align-items: center;
+  }
+
   .filters-advanced {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
