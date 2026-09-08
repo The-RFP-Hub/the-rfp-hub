@@ -93,7 +93,11 @@ import {
   tokenize,
 } from "../src/modules/services/dedupe/embedding-provider.js";
 import committedIdfTable from "../src/modules/services/dedupe/idf-table.json";
-import { type EmbeddableOpportunity, embeddingText } from "../src/modules/shared/embedding-text.js";
+import {
+  type EmbeddableOpportunity,
+  descriptionHash,
+  embeddingText,
+} from "../src/modules/shared/embedding-text.js";
 
 /** The corpus this repository ships, and the only input this script reads. */
 const CORPUS_PATH = fileURLToPath(new URL("../data/seed-corpus.json", import.meta.url));
@@ -181,7 +185,7 @@ function paraphrase(text: string): string {
 const MUTATIONS_M5_APPLY = (t: string): string =>
   reverseTriples(truncateTo(dropEvery(substitute(t, SUBSTITUTIONS_HEAVY), 3), 0.5));
 
-export type MutationId = "M0" | "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7";
+export type MutationId = "M0" | "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7" | "M8";
 
 /**
  * The six ways one programme gets entered twice, each as a pure deterministic text operator.
@@ -220,6 +224,14 @@ export const MUTATIONS: Record<MutationId, { label: string; apply: (text: string
   M7: {
     label: "M5's text mutation, structural fields blanked",
     apply: MUTATIONS_M5_APPLY,
+  },
+  // The M3 reviewer's copy: description verbatim, summary dropped, taxonomy blanked, another
+  // organization. Scored 0.313 under the summary-first text basis. Applied by
+  // `deriveMutationPositives`, which builds this rung from the record's own fields rather than
+  // from one shared body.
+  M8: {
+    label: "verbatim description; summary, taxonomy and organization dropped",
+    apply: (t) => t,
   },
 };
 
@@ -272,6 +284,22 @@ export function deriveMutationPositives(
   const { apply } = MUTATIONS[mutation];
   const positive: DerivedPair[] = [];
   for (const doc of usableOf(documents).slice(0, count)) {
+    if (mutation === "M8") {
+      positive.push({
+        label: `${doc.id} ↔ M8`,
+        left: doc,
+        right: {
+          title: (doc.title ?? "").replace(/ — /g, " - "),
+          summary: null,
+          description: doc.description,
+          fundingType: doc.fundingType,
+          ecosystems: [],
+          categories: [],
+          operatingOrganizations: [{ name: "Directory" }],
+        },
+      });
+      continue;
+    }
     const body = bodyOf(doc);
     positive.push({
       label: `${doc.id} ↔ ${mutation}`,
@@ -319,6 +347,8 @@ export function derivePairs(documents: CorpusDocument[], count = 12): DerivedPai
 export interface ScoredPair {
   label: string;
   similarity: number;
+  /** Both descriptions hash alike — the identical-description arm's whole input. */
+  descriptionMatch: boolean;
   /** Cosine corrected by the norm ratio. NOT a containment, NOT bounded by 1 — see the header. */
   overlap: number;
   /** Distinct embedded tokens on the SHORTER side: the substance guard's input. */
@@ -442,7 +472,14 @@ export function scanCorpusPairs(
 ): CorpusScan {
   const vectors = documents.map((doc) => {
     const detail = provider.embedSyncDetailed(embeddingText(doc));
-    return { doc, id: doc.id, vector: detail.vector, norm: detail.norm, tokens: detail.tokens };
+    return {
+      doc,
+      id: doc.id,
+      vector: detail.vector,
+      norm: detail.norm,
+      tokens: detail.tokens,
+      hash: descriptionHash(doc.description),
+    };
   });
 
   const total = (documents.length * (documents.length - 1)) / 2;
@@ -476,6 +513,7 @@ export function scanCorpusPairs(
       const similarity = round3(raw);
       const value = overlapOf({ similarity: raw, leftNorm: left.norm, rightNorm: right.norm }) ?? 0;
       const minTokens = Math.min(left.tokens, right.tokens);
+      const descriptionMatch = left.hash !== null && left.hash === right.hash;
       if (similarity >= threshold) atOrAboveThreshold++;
       if (
         decidePair(
@@ -483,6 +521,7 @@ export function scanCorpusPairs(
             similarity: raw,
             left: { norm: left.norm, tokenCount: left.tokens },
             right: { norm: right.norm, tokenCount: right.tokens },
+            descriptionMatch,
           },
           rule,
         ).accepted
@@ -492,6 +531,7 @@ export function scanCorpusPairs(
       scored.push({
         label: `${left.id} ↔ ${right.id}`,
         similarity,
+        descriptionMatch,
         overlap: round3(value),
         minTokens,
       });
@@ -556,8 +596,9 @@ export function defaultRule(
     similarityThreshold,
     overlapEnabled: true,
     overlapThreshold: DEFAULT_OVERLAP_THRESHOLD.lexical,
-    overlapMinTokens: 20,
+    overlapMinTokens: 40,
     overlapMinSimilarity: 0.35,
+    identicalDescriptionEnabled: true,
     suppliesNorm: true,
   };
 }
@@ -736,9 +777,14 @@ export interface MutationReport {
   median: number;
   recallAtThreshold: number;
   recallAtZeroFp: number;
-  /** Recall under the COMBINED rule — both arms, the substance guard applied. */
+  /** Recall under the COMBINED rule — every arm, the substance guard applied. */
   recallCombined: number;
-  /** The worst (lowest) overlap on this rung, which is what `OVERLAP_MIN` has to clear. */
+  /**
+   * The worst (lowest) overlap among the pairs the overlap arm is ACCOUNTABLE for on this rung:
+   * admitted by the token guard and missed by the lexical arm. `Infinity` when the rung has none
+   * — a rung the lexical arm catches whole, or whose shorter side sits under the guard, says
+   * nothing about where `OVERLAP_MIN` may sit.
+   */
   worstOverlap: number;
   /** The fewest distinct tokens any pair on this rung had, against `MIN_TOKENS`. */
   minTokens: number;
@@ -805,9 +851,11 @@ export function sweep(
     const left = provider.embedSyncDetailed(embeddingText(pair.left));
     const right = provider.embedSyncDetailed(embeddingText(pair.right));
     const raw = cosineSimilarity(left.vector, right.vector);
+    const leftHash = descriptionHash(pair.left.description);
     return {
       label: pair.label,
       similarity: round3(raw),
+      descriptionMatch: leftHash !== null && leftHash === descriptionHash(pair.right.description),
       overlap: round3(
         overlapOf({ similarity: raw, leftNorm: left.norm, rightNorm: right.norm }) ?? 0,
       ),
@@ -816,9 +864,12 @@ export function sweep(
   };
   const accepts = (pair: ScoredPair): boolean =>
     pair.similarity >= rule.similarityThreshold ||
+    (rule.identicalDescriptionEnabled && pair.descriptionMatch) ||
     (pair.minTokens >= rule.overlapMinTokens &&
       pair.similarity >= rule.overlapMinSimilarity &&
       pair.overlap >= rule.overlapThreshold);
+  const accountable = (pair: ScoredPair): boolean =>
+    pair.minTokens >= rule.overlapMinTokens && pair.similarity < rule.similarityThreshold;
 
   const pairs = derivePairs(documents);
   const positives = pairs.positive.map(score);
@@ -851,10 +902,16 @@ export function sweep(
       recallAtThreshold: sims.filter((s) => s >= threshold).length,
       recallAtZeroFp: sims.filter((s) => s >= zeroFpPoint).length,
       recallCombined: scoredPairs.filter(accepts).length,
-      worstOverlap: Math.min(...scoredPairs.map((pair) => pair.overlap)),
+      worstOverlap: Math.min(...scoredPairs.filter(accountable).map((pair) => pair.overlap)),
       minTokens: Math.min(...scoredPairs.map((pair) => pair.minTokens)),
     };
   });
+
+  // The band is measured over the rungs the overlap arm is credited with recovering. M6 (heavy
+  // synonyms, a third dropped, truncated to a quarter) is the acknowledged limit since the
+  // description joined the embedded text: two of its twelve sit between the hardest negative and
+  // the threshold, and `test/unit/dedupe-threshold.test.ts` pins its recall as a floor instead.
+  const bandRungs = mutations.filter((rung) => rung.id !== "M6");
 
   return {
     provider: provider.id,
@@ -871,9 +928,9 @@ export function sweep(
     corpusPairsAtOrAboveThreshold: scan.atOrAboveThreshold,
     rule,
     hardestNegativeOverlap: scan.topByOverlap[0]?.overlap ?? 0,
-    worstPositiveOverlap: Math.min(...mutations.map((rung) => rung.worstOverlap)),
+    worstPositiveOverlap: Math.min(...bandRungs.map((rung) => rung.worstOverlap)),
     overlapBand: round3(
-      Math.min(...mutations.map((rung) => rung.worstOverlap)) -
+      Math.min(...bandRungs.map((rung) => rung.worstOverlap)) -
         (scan.topByOverlap[0]?.overlap ?? 0),
     ),
     corpusPairsAcceptedCombined: scan.acceptedCombined,
@@ -933,7 +990,7 @@ if (isCliEntry) {
     console.log(
       `  ${m.id}  worst ${m.worst.toFixed(3)}  median ${m.median.toFixed(3)}  ` +
         `${m.recallAtThreshold}/${m.count} / ${m.recallAtZeroFp}/${m.count} / ` +
-        `${m.recallCombined}/${m.count}  overlap ${m.worstOverlap.toFixed(3)}  ` +
+        `${m.recallCombined}/${m.count}  overlap ${Number.isFinite(m.worstOverlap) ? m.worstOverlap.toFixed(3) : "—"}  ` +
         `tokens ${m.minTokens}  ${m.label}`,
     );
   }

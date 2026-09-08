@@ -61,6 +61,7 @@ const MATCH_REASON_LABELS: Record<string, string> = {
   // Never "contains" or "copy of": the underlying number is cosine corrected by a length ratio —
   // an estimate of shared vocabulary, not a containment proof.
   overlap: "shortened re-listing",
+  identical_description: "identical description",
   application_url: "same application link",
   operating_org: "same organization",
 };
@@ -252,7 +253,9 @@ export function describeDuplicateCheck(status: DuplicateCheckStatus, matches: nu
   if (status === "unavailable") {
     return "The duplicate check could not run just now. This entry is queued for the nightly pass — it has not been compared yet.";
   }
-  if (matches === 0) return "Checked against the published entries: nothing similar found.";
+  if (matches === 0) {
+    return "The check ran against the published entries and none crossed the detection rule. That is not a guarantee that nothing similar exists.";
+  }
   return `Checked against the published entries: ${matches} possible match${matches === 1 ? "" : "es"} found.`;
 }
 

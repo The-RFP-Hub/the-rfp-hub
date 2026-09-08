@@ -937,40 +937,48 @@ held to containment on replace — a foreign-operated one is still rejected.
 - **Dedup threshold** — the operating point is **per provider**, because a cosine means different
   things in a learned 1536-dimension space and in a hashed token bag.
 
-  **`lexical` is settled at 0.75.** `pnpm --filter @the-rfp-hub/api dedupe:threshold` sweeps the
-  committed corpus: positives are six deterministic mutation classes of the realistic duplicate
-  (from the honest re-listing to the evasive rewrite), and negatives are EVERY distinct pair of
-  corpus documents — the full pairwise scan, because the stride sample this report once used
-  missed the hardest cases entirely (the unweighted bag's honest band was 0.018, with sixteen
-  real corpus pairs above its threshold; the fix is the idf² weighting the featurizer now carries).
+  **What is embedded.** `embeddingText` composes title, summary AND a 2 000-character truncation
+  of the description, then organizations, ecosystems, categories and funding type — both bodies,
+  on every record. It used to embed the summary when present and the description only as a
+  fallback, and that compared two records on different text whenever exactly one of them carried
+  a summary: the M3 acceptance reviewer's verbatim copy of a live listing, submitted without its
+  summary, scored **0.313** against it and was not flagged. The composition is part of the model
+  identity (`tfidf-hashed-v2+…`), so the change re-embedded the whole table through the ordinary
+  backfill and every number below was measured again.
+
+  **`lexical` is settled at 0.78.** `pnpm --filter @the-rfp-hub/api dedupe:threshold` sweeps the
+  committed corpus: positives are deterministic mutation classes of the realistic duplicate (from
+  the honest re-listing to the evasive rewrite, plus the reviewer's copy as M8), and negatives are
+  EVERY distinct pair of corpus documents — the full pairwise scan, because the stride sample this
+  report once used missed the hardest cases entirely.
 
   | | value |
   |---|---|
-  | worst positive (M0 paraphrase) | 0.913 |
-  | hardest of 12 720 corpus negatives | 0.592 |
-  | separation margin | 0.321 |
+  | worst positive (M0 paraphrase) | 0.905 |
+  | hardest of 12 720 corpus negatives | 0.700 (the two Rocket Pool GMC rounds) |
+  | separation margin | 0.205 (0.321 while the summary alone was embedded — long bodies share boilerplate) |
   | corpus pairs at or above the threshold | **0** |
-  | operating point | **0.75** — the midpoint of the band, not its edge |
+  | operating point | **0.78** — just under the 0.80 midpoint, so the synonym-plus-compression rung (worst 0.782) stays whole |
 
   The mutation ladder is recorded honestly, limits included: heavy synonym swaps and
   synonym-plus-compression are caught at full recall; a body truncated to 40 % (M3), or truncated
-  AND compressed AND reordered (M5), is asserted at zero **on the lexical arm** at the configured
-  threshold — a property of the mid-band operating point chosen for false-positive headroom, not an
-  absolute bound (the same featurizer recovers both rungs at its zero-false-positive point, which
-  the report prints), and at **full recall under the combined rule** below. A held-out check
-  (weights from half the corpus, band measured on the other half) guards the frozen idf table
-  against overfitting its source.
+  AND compressed AND reordered (M5), is not whole **on the lexical arm** at the configured
+  threshold — a property of the operating point chosen for false-positive headroom, not an
+  absolute bound — and at **full recall under the combined rule** below. A held-out check (weights
+  from half the corpus, band measured on the other half: 0.321) guards the frozen idf table against
+  overfitting its source.
 
   `test/unit/dedupe-threshold.test.ts` re-derives all of it on every commit and fails if the
-  classes stop separating, if the margin drops under 0.30, if any corpus pair crosses the
+  classes stop separating, if the margin drops under 0.15, if any corpus pair crosses the
   threshold, or if the threshold ends up within 0.05 of either class. A corpus change that closes
   the band is therefore a red build and a decision to make again, not a silent loss of
   detection.
-- **The overlap arm** — the second half of the predicate, and the reason M3/M5/M6 are now caught.
+- **The overlap arm** — the second half of the predicate, and the reason M3/M5/M7 are caught.
 
-  A pair is suspected when the cosine clears 0.75 (arm A, unchanged), **or** when a
-  length-corrected term overlap clears 0.85 with at least 20 distinct tokens on the shorter side
-  and a cosine of at least 0.35 (arm B).
+  A pair is suspected when the cosine clears 0.78 (arm A), **or** when a length-corrected term
+  overlap clears 0.85 with at least 40 distinct tokens on the shorter side and a cosine of at
+  least 0.35 (arm B), **or** when the two descriptions are identical once normalised (arm C,
+  below).
 
   ```
   overlap(a,b) = dot(a,b) / min(‖a‖², ‖b‖²) = cos(â,b̂) · max(‖a‖,‖b‖) / min(‖a‖,‖b‖)
@@ -979,49 +987,72 @@ held to containment on replace — a foreign-operated one is still rejected.
   **What this number is not.** It is cosine corrected by the norm ratio. It *estimates* how much of
   the shorter entry's weighted vocabulary the longer entry accounts for. It is **not** a
   containment proof and **not** bounded by 1: under `1 + log(tf)` weighting and signed feature
-  hashing, a shorter side made of the longer side's highest-weight terms scores above 1 — measured
-  to 1.543 on a cherry-picked stub and 1.223 on an honest 40 % truncation of a real corpus entry.
-  Values above 1 are normal and are not clamped; the threshold is a lower bound, which is why that
-  is harmless. Nothing in the code, the API or these docs calls it a probability, a percentage or a
+  hashing, a shorter side made of the longer side's highest-weight terms scores above 1. Values
+  above 1 are normal and are not clamped; the threshold is a lower bound, which is why that is
+  harmless. Nothing in the code, the API or these docs calls it a probability, a percentage or a
   containment. Cosine cannot do this job on its own for a structural reason: normalization has
   already erased the difference in length that IS the signal.
 
+  The positive side of the band is the pairs the arm is ACCOUNTABLE for — admitted by the token
+  guard and missed by the lexical arm. A rung the lexical arm catches whole says nothing about
+  where the overlap threshold may sit.
+
   | | full corpus | held out (idf from one half, scored on the other) |
   |---|---|---|
-  | hardest negative overlap | **0.682** (`fundingmap:1042 ↔ 961`) | 0.750 |
-  | worst positive overlap (M4) | 0.956 | 0.945 |
-  | separating band | **0.274** | 0.195 |
+  | hardest negative overlap | **0.750** (`fundingmap:1412 ↔ 1398`) | 0.769 |
+  | worst accountable positive overlap (M7) | 0.918 | 0.915 |
+  | separating band | **0.168** | 0.146 |
   | corpus pairs accepted by the combined rule | **0** | **0** |
-  | operating point | **0.85**, inside both bands and on the edge of neither | |
+  | operating point | **0.85**, inside both bands | |
 
-  | rung | lexical recall | **combined recall** | worst overlap | min tokens |
+  | rung | lexical recall | **combined recall** | worst accountable overlap | min tokens |
   |---|---|---|---|---|
-  | M0 paraphrase | 12/12 | 12/12 | 0.987 | 127 |
-  | M1 heavy synonyms | 12/12 | 12/12 | 0.968 | 148 |
-  | M2 reorder | 12/12 | 12/12 | 1.000 | 148 |
-  | **M3 truncate 40 %** | **0/12** | **12/12** | 1.036 | 70 |
-  | M4 synonyms + drop ⅓ | 12/12 | 12/12 | 0.956 | 105 |
-  | **M5 syn + drop + trunc + reorder** | **0/12** | **12/12** | 1.027 | 59 |
-  | **M6 syn + drop + truncate 25 %** | **0/12** | **12/12** | 1.017 | 36 |
-  | **M7 M5 with structural fields blanked** | **0/12** | **12/12** | 1.032 | 59 |
+  | M0 paraphrase | 12/12 | 12/12 | — | 127 |
+  | M1 heavy synonyms | 12/12 | 12/12 | — | 148 |
+  | M2 reorder | 12/12 | 12/12 | — | 148 |
+  | **M3 truncate 40 %** | 2/12 | **12/12** | 1.015 | 70 |
+  | M4 synonyms + drop ⅓ | 12/12 | 12/12 | — | 105 |
+  | **M5 syn + drop + trunc + reorder** | **0/12** | **12/12** | 0.920 | 59 |
+  | **M6 syn + drop + truncate 25 %** | **0/12** | **10/12** | 0.812 | 36 |
+  | **M7 M5 with structural fields blanked** | **0/12** | **12/12** | 0.918 | 59 |
+  | M8 verbatim description, summary and taxonomy dropped | 12/12 | 12/12 | — | 147 |
 
-  **Structural signals are recorded as explanation and barred from the decision.** This was the
-  sketched design and the measurement says the opposite of what it assumed: the corpus's hardest
-  negatives ARE the structurally identical siblings. Normalized-URL equality and primary-org
-  equality each top out at a hardest negative of 0.568, deadline-day coincidence at 0.552, amount +
-  currency at 0.335, and exact normalized-title equality never fires at all. Corroboration moves
-  the safe floor from 0.593 to 0.569 — **0.024** — against M5's worst positive of 0.598. A
-  conjunction band `(url ∨ org) ∧ overlap ≥ C_low` was measured too: the hardest corroborated
-  overlap (guard applied) is **0.682 — the same pair and the same value as the global hardest**, so
-  `C_low` would have to sit above it while every rung is already at 0.956 or better. **It catches
-  nothing**, and since a stub attacker copies `applicationUrl` for free it would make the attack
-  below *easier*. `matchedOn` therefore carries structural labels — never values — computed from
-  the live rows at read time, never stored, because "these share an application URL" stops being
-  true the moment either entry is edited.
+  M6 is the acknowledged limit since the description joined the embedded text: its shorter side
+  sits under the 40-token guard on two of twelve, and the test pins its recall as a floor of 8
+  rather than lowering the guard, which the stub-attack numbers below say is not free. The band is
+  measured over the other rungs.
+
+  **URL and organization are recorded as explanation and barred from the decision.** This was
+  the sketched design and the measurement says the opposite of what it assumed: the corpus's
+  hardest negatives ARE the structurally identical siblings. Primary-org equality and deadline-day
+  coincidence each top out at a hardest negative of 0.700 — the global hardest — normalized-URL
+  equality at 0.403, amount + currency at 0.359, and exact normalized-title equality never fires
+  at all. A conjunction band `(url ∨ org) ∧ overlap ≥ C_low` was measured too: the hardest
+  corroborated overlap (guard applied) is **0.750 — the same pair and the same value as the global
+  hardest**, so `C_low` would have to sit above it while every accountable rung is already at
+  0.918 or better. **It catches nothing**, and since a stub attacker copies `applicationUrl` for
+  free it would make the attack below *easier*. `matchedOn` therefore carries these as labels —
+  never values — computed from the live rows at read time, never stored, because "these share an
+  application URL" stops being true the moment either entry is edited.
 
   The corpus's four genuinely hard funder families are named in the harness so a new one arrives as
   a regression with a name attached: the Arbitrum DDA tracks, the Rocket Pool GMC rounds, the Road
   to Devcon regional programs, and the SSV grant/bounty pair.
+
+- **The identical-description arm (arm C)** — the one structural fact admitted to the decision,
+  and it is admitted because it is not a sibling signal: two rounds of one programme share a URL,
+  an organization and a deadline day, but not a byte-identical body of 200+ characters. Zero
+  distinct corpus pairs share one.
+
+  `opportunity_embeddings.description_hash` is `sha256` over the WHOLE description, NFKC-normalised,
+  lowercased and whitespace-collapsed — null under 200 characters, so two template sentences are
+  not a pair. It is independent of the vector: a copied body is a copy whatever title, summary or
+  taxonomy is wrapped around it, and the vector's 2 000-character truncation does not decide it.
+  Detection looks equal hashes up through their own index, beside the top-20 ANN list, so an exact
+  copy is found however many nearer-by-cosine rows exist. A pair it accepts is stamped
+  `signal.arm = "identical_description"`, pruned once the hashes diverge, re-judged by the resweep
+  like any other, and switched off — retiring its pairs on the next nightly run — by
+  `DEDUPE_IDENTICAL_DESCRIPTION_ENABLED=false`, which is part of `rules_key`.
 
   **The stub attack, and a pre-existing exposure it revealed.** An attacker who wants somebody's
   entry flagged as *their* duplicate builds a listing from the target's rarest terms. Measured over
@@ -1029,35 +1060,33 @@ held to containment on replace — a foreign-operated one is still rejected.
 
   | arm | wins |
   |---|---|
-  | arm A (cosine ≥ 0.75) — **the detector that already shipped** | **160/160**, median winning stub **5 tokens** |
-  | arm B without the token guard | 147/160 |
-  | arm B at `MIN_TOKENS = 20` | **3/160** |
+  | arm A (cosine ≥ 0.78) — **the detector that already shipped** | **160/160**, median winning stub **33 tokens** |
+  | arm B without the token guard | 160/160 |
+  | arm B at `MIN_TOKENS = 40` | **69/160** |
   | reachable via arm B but **not** already via arm A | **0/160** |
 
-  Two things follow and both are stated rather than buried. `MIN_TOKENS = 20` is the only guard
-  that works — a norm-ratio ceiling changed nothing at any setting and was deleted, a cosine floor
+  Two things follow and both are stated rather than buried. `MIN_TOKENS` is the only guard that
+  works — a norm-ratio ceiling changed nothing at any setting and was deleted, a cosine floor
   changes nothing because the attacker uses a larger stub, and an `overlap` ceiling is evaded by
-  padding with filler and would clip honest truncations at 1.223. And **the arm-A exposure is a
-  property of the shipped TF-IDF detector, not of this change**: it is 160/160 today, arm B's
-  marginal contribution is zero, and it is filed as its own issue with its own threat model rather
-  than pretended into existence here. `test/unit/dedupe-threshold.test.ts` pins the marginal figure
-  at exactly 0, the arm-B figure at ≤ 3, and the no-guard figure at ≥ 100 so the guard's
-  justification stays executable.
-
-  **The honest price.** `MIN_TOKENS = 20` excludes roughly a quarter of corpus documents from arm B,
-  largely because `embeddingText` prefers a short `summary` over a long `description` (144 of 160
-  documents have a summary under a third of their description's token count). Fixing that
-  preference would *increase* arm B's applicable population and is the highest-value follow-up —
-  but it changes `embeddingText`, therefore every `content_hash`, therefore the model string and
-  every pinned number in this section, so it belongs in its own change with its own re-benchmark.
+  padding with filler and would clip honest truncations. It was 20 while a one-line summary was
+  the embedded text (3/160); with ~150 tokens per entry a 20-token stub cleared it on 116, and 40
+  is where the rungs the arm exists for stay whole. And **the arm-A exposure is a property of the
+  shipped TF-IDF detector, not of this change**: it is 160/160 today, arm B's marginal contribution
+  is zero, and it is filed as its own issue with its own threat model rather than pretended into
+  existence here. `test/unit/dedupe-threshold.test.ts` pins the marginal figure at exactly 0, the
+  arm-B figure at ≤ 80, and the no-guard figure at ≥ 100 so the guard's justification stays
+  executable.
 
   **New columns.** `opportunity_embeddings.norm` and `.token_count` are nullable by design: a row
   written before them has a valid vector and an unknown magnitude, and unknown must degrade to "the
-  overlap arm is not evaluated", never to "dissimilar". `opportunity_duplicates.signal` records the
-  numeric decision inputs (`arm`, `lexical`, `overlap`, `minTokens`) and `.rules_key` records which
-  rule wrote the row — the stamp that lets `embedding-backfill`'s resweep arm retire pairs a
-  rollback or a threshold change orphaned. `similarity` remains the lexical cosine with unchanged
-  semantics and rounding; an arm-B pair simply carries one below 0.75.
+  overlap arm is not evaluated", never to "dissimilar". `opportunity_embeddings.description_hash`
+  is nullable for a different reason — a body under the substance floor has no hash — and a row
+  whose stored hash no longer matches its description is selected by the backfill like a stale
+  `content_hash`. `opportunity_duplicates.signal` records the numeric decision inputs (`arm`,
+  `lexical`, `overlap`, `minTokens`) and `.rules_key` records which rule wrote the row — the stamp
+  that lets `embedding-backfill`'s resweep arm retire pairs a rollback or a threshold change
+  orphaned. `similarity` remains the lexical cosine with unchanged semantics and rounding; an
+  arm-B or arm-C pair simply carries one below 0.78.
 
   **`rules_key` is text and DERIVED, and that is the whole point of it.** It is a short digest of
   the predicate's shape together with the effective configuration it ran under — both thresholds,

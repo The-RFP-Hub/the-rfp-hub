@@ -15,6 +15,15 @@
  *                       ∧ min(tokens(a), tokens(b)) ≥ overlapMinTokens
  *                       ∧ cosine ≥ overlapMinSimilarity
  *                       ∧ overlap(a, b) ≥ overlapThreshold )                  … arm B "overlap"
+ *                    ∨  ( identical-description arm live
+ *                       ∧ descriptionHash(a) ≠ null
+ *                       ∧ descriptionHash(a) = descriptionHash(b) )           … arm C "identical_description"
+ *
+ * ARM C IS THE ONE STRUCTURAL SIGNAL ADMITTED, and it is admitted because it is not a sibling
+ * signal: two rounds of one programme share a URL, an organization and a deadline day, but they
+ * do not share a byte-identical body of 200+ characters. A verbatim copy of a live listing scored
+ * 0.31 under the old text basis (see `embedding-text.ts`) and 0.975 under the new one; the hash
+ * is what keeps that copy caught whatever summary, title or taxonomy is wrapped around it.
  *
  * WHAT `overlap` IS, AND — MORE IMPORTANTLY — WHAT IT IS NOT.
  *
@@ -31,10 +40,13 @@
  *
  * WHY `overlapMinTokens` EXISTS, and why it is the only guard that works. An attacker who wants a
  * target's entry flagged as their duplicate builds a stub out of the target's rarest terms. With
- * no substance guard that attack wins 147 of 160 corpus documents on arm B. At 20 distinct tokens
- * on the SHORTER side it wins 3. Those figures are MEASURED, not quoted — `scripts/
- * dedupe-threshold-report.ts` prints them on every run and `test/unit/dedupe-threshold.test.ts`
- * pins them, so a stale number here is a number the build disagrees with. A norm-ratio ceiling was measured and deleted: it changed
+ * no substance guard that attack wins 160 of 160 corpus documents on arm B. At 40 distinct tokens
+ * on the SHORTER side it wins 72 — every one of which already beats arm A, so the arm's MARGINAL
+ * exposure is 0. (It was 3 at 20 tokens while the embedded text was a one-line summary; with the
+ * description embedded every entry carries ~150 tokens and a 20-token stub cleared the guard on
+ * 116.) Those figures are MEASURED, not quoted — `scripts/dedupe-threshold-report.ts` prints them
+ * on every run and `test/unit/dedupe-threshold.test.ts` pins them, so a stale number here is a
+ * number the build disagrees with. A norm-ratio ceiling was measured and deleted: it changed
  * nothing at any setting once `overlapMinSimilarity` was applied, and it would have clipped honest
  * truncations. An `overlap` CEILING is not proposed either — padding a stub with filler evades it.
  *
@@ -44,11 +56,12 @@
  * arm B's marginal exposure on this corpus is zero, and the arm-A exposure is filed as its own
  * issue rather than pretended into existence by this change.
  *
- * STRUCTURAL SIGNALS ARE NOT IN THIS PREDICATE, deliberately. The corpus's hardest negatives ARE
+ * URL AND ORGANIZATION ARE NOT IN THIS PREDICATE, deliberately. The corpus's hardest negatives ARE
  * the structurally identical siblings — same application URL, same operating organization, same
- * deadline day — so gating on structure moves the safe floor by 0.024 against a worst positive of
- * 0.598. Structural evidence is recorded as EXPLANATION at read time (`matchedOn`) and barred from
- * the decision. See `docs/data-model.md` for the measurements.
+ * deadline day — so gating on those moves the safe floor by 0.024 against a worst positive of
+ * 0.598. They are recorded as EXPLANATION at read time (`matchedOn`) and barred from the decision.
+ * The description hash (arm C) is the one structural fact admitted, for the reason above: siblings
+ * share a URL, not a body. See `docs/data-model.md` for the measurements.
  */
 import { createHash } from "node:crypto";
 
@@ -65,6 +78,8 @@ export interface DuplicateSignalInputs {
   similarity: number;
   left: SignalSide;
   right: SignalSide;
+  /** Both description hashes known and equal. Absent or false means arm C has nothing to say. */
+  descriptionMatch?: boolean;
 }
 
 export interface DuplicateRuleConfig {
@@ -75,6 +90,8 @@ export interface DuplicateRuleConfig {
   overlapThreshold: number;
   overlapMinTokens: number;
   overlapMinSimilarity: number;
+  /** Arm C's switch, from `DEDUPE_IDENTICAL_DESCRIPTION_ENABLED`. */
+  identicalDescriptionEnabled: boolean;
   /**
    * The provider's declared capability. Arm B cannot be evaluated without it, and a config that
    * enables the arm against a provider that supplies no norms must degrade to arm A only rather
@@ -84,7 +101,7 @@ export interface DuplicateRuleConfig {
 }
 
 /** Which arm accepted a pair. Stored on the row so arm-B volume is filterable from day one. */
-export type DuplicateArm = "lexical" | "overlap";
+export type DuplicateArm = "lexical" | "overlap" | "identical_description";
 
 /**
  * The NUMERIC decision inputs, recorded on the pair row.
@@ -118,7 +135,7 @@ export interface DuplicateDecision {
  * `DEDUPE_OVERLAP_ENABLED`, which is exactly when the pairs a previous rule wrote need retiring.
  * A rollback that depends on somebody remembering to bump a constant is not a rollback.
  */
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 
 /**
  * The identity of the rule that produced a pair row: the predicate's shape AND the effective
@@ -159,6 +176,7 @@ export function rulesKey(config: DuplicateRuleConfig, identity: RuleProviderIden
     ...(overlapLive
       ? [config.overlapThreshold, config.overlapMinTokens, config.overlapMinSimilarity]
       : []),
+    config.identicalDescriptionEnabled,
   ]);
   return `v${RULES_VERSION}:${createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 16)}`;
 }
@@ -224,6 +242,19 @@ export function decidePair(
       arm: "lexical",
       signal: {
         arm: "lexical",
+        lexical: round3(similarity),
+        overlap: nullableRound(value),
+        minTokens: tokens,
+      },
+    };
+  }
+
+  if (config.identicalDescriptionEnabled && inputs.descriptionMatch === true) {
+    return {
+      accepted: true,
+      arm: "identical_description",
+      signal: {
+        arm: "identical_description",
         lexical: round3(similarity),
         overlap: nullableRound(value),
         minTokens: tokens,

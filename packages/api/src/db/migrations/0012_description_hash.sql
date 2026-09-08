@@ -1,0 +1,2 @@
+ALTER TABLE "opportunity_embeddings" ADD COLUMN "description_hash" text;--> statement-breakpoint
+CREATE INDEX "ix_opp_embed_description_hash" ON "opportunity_embeddings" USING btree ("description_hash");

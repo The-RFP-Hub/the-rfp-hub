@@ -12,16 +12,18 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DESCRIPTION_HASH_MIN_CHARS,
   DESCRIPTION_LIMIT,
   collapseWhitespace,
   contentHash,
+  descriptionHash,
   embeddingText,
 } from "../../src/modules/shared/embedding-text.js";
 
 const record = {
   title: "Ecosystem Grants Round 5",
   summary: "Funding for public goods on Ethereum.",
-  description: "A much longer body that is not used while a summary exists.",
+  description: "A longer body, embedded beside the summary.",
   fundingType: "grant",
   ecosystems: ["ethereum", "optimism"],
   categories: ["public-goods"],
@@ -29,11 +31,12 @@ const record = {
 };
 
 describe("embeddingText", () => {
-  it("composes title, body, orgs, ecosystems, categories and funding type", () => {
+  it("composes title, summary, description, orgs, ecosystems, categories and funding type", () => {
     expect(embeddingText(record)).toBe(
       [
         "Ecosystem Grants Round 5",
         "Funding for public goods on Ethereum.",
+        "A longer body, embedded beside the summary.",
         "Example Foundation, Second Org",
         "ethereum, optimism",
         "public-goods",
@@ -53,13 +56,22 @@ describe("embeddingText", () => {
     expect(collapseWhitespace("a \n\t b ")).toBe("a b");
   });
 
-  it("falls back to the description when there is no summary, truncated", () => {
+  it("truncates the description, on a word boundary", () => {
     const long = { ...record, summary: null, description: "word ".repeat(2000) };
     const text = embeddingText(long);
     const body = text.split("\n\n")[1] ?? "";
     expect(body.length).toBeLessThanOrEqual(DESCRIPTION_LIMIT);
-    // Truncation lands on a word boundary rather than mid-token.
     expect(body.endsWith("word")).toBe(true);
+  });
+
+  // The M3 reviewer's copy: the same description with and without the summary used to embed as
+  // two unrelated texts (cosine 0.31). Both parts are always in, so the copy shares its body.
+  it("embeds the description whether or not a summary is present", () => {
+    const withSummary = embeddingText(record);
+    const without = embeddingText({ ...record, summary: null });
+    expect(withSummary).toContain(record.description);
+    expect(without).toContain(record.description);
+    expect(without).not.toContain(record.summary);
   });
 
   it("drops empty parts rather than emitting empty delimiters", () => {
@@ -78,6 +90,31 @@ describe("embeddingText", () => {
   // The repository-level rule, asserted rather than assumed.
   it("never emits a NUL byte", () => {
     expect(embeddingText(record)).not.toContain("\u0000");
+  });
+});
+
+describe("descriptionHash", () => {
+  const body = "Round 40 of the retrospective awards track, ".repeat(8);
+
+  it("is null under the substance floor and a sha256 above it", () => {
+    expect(descriptionHash("short")).toBeNull();
+    expect(descriptionHash(null)).toBeNull();
+    expect(body.length).toBeGreaterThanOrEqual(DESCRIPTION_HASH_MIN_CHARS);
+    expect(descriptionHash(body)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("ignores case, whitespace shape and Unicode form, and nothing else", () => {
+    const messy = ` ${body.toUpperCase().replace(/ /g, "\r\n\t ")} `;
+    expect(descriptionHash(messy)).toBe(descriptionHash(body));
+    expect(descriptionHash("Caf\u00e9 ".repeat(60))).toBe(
+      descriptionHash("Cafe\u0301 ".repeat(60)),
+    );
+    expect(descriptionHash(`${body}.`)).not.toBe(descriptionHash(body));
+  });
+
+  it("is independent of the embedding's truncation", () => {
+    const long = "word ".repeat(1000);
+    expect(descriptionHash(`${long}tail`)).not.toBe(descriptionHash(`${long}other`));
   });
 });
 

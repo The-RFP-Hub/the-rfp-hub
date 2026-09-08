@@ -41,6 +41,7 @@ export interface EmbeddingSearchMatch {
    */
   norm: number | null;
   tokenCount: number | null;
+  descriptionHash: string | null;
 }
 
 export interface PendingEmbeddingRow {
@@ -50,6 +51,7 @@ export interface PendingEmbeddingRow {
   contentHash: string | null;
   norm: number | null;
   tokenCount: number | null;
+  descriptionHash: string | null;
 }
 
 /** One suspected pair carrying a stale rule key, with both sides' decision inputs. */
@@ -60,6 +62,8 @@ export interface StaleRulesPair {
   rightNorm: number | null;
   leftTokenCount: number | null;
   rightTokenCount: number | null;
+  /** Both sides' description hashes known and equal. */
+  descriptionMatch: boolean;
 }
 
 /** Persistence and pgvector queries for semantic duplicate detection. */
@@ -130,6 +134,7 @@ export class EmbeddingRepository {
     contentHash: string;
     norm: number | null;
     tokenCount: number | null;
+    descriptionHash: string | null;
   }): Promise<void> {
     await this.exec
       .insert(opportunityEmbeddings)
@@ -143,6 +148,7 @@ export class EmbeddingRepository {
           contentHash: values.contentHash,
           norm: values.norm,
           tokenCount: values.tokenCount,
+          descriptionHash: values.descriptionHash,
           createdAt: new Date(),
         },
       });
@@ -183,6 +189,7 @@ export class EmbeddingRepository {
         // planner loses the HNSW index and the search degrades to a sequential scan.
         norm: opportunityEmbeddings.norm,
         tokenCount: opportunityEmbeddings.tokenCount,
+        descriptionHash: opportunityEmbeddings.descriptionHash,
       })
       .from(opportunityEmbeddings)
       .innerJoin(opportunities, eq(opportunities.id, opportunityEmbeddings.opportunityId))
@@ -190,13 +197,46 @@ export class EmbeddingRepository {
       .orderBy(asc(distance))
       .limit(ANN_CANDIDATES);
 
-    return rows.map(({ reviewStatus, isListed, ...row }) => ({
-      ...row,
-      isPublic: reviewStatus === "approved" && isListed,
-      similarity: Number(row.similarity),
-      norm: row.norm === null ? null : Number(row.norm),
-      tokenCount: row.tokenCount === null ? null : Number(row.tokenCount),
-    }));
+    return rows.map(toSearchMatch);
+  }
+
+  /**
+   * Every non-merged entry whose stored description hash equals `hash`, in the same projection as
+   * `searchNearest` so the two candidate lists merge. Not an ANN query: an exact copy must be found
+   * however many nearer-by-cosine rows exist, which is the point of the arm.
+   */
+  async sameDescription(
+    hash: string,
+    vector: number[],
+    options: { exclude: number; identity: EmbeddingIdentity },
+  ): Promise<EmbeddingSearchMatch[]> {
+    const distance = cosineDistanceTo(vector);
+    const rows = await this.exec
+      .select({
+        id: opportunities.id,
+        publicId: opportunities.publicId,
+        title: opportunities.title,
+        reviewStatus: opportunities.reviewStatus,
+        isListed: opportunities.isListed,
+        similarity: sql<number>`1 - (${distance})`,
+        norm: opportunityEmbeddings.norm,
+        tokenCount: opportunityEmbeddings.tokenCount,
+        descriptionHash: opportunityEmbeddings.descriptionHash,
+      })
+      .from(opportunityEmbeddings)
+      .innerJoin(opportunities, eq(opportunities.id, opportunityEmbeddings.opportunityId))
+      .where(
+        and(
+          eq(opportunityEmbeddings.descriptionHash, hash),
+          sql`${opportunityEmbeddings.opportunityId} <> ${options.exclude}`,
+          eq(opportunityEmbeddings.model, options.identity.model),
+          eq(opportunityEmbeddings.providerId, options.identity.providerId),
+          isNull(opportunities.mergedIntoId),
+        ),
+      )
+      .orderBy(asc(distance))
+      .limit(ANN_CANDIDATES);
+    return rows.map(toSearchMatch);
   }
 
   /**
@@ -211,7 +251,15 @@ export class EmbeddingRepository {
     opportunityId: number,
     vector: number[],
     identity: EmbeddingIdentity,
-  ): Promise<{ id: number; similarity: number; norm: number | null; tokenCount: number | null }[]> {
+  ): Promise<
+    {
+      id: number;
+      similarity: number;
+      norm: number | null;
+      tokenCount: number | null;
+      descriptionHash: string | null;
+    }[]
+  > {
     const counterpart = sql`case when ${opportunityDuplicates.opportunityId} = ${opportunityId} then ${opportunityDuplicates.duplicateOfId} else ${opportunityDuplicates.opportunityId} end`;
     const rows = await this.exec
       .select({
@@ -219,6 +267,7 @@ export class EmbeddingRepository {
         similarity: sql<number>`1 - (${cosineDistanceTo(vector)})`,
         norm: opportunityEmbeddings.norm,
         tokenCount: opportunityEmbeddings.tokenCount,
+        descriptionHash: opportunityEmbeddings.descriptionHash,
       })
       .from(opportunityDuplicates)
       .innerJoin(
@@ -256,6 +305,7 @@ export class EmbeddingRepository {
         contentHash: opportunityEmbeddings.contentHash,
         norm: opportunityEmbeddings.norm,
         tokenCount: opportunityEmbeddings.tokenCount,
+        descriptionHash: opportunityEmbeddings.descriptionHash,
       })
       .from(opportunities)
       .leftJoin(opportunityEmbeddings, eq(opportunityEmbeddings.opportunityId, opportunities.id))
@@ -295,6 +345,8 @@ export class EmbeddingRepository {
         rightNorm: right.norm,
         leftTokenCount: left.tokenCount,
         rightTokenCount: right.tokenCount,
+        leftDescriptionHash: left.descriptionHash,
+        rightDescriptionHash: right.descriptionHash,
       })
       .from(opportunityDuplicates)
       .innerJoin(
@@ -338,8 +390,31 @@ export class EmbeddingRepository {
       rightNorm: row.rightNorm === null ? null : Number(row.rightNorm),
       leftTokenCount: row.leftTokenCount === null ? null : Number(row.leftTokenCount),
       rightTokenCount: row.rightTokenCount === null ? null : Number(row.rightTokenCount),
+      descriptionMatch:
+        row.leftDescriptionHash !== null && row.leftDescriptionHash === row.rightDescriptionHash,
     }));
   }
+}
+
+function toSearchMatch(row: {
+  id: number;
+  publicId: string;
+  title: string;
+  reviewStatus: OpportunityRow["reviewStatus"];
+  isListed: boolean;
+  similarity: number;
+  norm: number | null;
+  tokenCount: number | null;
+  descriptionHash: string | null;
+}): EmbeddingSearchMatch {
+  const { reviewStatus, isListed, ...rest } = row;
+  return {
+    ...rest,
+    isPublic: reviewStatus === "approved" && isListed,
+    similarity: Number(row.similarity),
+    norm: row.norm === null ? null : Number(row.norm),
+    tokenCount: row.tokenCount === null ? null : Number(row.tokenCount),
+  };
 }
 
 /**

@@ -27,6 +27,7 @@ const RULE: DuplicateRuleConfig = {
   overlapThreshold: 0.85,
   overlapMinTokens: 20,
   overlapMinSimilarity: 0.35,
+  identicalDescriptionEnabled: true,
   suppliesNorm: true,
 };
 
@@ -126,6 +127,58 @@ describe("decidePair", () => {
   });
 });
 
+describe("the identical-description arm", () => {
+  it("accepts a pair whose descriptions hash alike whatever the cosine says", () => {
+    const decision = decidePair(
+      { similarity: 0.31, left: side(1, 100), right: side(1, 30), descriptionMatch: true },
+      RULE,
+    );
+    expect(decision.accepted).toBe(true);
+    expect(decision.arm).toBe("identical_description");
+    expect(decision.signal?.lexical).toBe(0.31);
+  });
+
+  it("yields to the lexical arm when both would accept", () => {
+    const decision = decidePair(
+      { similarity: 0.9, left: side(1, 100), right: side(1, 100), descriptionMatch: true },
+      RULE,
+    );
+    expect(decision.arm).toBe("lexical");
+  });
+
+  it("is tried before the overlap arm", () => {
+    const decision = decidePair(
+      { similarity: 0.5, left: side(1, 100), right: side(3, 100), descriptionMatch: true },
+      RULE,
+    );
+    expect(decision.arm).toBe("identical_description");
+  });
+
+  it("says nothing when the hashes differ or are unknown", () => {
+    for (const descriptionMatch of [false, undefined]) {
+      const decision = decidePair(
+        { similarity: 0.31, left: side(1, 100), right: side(1, 100), descriptionMatch },
+        RULE,
+      );
+      expect(decision.accepted).toBe(false);
+    }
+  });
+
+  it("is inert when switched off", () => {
+    const decision = decidePair(
+      { similarity: 0.31, left: side(1, 100), right: side(1, 100), descriptionMatch: true },
+      { ...RULE, identicalDescriptionEnabled: false },
+    );
+    expect(decision.accepted).toBe(false);
+  });
+
+  it("keeps a pair while the descriptions still match and prunes it once they diverge", () => {
+    const inputs = { similarity: 0.31, left: side(1, 100), right: side(1, 100) };
+    expect(shouldPrune({ ...inputs, descriptionMatch: true }, RULE)).toBe(false);
+    expect(shouldPrune({ ...inputs, descriptionMatch: false }, RULE)).toBe(true);
+  });
+});
+
 describe("shouldPrune", () => {
   it("prunes a pair neither arm accepts any more", () => {
     expect(shouldPrune({ similarity: 0.2, left: side(1, 100), right: side(1, 100) }, RULE)).toBe(
@@ -191,6 +244,7 @@ describe("rulesKey", () => {
     const shuffled: DuplicateRuleConfig = {
       suppliesNorm: RULE.suppliesNorm,
       overlapMinSimilarity: RULE.overlapMinSimilarity,
+      identicalDescriptionEnabled: true,
       overlapThreshold: RULE.overlapThreshold,
       overlapMinTokens: RULE.overlapMinTokens,
       overlapEnabled: RULE.overlapEnabled,
@@ -212,6 +266,7 @@ describe("rulesKey", () => {
     expect(key({ overlapMinTokens: 25 }), "the substance guard").not.toBe(base);
     expect(key({ overlapMinSimilarity: 0.4 }), "the cosine floor").not.toBe(base);
     expect(key({ suppliesNorm: false }), "the provider capability").not.toBe(base);
+    expect(key({ identicalDescriptionEnabled: false }), "the description arm").not.toBe(base);
     expect(rulesKey(RULE, { ...IDENTITY, model: "other-model" }), "the model").not.toBe(base);
     expect(rulesKey(RULE, { ...IDENTITY, providerId: "other" }), "the provider").not.toBe(base);
   });

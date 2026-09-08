@@ -303,7 +303,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "string",
         enum: ["ok", "unavailable", "disabled"],
         description:
-          "Whether duplicate detection RAN. `ok` with an empty `duplicates` means checked and nothing similar; `unavailable` means the embedding call failed or timed out and a backfill still owes this entry a check; `disabled` means no provider is configured. Without this a client cannot tell the three apart. Detection never blocks a write — a failure is reported here, not as an error.",
+          "Whether duplicate detection RAN. `ok` with an empty `duplicates` means the check ran and no entry crossed the detection rule — not a guarantee that nothing similar exists; `unavailable` means the embedding call failed or timed out and a backfill still owes this entry a check; `disabled` means no provider is configured. Without this a client cannot tell the three apart. Detection never blocks a write — a failure is reported here, not as an error.",
       },
       duplicates: {
         type: "array",
@@ -367,10 +367,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "array",
         items: {
           type: "string",
-          enum: ["lexical", "overlap", "application_url", "operating_org"],
+          enum: ["lexical", "overlap", "identical_description", "application_url", "operating_org"],
         },
         description:
-          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot, `identical_description` = the two descriptions are byte-identical once normalised, whatever the summary, title or taxonomy around them), and anything after it is structural evidence corroborating the decision. URL and organization equality are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
       },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
@@ -412,10 +412,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "array",
         items: {
           type: "string",
-          enum: ["lexical", "overlap", "application_url", "operating_org"],
+          enum: ["lexical", "overlap", "identical_description", "application_url", "operating_org"],
         },
         description:
-          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot, `identical_description` = the two descriptions are byte-identical once normalised, whatever the summary, title or taxonomy around them), and anything after it is structural evidence corroborating the decision. URL and organization equality are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
       },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
@@ -564,16 +564,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: ["object", "null"],
         additionalProperties: true,
         description:
-          "The numeric decision inputs the detector recorded — `arm`, `lexical` (the cosine), `overlap` (cosine corrected by the norm ratio; an ESTIMATE of how much of the shorter entry's weighted vocabulary the longer one accounts for, NOT a containment and not bounded by 1) and `minTokens`. Null on a pair written before the column existed.",
+          "The numeric decision inputs the detector recorded — `arm` (`lexical`, `overlap` or `identical_description`), `lexical` (the cosine), `overlap` (cosine corrected by the norm ratio; an ESTIMATE of how much of the shorter entry's weighted vocabulary the longer one accounts for, NOT a containment and not bounded by 1) and `minTokens`. Null on a pair written before the column existed.",
       },
       matchedOn: {
         type: "array",
         items: {
           type: "string",
-          enum: ["lexical", "overlap", "application_url", "operating_org"],
+          enum: ["lexical", "overlap", "identical_description", "application_url", "operating_org"],
         },
         description:
-          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot, `identical_description` = the two descriptions are byte-identical once normalised, whatever the summary, title or taxonomy around them), and anything after it is structural evidence corroborating the decision. URL and organization equality are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
       },
       detectedAt: { type: "string", format: "date-time" },
       reviewedAt: { type: ["string", "null"], format: "date-time" },

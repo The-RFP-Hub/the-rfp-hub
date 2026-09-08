@@ -102,6 +102,8 @@ export interface DedupeConfig {
   overlapMinTokens: number;
   /** Cosine floor under which the overlap arm is not evaluated at all. */
   overlapMinSimilarity: number;
+  /** Arm C: a byte-identical (normalised) description is a pair whatever the cosine says. */
+  identicalDescriptionEnabled: boolean;
 }
 
 export interface VerificationConfig {
@@ -465,14 +467,16 @@ export function readEmbeddingProvider(raw: string | undefined): EmbeddingProvide
  * universal constant — one provider today does not mean one provider forever, and this shape is
  * where that insight is recorded.
  *
- * `lexical` is SETTLED at 0.75 — the midpoint of the separating band measured by
+ * `lexical` is SETTLED at 0.78 — inside the separating band measured by
  * `scripts/dedupe-threshold-report.ts` over EVERY distinct pair of the committed corpus (worst
- * positive 0.913, hardest of 12 720 corpus negatives 0.592). `test/unit/dedupe-threshold.test.ts`
- * asserts that band in CI, so a corpus change that closes it fails the build rather than silently
- * degrading detection.
+ * positive 0.905, hardest of 12 720 corpus negatives 0.700; the band narrowed from 0.321 when
+ * `embeddingText` started embedding the description beside the summary). Just under the 0.80
+ * midpoint so the synonym-plus-compression rung (M4, worst 0.782) stays whole.
+ * `test/unit/dedupe-threshold.test.ts` asserts that band in CI, so a corpus change that closes it
+ * fails the build rather than silently degrading detection.
  */
 export const DEFAULT_SIMILARITY_THRESHOLD: Record<EmbeddingProvider, number> = {
-  lexical: 0.75,
+  lexical: 0.78,
   disabled: 1,
 };
 
@@ -497,16 +501,18 @@ export function readSimilarityThreshold(
  * same reason: a length-corrected overlap means something different in every weighting.
  *
  * `lexical` is settled at **0.85**, measured by `scripts/dedupe-threshold-report.ts` over every
- * distinct pair of the committed corpus with the same substance guard the runtime applies:
+ * distinct pair of the committed corpus with the same substance guard the runtime applies. The
+ * positive side is the pairs the arm is ACCOUNTABLE for: admitted by the token guard and missed
+ * by the lexical arm.
  *
  * | | full corpus | held out (idf from one half, scored on the other) |
  * |---|---|---|
- * | hardest negative overlap | 0.682 | 0.750 |
- * | worst positive overlap | 0.956 | 0.945 |
- * | band | 0.274 | 0.195 |
+ * | hardest negative overlap | 0.750 | 0.769 |
+ * | worst positive overlap | 0.918 | 0.915 |
+ * | band | 0.168 | 0.146 |
  *
- * 0.85 is inside both bands and on the edge of neither: +0.168 above the hardest full-corpus
- * negative, −0.106 below the worst positive; +0.100 / −0.095 out of sample.
+ * 0.85 is inside both bands: +0.100 above the hardest full-corpus negative, −0.068 below the
+ * worst positive; +0.081 / −0.065 out of sample.
  *
  * `disabled` is **4**, not 1 — see `readOverlapThreshold`, overlap is not bounded by 1, so 1 would
  * be a reachable value rather than an unreachable one.
@@ -882,13 +888,19 @@ export const config: AppConfig = {
     maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
     overlapEnabled: readBoolean(process.env.DEDUPE_OVERLAP_ENABLED, true),
     overlapThreshold: readOverlapThreshold(process.env.DEDUPE_OVERLAP_THRESHOLD, embeddingProvider),
-    // 20 distinct tokens on the shorter side. The only guard measured to work against the stub
-    // attack, and it costs nothing on real negatives — the hardest stays 0.682 at every setting —
-    // while every mutation rung clears it with at least 16 tokens spare. The attack numbers are
+    // 40 distinct tokens on the shorter side. It was 20 while the embedded text was a one-line
+    // summary; with the description embedded too every entry carries ~150 tokens and a 20-token
+    // stub cleared the guard on 116 of 160 targets. At 40 that is 72, still zero MARGINAL to arm A
+    // (which the stub beats anyway), and the rungs the arm exists for (M3, M5, M7) stay whole. The
+    // price is the 25 %-truncation rung, whose shorter side falls under the guard. The numbers are
     // printed by `scripts/dedupe-threshold-report.ts` and pinned by `test/unit/
     // dedupe-threshold.test.ts`, so they are measured on every run rather than quoted here.
-    overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 20),
+    overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 40),
     overlapMinSimilarity: readOverlapMinSimilarity(process.env.DEDUPE_OVERLAP_MIN_SIMILARITY, 0.35),
+    identicalDescriptionEnabled: readBoolean(
+      process.env.DEDUPE_IDENTICAL_DESCRIPTION_ENABLED,
+      true,
+    ),
   },
 
   verification: {

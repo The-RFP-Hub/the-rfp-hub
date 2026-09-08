@@ -17,7 +17,8 @@ import type { AccountRole, ApiKeyScope } from "./capabilities.js";
 /**
  * Whether duplicate detection RAN, which is a different question from whether it found anything.
  *
- * `ok` with an empty `duplicates` means "checked, nothing similar". `unavailable` means the
+ * `ok` with an empty `duplicates` means "the check ran and no entry crossed the detection rule" —
+ * not a promise that nothing similar exists, only that nothing scored as a duplicate. `unavailable` means the
  * embedding call failed or timed out and the backfill job still owes this entry a check.
  * `disabled` means the deployment has no provider configured. Without this member a client cannot
  * tell the three apart, and would read every one of them as "no duplicates".
@@ -73,11 +74,13 @@ export interface DuplicateMatchView {
   /**
    * Why this pair was flagged, as LABELS — `["overlap", "application_url"]`, never the values.
    *
-   * The first entry is always the arm that decided (`lexical` or `overlap`); anything after it is
-   * structural evidence corroborating the decision, computed from the two LIVE rows at read time
-   * and never stored, because "these share an application URL" stops being true the moment either
-   * is edited. Structural signals are deliberately barred from the decision itself — the corpus's
-   * hardest negatives ARE the structurally identical siblings.
+   * The first entry is always the arm that decided (`lexical`, `overlap` or
+   * `identical_description`); anything after it is structural evidence corroborating the decision,
+   * computed from the two LIVE rows at read time and never stored, because "these share an
+   * application URL" stops being true the moment either is edited. URL and organization are
+   * deliberately barred from the decision itself — the corpus's hardest negatives ARE the
+   * structurally identical siblings. A byte-identical description is the one structural fact
+   * admitted, because siblings do not share one.
    *
    * **Empty** on every pair recorded before the reasons existed: no reasons recorded.
    */
@@ -187,11 +190,9 @@ export interface DuplicatePairView {
   /**
    * Why this pair was flagged, as LABELS — `["overlap", "application_url"]`, never the values.
    *
-   * The first entry is always the arm that decided (`lexical` or `overlap`); anything after it is
-   * structural evidence corroborating the decision, computed from the two LIVE rows at read time
-   * and never stored, because "these share an application URL" stops being true the moment either
-   * is edited. Structural signals are deliberately barred from the decision itself — the corpus's
-   * hardest negatives ARE the structurally identical siblings.
+   * The first entry is always the arm that decided (`lexical`, `overlap` or
+   * `identical_description`); anything after it is structural evidence corroborating the decision,
+   * computed from the two LIVE rows at read time and never stored. See `DuplicateMatchView`.
    *
    * **Empty** on every pair recorded before the reasons existed: no reasons recorded.
    */
