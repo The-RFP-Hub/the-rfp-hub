@@ -19,6 +19,11 @@
  *     operating point. The exponent is aggressive on purpose and pinned as a named constant
  *     (`IDF_EXPONENT`); the report sweeps it so the choice stays visibly a point on a curve.
  *
+ * `v2` IN THE MODEL STRING IS THE TEXT COMPOSITION, not the arithmetic: `embeddingText` now embeds
+ * summary and description together, and a vector built from the old summary-or-description text
+ * is not comparable to one built from this. Bumping the family is what keeps the two spaces apart
+ * in the same table while the backfill drains.
+ *
  * WHY THE DF TABLE IS FROZEN. Live document frequencies shift on every write; every shift changes
  * every vector and every `content_hash`, and the backfill cursor would select the whole table
  * forever. A frozen table makes the weighting part of the MODEL IDENTITY: refreshing it is a
@@ -196,7 +201,7 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
       .update(JSON.stringify({ n: table.documentCount, df: table.df, e: this.exponent }), "utf8")
       .digest("hex")
       .slice(0, 12);
-    this.model = `tfidf-hashed-v1+${digest}`;
+    this.model = `tfidf-hashed-v2+${digest}`;
     this.documentCount = table.documentCount;
     // A Map, never the raw JSON object: `df["constructor"]` on a plain object answers
     // `Object.prototype.constructor` — a function — and one hostile-looking but perfectly

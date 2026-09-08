@@ -5,11 +5,14 @@
  * current, so the same record must produce the same string on every process, in every order, or
  * every backfill run re-embeds the entire table and pays for it.
  *
- * What goes in, and why only this: title and summary carry the identity of a programme; the
- * organizations, ecosystems and categories are what distinguish two programmes with similar names.
- * The description is used only when there is no summary, and truncated, because a long body is
- * mostly boilerplate — eligibility prose, application instructions — that is nearly identical
- * across unrelated programmes and would pull every pair's similarity up.
+ * What goes in: title, summary AND a truncated description, then the organizations, ecosystems
+ * and categories that distinguish two programmes with similar names. Summary and description are
+ * BOTH always in, on every record. The previous rule — summary when present, description only as
+ * a fallback — compared two records on different text whenever exactly one of them carried a
+ * summary, and a verbatim copy of a live listing submitted without its summary scored 0.31
+ * against it. The boilerplate a long body carries does narrow the band between true duplicates
+ * and the hardest unrelated pairs (measured in `scripts/dedupe-threshold-report.ts`), which is
+ * why the description is truncated and why the operating point was re-settled with this change.
  *
  * NO LITERAL NUL BYTE IS EVER USED AS A DELIMITER, here or in the hash input. `check:neutral`
  * SKIPS a tracked file containing a NUL (loudly, but it skips it), and `git diff` treats such a
@@ -73,14 +76,14 @@ function listPart(values: (string | null | undefined)[] | null | undefined): str
  */
 export function embeddingText(record: EmbeddableOpportunity): string {
   const title = collapseWhitespace(record.title ?? "");
-  const body = record.summary?.trim()
-    ? collapseWhitespace(record.summary)
-    : truncate(collapseWhitespace(record.description ?? ""), DESCRIPTION_LIMIT);
+  const summary = collapseWhitespace(record.summary ?? "");
+  const description = truncate(collapseWhitespace(record.description ?? ""), DESCRIPTION_LIMIT);
   const orgs = listPart(record.operatingOrganizations?.map((o) => o?.name));
 
   return [
     title,
-    body,
+    summary,
+    description,
     orgs,
     listPart(record.ecosystems),
     listPart(record.categories),
@@ -88,6 +91,22 @@ export function embeddingText(record: EmbeddableOpportunity): string {
   ]
     .filter((part) => part !== "")
     .join(DELIMITER);
+}
+
+/** Below this many normalised characters a description is too short to call a copy on its own. */
+export const DESCRIPTION_HASH_MIN_CHARS = 200;
+
+/**
+ * The exact-copy key: sha256 over the WHOLE description, Unicode-normalised, lowercased and
+ * whitespace-collapsed. Independent of the embedding — a copied body is a copy whatever title,
+ * summary or taxonomy was put around it, and the vector's 2 000-character truncation must not
+ * decide it. `null` for a body under `DESCRIPTION_HASH_MIN_CHARS`: two short template sentences
+ * are not evidence of the same programme.
+ */
+export function descriptionHash(description: string | null | undefined): string | null {
+  const normalized = collapseWhitespace((description ?? "").normalize("NFKC")).toLowerCase();
+  if (normalized.length < DESCRIPTION_HASH_MIN_CHARS) return null;
+  return createHash("sha256").update(normalized, "utf8").digest("hex");
 }
 
 /**

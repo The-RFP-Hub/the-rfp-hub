@@ -197,6 +197,7 @@ describeWithDb("M3OVL the overlap arm", () => {
           overlapThreshold: config.dedupe.overlapThreshold,
           overlapMinTokens: config.dedupe.overlapMinTokens,
           overlapMinSimilarity: config.dedupe.overlapMinSimilarity,
+          identicalDescriptionEnabled: true,
           suppliesNorm: true,
         },
         { providerId: live.id, model: live.model },

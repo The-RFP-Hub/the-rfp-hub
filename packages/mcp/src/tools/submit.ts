@@ -133,7 +133,7 @@ export function explainDuplicateCheck(
   switch (status) {
     case "ok":
       return found === 0
-        ? "The duplicate check RAN and found nothing similar among publicly visible entries."
+        ? "The duplicate check RAN and no publicly visible entry crossed the detection rule. That is not a guarantee that nothing similar exists."
         : `The duplicate check RAN and flagged ${found} publicly visible entr${found === 1 ? "y" : "ies"} as similar. Similar is not identical — read them before assuming this is a repeat.`;
     case "unavailable":
       return (

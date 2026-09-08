@@ -28,7 +28,12 @@ export interface ReasonSide {
 }
 
 /** The labels this function can produce, so a client can switch on them exhaustively. */
-export type MatchReason = "lexical" | "overlap" | "application_url" | "operating_org";
+export type MatchReason =
+  | "lexical"
+  | "overlap"
+  | "identical_description"
+  | "application_url"
+  | "operating_org";
 
 /**
  * Comparison form for a URL: scheme, `www.`, a trailing slash and case are not identity.
@@ -80,7 +85,7 @@ export function matchReasons(
 ): MatchReason[] {
   if (signal === null || signal === undefined) return [];
   const arm = signal.arm;
-  if (arm !== "lexical" && arm !== "overlap") return [];
+  if (arm !== "lexical" && arm !== "overlap" && arm !== "identical_description") return [];
 
   const reasons: MatchReason[] = [arm];
 

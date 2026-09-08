@@ -30,7 +30,7 @@ describe("LexicalEmbeddingProvider identity", () => {
   it("has not moved", () => {
     const provider = new LexicalEmbeddingProvider();
     expect(provider.id).toBe("lexical");
-    expect(provider.model).toBe("tfidf-hashed-v1+5561ec0f11de");
+    expect(provider.model).toBe("tfidf-hashed-v2+42cf38688dda");
     expect(provider.dimensions).toBe(EMBEDDING_DIMENSIONS);
   });
 

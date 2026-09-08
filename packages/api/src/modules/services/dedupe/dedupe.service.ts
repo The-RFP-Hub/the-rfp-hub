@@ -79,8 +79,9 @@ import type {
   DuplicateSideView,
   MergeResultView,
 } from "../../shared/api-views.js";
+import { DeadlineExceeded, withDeadline } from "../../shared/deadline.js";
 import { nextDeadlineAt } from "../../shared/deadlines.js";
-import { contentHash, embeddingText } from "../../shared/embedding-text.js";
+import { contentHash, descriptionHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
 import {
   type NotificationDispatchEnqueuer,
@@ -209,6 +210,7 @@ export class DedupeService {
       overlapThreshold: dedupe.overlapThreshold,
       overlapMinTokens: dedupe.overlapMinTokens,
       overlapMinSimilarity: dedupe.overlapMinSimilarity,
+      identicalDescriptionEnabled: dedupe.identicalDescriptionEnabled,
       suppliesNorm: provider.suppliesNorm,
     };
   }
@@ -243,17 +245,31 @@ export class DedupeService {
     scope: CandidateScope = "public",
   ): Promise<DuplicateCheckResult> {
     if (!this.provider) return { status: "disabled", duplicates: [] };
+    const timeoutMs = this.config.dedupe.checkTimeoutMs;
     try {
-      if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
-        return { status: "unavailable", duplicates: [] };
-      }
-      const matches = await this.embedAndDetect(opportunityId, scope);
-      return { status: "ok", duplicates: matches };
-    } catch {
+      return await withDeadline(this.detect(opportunityId, scope), timeoutMs, "duplicate check");
+    } catch (error) {
       // Deliberately swallowed and reported as a status. `embedding-backfill` selects exactly the
-      // rows this leaves without a current embedding row.
+      // rows this leaves without a current embedding row. A pass that merely ran LATE still
+      // finishes in the background and records what it finds; only this response goes without.
+      if (error instanceof DeadlineExceeded) {
+        this.logger.warn(
+          { opportunityId, scope, timeoutMs },
+          "DUPLICATE CHECK TIMED OUT: reported as unavailable; the pass continues in the background and embedding-backfill re-checks the entry",
+        );
+      }
       return { status: "unavailable", duplicates: [] };
     }
+  }
+
+  private async detect(
+    opportunityId: number,
+    scope: CandidateScope,
+  ): Promise<DuplicateCheckResult> {
+    if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
+      return { status: "unavailable", duplicates: [] };
+    }
+    return { status: "ok", duplicates: await this.embedAndDetect(opportunityId, scope) };
   }
 
   /**
@@ -328,6 +344,18 @@ export class DedupeService {
     // not be: a candidate set that shrank with the caller's credential is what left two pending
     // entries paired by nothing at all.
     const neighbours = await this.search(subject.vector, { exclude: row.id });
+    // Exact-body candidates are appended AFTER the cosine ranking rather than merged into it: the
+    // ANN list is what a submitter sees first, and an identical body that cosine also ranks high
+    // is already in it. Only a copy the top-20 missed is added, and it is added at the end.
+    const seen = new Set(neighbours.map((match) => match.id));
+    const sameBody =
+      rule.identicalDescriptionEnabled && subject.descriptionHash !== null
+        ? await this.repos.embeddings.sameDescription(subject.descriptionHash, subject.vector, {
+            exclude: row.id,
+            identity: { model: provider.model, providerId: provider.id },
+          })
+        : [];
+    for (const match of sameBody) if (!seen.has(match.id)) neighbours.push(match);
     // Neighbours arrive in descending cosine order and STAY in it. The caps below truncate, so the
     // order decides which five a submitter sees: sorting by anything else — or letting arm-B pairs
     // interleave by overlap — would let a length-corrected match crowd out a stronger lexical one.
@@ -338,6 +366,8 @@ export class DedupeService {
           similarity: match.similarity,
           left: { norm: subject.norm, tokenCount: subject.tokenCount },
           right: { norm: match.norm, tokenCount: match.tokenCount },
+          descriptionMatch:
+            subject.descriptionHash !== null && match.descriptionHash === subject.descriptionHash,
         },
         rule,
       );
@@ -418,20 +448,23 @@ export class DedupeService {
     row: OpportunityRow,
     provider: EmbeddingProvider,
     depth = 0,
-  ): Promise<{ vector: number[]; norm: number | null; tokenCount: number | null }> {
+  ): Promise<EmbeddedSubject> {
     const text = embeddingTextFor(row);
     const hash = contentHash(text, provider.model, provider.id);
+    const bodyHash = descriptionHash(row.description);
 
     const current = await this.repos.embeddings.findByOpportunityId(row.id);
     if (
       current &&
       current.contentHash === hash &&
+      current.descriptionHash === bodyHash &&
       (!provider.suppliesNorm || (current.norm !== null && current.tokenCount !== null))
     ) {
       return {
         vector: current.embedding,
         norm: current.norm,
         tokenCount: current.tokenCount,
+        descriptionHash: current.descriptionHash,
       };
     }
 
@@ -459,11 +492,17 @@ export class DedupeService {
       contentHash: hash,
       norm: detail.norm,
       tokenCount: detail.tokens,
+      descriptionHash: bodyHash,
     });
     // Returned rather than re-read: the caller needs the subject's own norm and token count for
     // every candidate comparison, and a second SELECT for numbers we just computed is a round trip
     // that can also disagree with what was written.
-    return { vector: detail.vector, norm: detail.norm, tokenCount: detail.tokens };
+    return {
+      vector: detail.vector,
+      norm: detail.norm,
+      tokenCount: detail.tokens,
+      descriptionHash: bodyHash,
+    };
   }
 
   /**
@@ -487,6 +526,7 @@ export class DedupeService {
       similarity: number;
       norm: number | null;
       tokenCount: number | null;
+      descriptionHash: string | null;
     }[]
   > {
     const provider = this.provider;
@@ -584,7 +624,7 @@ export class DedupeService {
    */
   private async pruneStalePairs(
     opportunityId: number,
-    subject: { vector: number[]; norm: number | null; tokenCount: number | null },
+    subject: EmbeddedSubject,
     rule: DuplicateRuleConfig,
   ): Promise<void> {
     const provider = this.provider;
@@ -601,6 +641,8 @@ export class DedupeService {
             similarity: Number(row.similarity),
             left: { norm: subject.norm, tokenCount: subject.tokenCount },
             right: { norm: row.norm, tokenCount: row.tokenCount },
+            descriptionMatch:
+              subject.descriptionHash !== null && row.descriptionHash === subject.descriptionHash,
           },
           rule,
         ),
@@ -684,6 +726,7 @@ export class DedupeService {
         similarity: pair.similarity,
         left: { norm: pair.leftNorm, tokenCount: pair.leftTokenCount },
         right: { norm: pair.rightNorm, tokenCount: pair.rightTokenCount },
+        descriptionMatch: pair.descriptionMatch,
       };
       if (shouldPrune(inputs, rule)) {
         doomed.push(pair.id);
@@ -768,7 +811,8 @@ export class DedupeService {
           entry.providerId !== provider.id ||
           missingScalars ||
           entry.contentHash !==
-            contentHash(embeddingTextFor(entry.row), provider.model, provider.id)
+            contentHash(embeddingTextFor(entry.row), provider.model, provider.id) ||
+          entry.descriptionHash !== descriptionHash(entry.row.description)
         ) {
           picked.push(entry.row.id);
           if (picked.length >= limit) break;
@@ -1107,6 +1151,14 @@ async function lockPair(repos: Repositories, pairId: number): Promise<Opportunit
  * to decide whether a stored hash is still the entry's — and two copies of this projection is two
  * derivations that eventually disagree about what an entry's content hash should be.
  */
+/** The subject's own vector and the scalars every candidate comparison needs beside it. */
+interface EmbeddedSubject {
+  vector: number[];
+  norm: number | null;
+  tokenCount: number | null;
+  descriptionHash: string | null;
+}
+
 function embeddingTextFor(row: OpportunityRow): string {
   return embeddingText({
     title: row.title,

@@ -17,7 +17,14 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { EmbeddingProvider } from "../../src/modules/services/dedupe/embedding-provider.js";
-import { ALPHA_BODY, UNRELATED_BODY, reword } from "../helpers/dedupe-text.js";
+import {
+  ALPHA_BODY,
+  ARCHIVE_BODY,
+  COMPOST_BODY,
+  LEDGER_BODY,
+  UNRELATED_BODY,
+  reword,
+} from "../helpers/dedupe-text.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
@@ -39,6 +46,7 @@ const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = aw
 );
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
 const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe.service.js");
+const { config } = await import("../../src/config.js");
 
 const NS = "m3dup";
 const OTHER_NS = "m3dup-other";
@@ -65,14 +73,19 @@ const ours = (response: { json(): { duplicates: { id: string }[] } }): string[] 
     .filter((id) => id.startsWith(`${NS}:`));
 
 /** A submission carrying a real body, so the bag-of-words provider has something to work with. */
-function entry(id: string, title: string, body: string, namespace = NS) {
+function entry(
+  id: string,
+  title: string,
+  body: string,
+  namespace = NS,
+  over: Record<string, unknown> = {},
+) {
   return submission(id, namespace, {
     title,
-    // The body goes in `description` only: the Standard caps `summary` at 500 characters, and
-    // `embeddingText` falls back to a truncated description when there is no summary — which is
-    // the path a real long-form entry takes anyway.
+    // The body goes in `description`: the Standard caps `summary` at 500 characters.
     description: body,
     ecosystems: ["M3DUP"],
+    ...over,
   } as Record<string, unknown>);
 }
 
@@ -254,6 +267,134 @@ run("M3DUP duplicate detection", () => {
     expect(sub.statusCode).toBe(200);
     const publicCounterpart = sub.json().items.find((d: { id: string }) => d.id === `${NS}:alpha`);
     expect(publicCounterpart).toEqual(expect.objectContaining({ isPublic: true }));
+  });
+
+  // ── T-DUP-1b ──────────────────────────────────────────────────────────────────
+  /**
+   * The M3 reviewer's test: a live listing copied verbatim, minus its summary. Under the
+   * summary-first text basis the two embedded as unrelated texts (cosine 0.31) and the 201 said
+   * `ok` with nothing in it. Summary and description are both embedded now, and the pair is found.
+   */
+  it("flags a verbatim copy of a live listing submitted without its summary", async () => {
+    const original = await post(
+      publisherToken,
+      entry(`${NS}:ledger`, "Ledger Tooling Retrospective Awards — Round 4", LEDGER_BODY, NS, {
+        summary:
+          "Recognition for already-shipped ledger indexing tools, judged on how far they moved the committee's goals.",
+      }),
+    );
+    expect(original.statusCode, original.body).toBe(201);
+
+    const copy = await post(
+      publisherToken,
+      entry(`${NS}:ledger-copy`, "Ledger Tooling Retrospective Awards - Round 4", LEDGER_BODY, NS, {
+        summary: undefined,
+        ecosystems: [],
+        categories: [],
+      }),
+    );
+    expect(copy.statusCode, copy.body).toBe(201);
+    expect(copy.json().duplicateCheck).toBe("ok");
+    expect(ours(copy)).toContain(`${NS}:ledger`);
+    expect((await pairBetween(`${NS}:ledger`, `${NS}:ledger-copy`))?.status).toBe("suspected");
+  });
+
+  /**
+   * The identical-description arm on its own. A provider that puts every distinct text on its own
+   * axis makes cosine 0 for any two different texts, so nothing but the hash can pair these; the
+   * assertion is that it does, that the reasons say so, and that pruning leaves it alone.
+   */
+  it("pairs two entries on an identical description alone, and explains it as such", async () => {
+    const orthogonal: EmbeddingProvider = {
+      id: "lexical",
+      model: "orthogonal-test-provider",
+      dimensions: 1536,
+      suppliesNorm: false,
+      async embed(text) {
+        return (await this.embedDetailed(text)).vector;
+      },
+      async embedDetailed(text) {
+        const vector = new Array<number>(1536).fill(0);
+        let h = 7;
+        for (const c of text) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+        vector[h % 1536] = 1;
+        return { vector, norm: null, tokens: null };
+      },
+    };
+    const service = new DedupeService(undefined, { provider: orthogonal });
+
+    const left = await post(
+      publisherToken,
+      entry(`${NS}:hash-left`, "Compost Commons Fellowship", COMPOST_BODY, NS, {
+        summary: "Fellowships for municipal compost programme coordinators.",
+      }),
+    );
+    const right = await post(
+      publisherToken,
+      entry(`${NS}:hash-right`, "Soil Stewards Cohort", COMPOST_BODY, NS, {
+        summary: undefined,
+        ecosystems: [],
+      }),
+    );
+    expect(left.statusCode, left.body).toBe(201);
+    expect(right.statusCode, right.body).toBe(201);
+
+    // Re-embed both in the orthogonal space; the second pass is the detection under test.
+    await service.embedAndDetect(await rowIdOf(`${NS}:hash-left`), "all");
+    const matches = await service.embedAndDetect(await rowIdOf(`${NS}:hash-right`), "all");
+    const match = matches.find((m) => m.id === `${NS}:hash-left`);
+    expect(match, JSON.stringify(matches)).toBeDefined();
+    expect(match?.similarity).toBe(0);
+    expect(match?.matchedOn[0]).toBe("identical_description");
+
+    const pair = await pairBetween(`${NS}:hash-left`, `${NS}:hash-right`);
+    expect(pair?.status).toBe("suspected");
+    expect(pair?.signal).toEqual(expect.objectContaining({ arm: "identical_description" }));
+
+    // Still there after a further pass (pruning re-judges every suspected pair)…
+    await service.embedAndDetect(await rowIdOf(`${NS}:hash-right`), "all");
+    expect((await pairBetween(`${NS}:hash-left`, `${NS}:hash-right`))?.status).toBe("suspected");
+
+    // …and gone once the descriptions diverge.
+    await db
+      .update(opportunities)
+      .set({ description: `${COMPOST_BODY} Amended after the fact.` })
+      .where(eq(opportunities.publicId, `${NS}:hash-right`));
+    await service.embedAndDetect(await rowIdOf(`${NS}:hash-right`), "all");
+    expect(await pairBetween(`${NS}:hash-left`, `${NS}:hash-right`)).toBeUndefined();
+  });
+
+  /** The bound the write path promises: a check that hangs answers `unavailable`, not never. */
+  it("answers unavailable within the configured deadline when the provider hangs", async () => {
+    const live = new LexicalEmbeddingProvider();
+    const hanging: EmbeddingProvider = {
+      id: live.id,
+      model: live.model,
+      dimensions: live.dimensions,
+      suppliesNorm: true,
+      embed: () => new Promise(() => undefined),
+      embedDetailed: () => new Promise(() => undefined),
+    };
+    const warnings: string[] = [];
+    const service = new DedupeService(undefined, {
+      provider: hanging,
+      config: { ...config, dedupe: { ...config.dedupe, checkTimeoutMs: 50 } },
+      logger: { warn: (_payload, message) => void warnings.push(message) },
+    });
+    const posted = await post(
+      publisherToken,
+      entry(`${NS}:slow`, "Glacier Monitoring Microgrants", ARCHIVE_BODY),
+    );
+    expect(posted.statusCode, posted.body).toBe(201);
+    // The write already embedded it; drop that row so the check has to call the provider.
+    const slowId = await rowIdOf(`${NS}:slow`);
+    await db.delete(opportunityEmbeddings).where(eq(opportunityEmbeddings.opportunityId, slowId));
+
+    const started = Date.now();
+    const result = await service.check(slowId, "public");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(result).toEqual({ status: "unavailable", duplicates: [] });
+    expect(warnings.some((w) => w.startsWith("DUPLICATE CHECK TIMED OUT"))).toBe(true);
   });
 
   // ── T-DUP-2 ───────────────────────────────────────────────────────────────────

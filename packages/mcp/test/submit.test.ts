@@ -129,8 +129,8 @@ describe("derived facts", () => {
 });
 
 describe("duplicateCheck is reported in three distinguishable ways", () => {
-  it("says 'ran and found nothing' only when it ran", () => {
-    expect(explainDuplicateCheck("ok", 0)).toContain("RAN and found nothing");
+  it("says 'ran and nothing crossed the rule' only when it ran", () => {
+    expect(explainDuplicateCheck("ok", 0)).toContain("RAN and no publicly visible entry crossed");
   });
 
   it("says a failed check is NOT the same as no duplicates", () => {

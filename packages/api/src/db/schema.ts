@@ -687,9 +687,15 @@ export const opportunityEmbeddings = pgTable(
      */
     norm: doublePrecision(),
     tokenCount: integer(),
+    /**
+     * `descriptionHash()` of the entry's WHOLE description, or null when it is too short to count.
+     * The identical-description arm looks entries up by it, independently of the vector search.
+     */
+    descriptionHash: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    index("ix_opp_embed_description_hash").on(t.descriptionHash),
     // HNSW over cosine distance. Cosine because the providers return normalised vectors and the
     // threshold is expressed as a cosine similarity; HNSW rather than IVFFlat because it needs no
     // training pass and stays correct as rows arrive one submission at a time.

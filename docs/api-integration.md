@@ -244,7 +244,7 @@ A `201` from a submission carries a `duplicateCheck` string:
 
 | Value | Meaning |
 |---|---|
-| `ok` | Detection ran. An empty `duplicates` array then means *checked, nothing similar* |
+| `ok` | Detection ran. An empty `duplicates` array then means *no entry crossed the detection rule* — not a guarantee that nothing similar exists |
 | `unavailable` | The check failed or timed out. A backfill still owes this entry a check — **this is not "no duplicates"** |
 | `disabled` | No provider is configured on this deployment |
 

@@ -74,9 +74,14 @@ describe("dedupe threshold, against the committed corpus", () => {
    * hardest negative separates this corpus and nothing else. The floor is a real one now that the
    * negative side is the full pairwise scan — the unweighted bag's honest band was 0.018.
    */
+  /**
+   * 0.321 while the embedded text was the summary alone; 0.205 with the description embedded
+   * beside it, because long bodies share boilerplate. Narrower, and still a band: the floor is set
+   * under the measured value so growth in the corpus is what fails it, not this change.
+   */
   it("keeps a usable margin between the two classes", () => {
     expect(result.worstPositive).toBeGreaterThan(result.bestNegative);
-    expect(result.margin).toBeGreaterThan(0.3);
+    expect(result.margin).toBeGreaterThan(0.15);
   });
 
   it("sits the operating point inside the band rather than on its edge", () => {
@@ -95,7 +100,9 @@ describe("dedupe threshold, against the committed corpus", () => {
     expect(again.hardestCorpusOverlaps).toEqual(result.hardestCorpusOverlaps);
     expect(again.stubAttack).toEqual(result.stubAttack);
     expect(again.conjunction).toEqual(result.conjunction);
-  });
+    // A second full pairwise scan plus the stub attack: ~1 s here, over 5 s on a CI runner now
+    // that every entry embeds ~150 tokens.
+  }, 60_000);
 });
 
 /**
@@ -128,9 +135,21 @@ describe("the overlap arm, against the committed corpus", () => {
     expect(rung("M5").worstOverlap).toBeGreaterThan(OVERLAP_MIN);
   });
 
-  it("catches every rung M0–M7 under the combined rule", () => {
-    const missed = result.mutations.filter((m) => m.recallCombined < m.count);
+  /**
+   * M6 — heavy synonyms, a third of the words dropped AND truncated to a quarter — is the one rung
+   * the combined rule no longer recovers whole: with the description embedded, its shorter side
+   * falls under the 40-token guard on two of twelve. Recorded as the acknowledged limit rather
+   * than hidden by lowering the guard, which the stub-attack numbers below say is not free.
+   */
+  it("catches every rung but M6 whole under the combined rule, and M6 at least 8 of 12", () => {
+    const missed = result.mutations.filter((m) => m.id !== "M6" && m.recallCombined < m.count);
     expect(missed.map((m) => `${m.id} ${m.recallCombined}/${m.count}`)).toEqual([]);
+    expect(rung("M6").recallCombined).toBeGreaterThanOrEqual(8);
+  });
+
+  /** The M3 reviewer's copy, caught by the identical-description arm whatever cosine says. */
+  it("catches a verbatim description with its summary and taxonomy dropped (M8), full recall", () => {
+    expect(rung("M8").recallCombined).toBe(rung("M8").count);
   });
 
   /**
@@ -175,7 +194,9 @@ describe("the overlap arm, against the committed corpus", () => {
   it("adds no new stub-attack exposure over the already-shipped lexical arm", () => {
     expect(result.stubAttack.targets).toBeGreaterThanOrEqual(100);
     expect(result.stubAttack.marginalWins).toBe(0);
-    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(3);
+    // 3 of 160 at a 20-token guard over summary-only text; 72 at a 40-token guard now that every
+    // entry embeds ~150 tokens. Every one of them already beats arm A (marginal 0 above).
+    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(80);
   });
 
   /**
@@ -185,7 +206,7 @@ describe("the overlap arm, against the committed corpus", () => {
    */
   it("shows MIN_TOKENS is load-bearing, not decorative", () => {
     expect(result.stubAttack.armBWinsWithoutTokenGuard).toBeGreaterThanOrEqual(100);
-    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(3);
+    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(80);
   });
 
   /**
@@ -254,8 +275,8 @@ describe("the mutation ladder, at the configured threshold", () => {
    * its keep" from "the corpus got easier". A ladder that silently omitted the rungs one arm fails
    * would be a test that lies.
    */
-  it("records M3 and M5 as missed by the lexical arm alone", () => {
-    expect(recall("M3")).toBe(0);
+  it("records M3 and M5 as not whole under the lexical arm alone", () => {
+    expect(recall("M3")).toBeLessThan(result.mutations.find((m) => m.id === "M3")?.count ?? 0);
     expect(recall("M5")).toBe(0);
   });
 });
@@ -297,25 +318,32 @@ describe("the frozen idf table", () => {
     const provider = new LexicalEmbeddingProvider({ table: buildIdfTable(training) });
     const rule = defaultRule();
 
+    // Admitted pairs only: a pair under the token guard is never decided by this arm.
     const positives = ["M0", "M3", "M5", "M6", "M7"].flatMap((id) =>
-      deriveMutationPositives(heldOut, id as "M0").map((pair) => {
-        const left = provider.embedSyncDetailed(embeddingText(pair.left));
-        const right = provider.embedSyncDetailed(embeddingText(pair.right));
-        return (
-          overlapOf({
-            similarity: cosineSimilarity(left.vector, right.vector),
-            leftNorm: left.norm,
-            rightNorm: right.norm,
-          }) ?? 0
-        );
-      }),
+      deriveMutationPositives(heldOut, id as "M0")
+        .map((pair) => {
+          const left = provider.embedSyncDetailed(embeddingText(pair.left));
+          const right = provider.embedSyncDetailed(embeddingText(pair.right));
+          return {
+            tokens: Math.min(left.tokens, right.tokens),
+            overlap:
+              overlapOf({
+                similarity: cosineSimilarity(left.vector, right.vector),
+                leftNorm: left.norm,
+                rightNorm: right.norm,
+              }) ?? 0,
+          };
+        })
+        .filter((pair) => pair.tokens >= rule.overlapMinTokens)
+        .map((pair) => pair.overlap),
     );
     const worstPositive = Math.min(...positives);
     const hardestNegative = hardestOverlapNegatives(heldOut, provider, 1, rule)[0]?.overlap ?? 1;
 
+    // 0.195 over summary-only text; 0.146 with the description embedded. Floor set under it.
     expect(positives.length).toBeGreaterThanOrEqual(8);
     expect(worstPositive).toBeGreaterThan(hardestNegative);
-    expect(worstPositive - hardestNegative).toBeGreaterThanOrEqual(0.15);
+    expect(worstPositive - hardestNegative).toBeGreaterThanOrEqual(0.12);
   });
 });
 
@@ -326,6 +354,9 @@ describe("the idf exponent", () => {
    * negative 0.571, to the same rounding) is the proof that this change is a weight function and
    * a data file — the hashing, the tokenizer, the dimensions and the draws are untouched.
    */
+  // 0.911 / 0.571 while the embedded text was the summary alone; the same arithmetic over the
+  // summary-plus-description text gives 0.899 / 0.596. Pinned to the digit so a change to the
+  // hashing, the tokenizer or the draws shows up here rather than as a moved threshold.
   it("at zero, reproduces the unweighted bag's historical numbers exactly", () => {
     const legacy = new LexicalEmbeddingProvider({ idfExponent: 0 });
     const score = (left: CorpusDocument, right: CorpusDocument): number =>
@@ -343,8 +374,8 @@ describe("the idf exponent", () => {
     const bestNegative = Math.max(
       ...pairs.negative.map((p) => score(p.left as CorpusDocument, p.right as CorpusDocument)),
     );
-    expect(worstPositive).toBe(0.911);
-    expect(bestNegative).toBe(0.571);
+    expect(worstPositive).toBe(0.899);
+    expect(bestNegative).toBe(0.596);
   });
 });
 
