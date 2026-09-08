@@ -79,6 +79,7 @@ import type {
   DuplicateSideView,
   MergeResultView,
 } from "../../shared/api-views.js";
+import { DeadlineExceeded, withDeadline } from "../../shared/deadline.js";
 import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, descriptionHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
@@ -244,17 +245,31 @@ export class DedupeService {
     scope: CandidateScope = "public",
   ): Promise<DuplicateCheckResult> {
     if (!this.provider) return { status: "disabled", duplicates: [] };
+    const timeoutMs = this.config.dedupe.checkTimeoutMs;
     try {
-      if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
-        return { status: "unavailable", duplicates: [] };
-      }
-      const matches = await this.embedAndDetect(opportunityId, scope);
-      return { status: "ok", duplicates: matches };
-    } catch {
+      return await withDeadline(this.detect(opportunityId, scope), timeoutMs, "duplicate check");
+    } catch (error) {
       // Deliberately swallowed and reported as a status. `embedding-backfill` selects exactly the
-      // rows this leaves without a current embedding row.
+      // rows this leaves without a current embedding row. A pass that merely ran LATE still
+      // finishes in the background and records what it finds; only this response goes without.
+      if (error instanceof DeadlineExceeded) {
+        this.logger.warn(
+          { opportunityId, scope, timeoutMs },
+          "DUPLICATE CHECK TIMED OUT: reported as unavailable; the pass continues in the background and embedding-backfill re-checks the entry",
+        );
+      }
       return { status: "unavailable", duplicates: [] };
     }
+  }
+
+  private async detect(
+    opportunityId: number,
+    scope: CandidateScope,
+  ): Promise<DuplicateCheckResult> {
+    if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
+      return { status: "unavailable", duplicates: [] };
+    }
+    return { status: "ok", duplicates: await this.embedAndDetect(opportunityId, scope) };
   }
 
   /**

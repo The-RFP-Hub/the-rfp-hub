@@ -104,6 +104,8 @@ export interface DedupeConfig {
   overlapMinSimilarity: number;
   /** Arm C: a byte-identical (normalised) description is a pair whatever the cosine says. */
   identicalDescriptionEnabled: boolean;
+  /** How long a submission waits for its duplicate check before answering `unavailable`. */
+  checkTimeoutMs: number;
 }
 
 export interface VerificationConfig {
@@ -901,6 +903,7 @@ export const config: AppConfig = {
       process.env.DEDUPE_IDENTICAL_DESCRIPTION_ENABLED,
       true,
     ),
+    checkTimeoutMs: readPositiveInt(process.env.EMBEDDING_TIMEOUT_MS, 5_000),
   },
 
   verification: {

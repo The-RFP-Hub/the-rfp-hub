@@ -19,6 +19,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import type { EmbeddingProvider } from "../../src/modules/services/dedupe/embedding-provider.js";
 import {
   ALPHA_BODY,
+  ARCHIVE_BODY,
   COMPOST_BODY,
   LEDGER_BODY,
   UNRELATED_BODY,
@@ -45,6 +46,7 @@ const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = aw
 );
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
 const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe.service.js");
+const { config } = await import("../../src/config.js");
 
 const NS = "m3dup";
 const OTHER_NS = "m3dup-other";
@@ -360,6 +362,39 @@ run("M3DUP duplicate detection", () => {
       .where(eq(opportunities.publicId, `${NS}:hash-right`));
     await service.embedAndDetect(await rowIdOf(`${NS}:hash-right`), "all");
     expect(await pairBetween(`${NS}:hash-left`, `${NS}:hash-right`)).toBeUndefined();
+  });
+
+  /** The bound the write path promises: a check that hangs answers `unavailable`, not never. */
+  it("answers unavailable within the configured deadline when the provider hangs", async () => {
+    const live = new LexicalEmbeddingProvider();
+    const hanging: EmbeddingProvider = {
+      id: live.id,
+      model: live.model,
+      dimensions: live.dimensions,
+      suppliesNorm: true,
+      embed: () => new Promise(() => undefined),
+      embedDetailed: () => new Promise(() => undefined),
+    };
+    const warnings: string[] = [];
+    const service = new DedupeService(undefined, {
+      provider: hanging,
+      config: { ...config, dedupe: { ...config.dedupe, checkTimeoutMs: 50 } },
+      logger: { warn: (_payload, message) => void warnings.push(message) },
+    });
+    const posted = await post(
+      publisherToken,
+      entry(`${NS}:slow`, "Glacier Monitoring Microgrants", ARCHIVE_BODY),
+    );
+    expect(posted.statusCode, posted.body).toBe(201);
+    // The write already embedded it; drop that row so the check has to call the provider.
+    const slowId = await rowIdOf(`${NS}:slow`);
+    await db.delete(opportunityEmbeddings).where(eq(opportunityEmbeddings.opportunityId, slowId));
+
+    const started = Date.now();
+    const result = await service.check(slowId, "public");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(result).toEqual({ status: "unavailable", duplicates: [] });
+    expect(warnings.some((w) => w.startsWith("DUPLICATE CHECK TIMED OUT"))).toBe(true);
   });
 
   // ── T-DUP-2 ───────────────────────────────────────────────────────────────────
