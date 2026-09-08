@@ -100,7 +100,9 @@ describe("dedupe threshold, against the committed corpus", () => {
     expect(again.hardestCorpusOverlaps).toEqual(result.hardestCorpusOverlaps);
     expect(again.stubAttack).toEqual(result.stubAttack);
     expect(again.conjunction).toEqual(result.conjunction);
-  });
+    // A second full pairwise scan plus the stub attack: ~1 s here, over 5 s on a CI runner now
+    // that every entry embeds ~150 tokens.
+  }, 60_000);
 });
 
 /**
