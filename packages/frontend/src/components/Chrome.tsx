@@ -25,15 +25,12 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  * renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
+import { BUILT_BY, FUNDED_BY } from "@/lib/credits";
 import {
-  GOVERNANCE,
   HOW_IT_WORKS,
   HOW_IT_WORKS_ROLES,
   PUBLISHERS,
-  PUBLISHERS_DOC,
   REPOSITORY,
-  REVIEW_CRITERIA,
-  RFC_PROCESS,
   STANDARD,
   apiDocsUrl,
 } from "@/lib/links";
@@ -71,6 +68,16 @@ interface NavItem {
   badge?: number;
   /** Which capability the API reported. `undefined` means "any signed-in account". */
   requires?: (me: Me) => boolean;
+}
+
+/**
+ * What the header calls the signed-in person: the display name they chose, else their handle, else
+ * the account id. The value is publisher-typed text, so the label it lands in truncates.
+ */
+function accountLabel(me: Me): string {
+  const displayName = me.displayName?.trim();
+  if (displayName) return displayName;
+  return me.handle ?? `account ${me.accountId}`;
 }
 
 /**
@@ -320,7 +327,7 @@ export function Chrome({ children }: { children: ReactNode }) {
         (item): item is NavItem => item !== undefined,
       )
     : PUBLIC_NAV;
-  const identity = me ? (me.handle ?? `account ${me.accountId}`) : "your account";
+  const identity = me ? accountLabel(me) : "your account";
 
   return (
     <div className="shell">
@@ -470,47 +477,50 @@ export function Chrome({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="shell-footer">
-        <GuardedLink href="/" className="shell-footer-brand" aria-label="RFP Hub home">
-          <BrandMark className="footer-mark" />
-          RFP Hub
-        </GuardedLink>
-        <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
-        <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>
-        <a href={STANDARD} target="_blank" rel="noopener noreferrer">
-          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-            The Standard
-          </IconLabel>
-        </a>
-        {/*
-         * The API this build talks to, not a hard-coded one. A preview deployment linking at
-         * production's documentation would be documenting a different API than the one its own
-         * pages are reading.
-         */}
-        <a href={apiDocsUrl(api.baseUrl)} target="_blank" rel="noopener noreferrer">
-          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-            API &amp; data
-          </IconLabel>
-        </a>
-        <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
-          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-            GitHub
-          </IconLabel>
-        </a>
-        <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
-          Governance
-        </a>
-        <a href={REVIEW_CRITERIA} target="_blank" rel="noopener noreferrer">
-          Review criteria
-        </a>
-        <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
-          Publisher program
-        </a>
-        <a href={RFC_PROCESS} target="_blank" rel="noopener noreferrer">
-          RFC process
-        </a>
-        <GuardedLink href="/privacy">Privacy</GuardedLink>
-        <GuardedLink href="/terms">Terms</GuardedLink>
-        <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
+        <div className="shell-footer-links">
+          <GuardedLink href="/" className="shell-footer-brand" aria-label="RFP Hub home">
+            <BrandMark className="footer-mark" />
+            RFP Hub
+          </GuardedLink>
+          <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
+          <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>
+          <a href={STANDARD} target="_blank" rel="noopener noreferrer">
+            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+              The Standard
+            </IconLabel>
+          </a>
+          {/*
+           * The API this build talks to, not a hard-coded one. A preview deployment linking at
+           * production's documentation would be documenting a different API than the one its own
+           * pages are reading.
+           */}
+          <a href={apiDocsUrl(api.baseUrl)} target="_blank" rel="noopener noreferrer">
+            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+              API &amp; data
+            </IconLabel>
+          </a>
+          <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
+            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+              GitHub
+            </IconLabel>
+          </a>
+          <GuardedLink href="/privacy">Privacy</GuardedLink>
+          <GuardedLink href="/terms">Terms</GuardedLink>
+        </div>
+        <div className="shell-footer-meta">
+          <p className="shell-footer-credits">
+            Built with ♥ by{" "}
+            <a href={BUILT_BY.href} target="_blank" rel="noopener noreferrer">
+              {BUILT_BY.name}
+            </a>
+            . Funded by the{" "}
+            <a href={FUNDED_BY.href} target="_blank" rel="noopener noreferrer">
+              {FUNDED_BY.name}
+            </a>
+            .
+          </p>
+          <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
+        </div>
       </footer>
     </div>
   );

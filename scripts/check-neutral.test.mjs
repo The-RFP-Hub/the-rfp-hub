@@ -227,6 +227,47 @@ describe("archived source material", () => {
 });
 
 /**
+ * THE CREDITS BOUNDARY — the second exemption, pinned the same way as the archive.
+ *
+ * The footer credits name who built and who funded the hub. That one file may carry the name; the
+ * footer component that renders it, and everything else, may not.
+ */
+describe("published credits", () => {
+  const CREDITS = "packages/frontend/src/lib/credits.ts";
+  const LINE = `export const BUILT_BY = { name: "${BRAND[0].toUpperCase()}${BRAND.slice(1)}", href: "https://${BRAND}hq.xyz" };`;
+
+  it("does not fire on the platform's name or hostname inside the credits file", () => {
+    expect(scanText(CREDITS, LINE)).toEqual([]);
+  });
+
+  it("still fires on the same line in the footer component and beside the credits file", () => {
+    for (const file of [
+      "packages/frontend/src/components/Chrome.tsx",
+      "packages/frontend/src/lib/links.ts",
+      "packages/frontend/src/lib/credits.test.ts",
+      "packages/frontend/credits.ts",
+    ]) {
+      expect(
+        scanText(file, LINE).map((f) => f.rule),
+        file,
+      ).toContain("source-neutral");
+    }
+  });
+
+  it("still applies every other rule inside the credits file", () => {
+    expect(scanText(CREDITS, `// ${TRACKER}`).map((f) => f.rule)).toEqual(["tracker-id"]);
+    expect(scanText(CREDITS, PLAINTEXT_APEX).map((f) => f.rule)).toEqual(["identity"]);
+  });
+
+  it("scans the credits file on disk clean, with the attribution intact", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const text = readFileSync(join(dir, "..", CREDITS), "utf8");
+    expect(scanText(CREDITS, text)).toEqual([]);
+    expect(text.toLowerCase()).toContain(BRAND);
+  });
+});
+
+/**
  * THE DENOMINATOR.
  *
  * The failure this guards against already happened: a tracked 522-line script contained a literal

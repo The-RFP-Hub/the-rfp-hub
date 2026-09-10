@@ -24,8 +24,9 @@
 // denominator — see `classifyTracked`, and the incident that rule exists for.
 //
 // The forbidden strings are assembled from parts throughout, so this file does not trip its own
-// rules. There is no skip comment and no way for a file to silence a rule from the inside; the one
-// exemption is the archived interview record, defined and bounded at ARCHIVED_SOURCE.
+// rules. There is no skip comment and no way for a file to silence a rule from the inside; the two
+// exemptions are the archived interview record, defined and bounded at ARCHIVED_SOURCE, and the
+// published credits, defined and bounded at CREDITS_SOURCE.
 //
 // Run with `pnpm check:neutral`. Exits non-zero on any hit.
 import { execFileSync } from "node:child_process";
@@ -122,8 +123,22 @@ const ARCHIVED_SOURCE = new Set([
   "user-interviews/Researcher-Weizenbaum-Institute-2026-07-31.md",
 ]);
 
+/**
+ * THE PUBLISHED CREDITS ARE THE SECOND, AND LAST, EXEMPTION. The footer says who built the hub and
+ * who funded it. That is attribution the maintainers decided to publish (2026-09-10), and it has to
+ * name the organizations to mean anything — an anonymous credit credits nobody. It is bounded the
+ * same three ways as the archive: only `source-neutral` is waived; only the ONE exact file that
+ * holds the names and links is listed, so the footer component, the rest of the frontend and every
+ * document stay under the rule; and the waiver fails closed if that file moves. Adding a path here
+ * is a claim that the file contains nothing but a credit line's names and links.
+ */
+const CREDITS_SOURCE = new Set(["packages/frontend/src/lib/credits.ts"]);
+
+/** Every path a rule may be waived for. Both lists must stay tracked — see `main`. */
+const WAIVED_PATHS = new Set([...ARCHIVED_SOURCE, ...CREDITS_SOURCE]);
+
 /** Whether `rule` is waived for `file`. The path must match a listed record exactly. */
-const isWaived = (file, rule) => ARCHIVED_SOURCE.has(file) && ARCHIVE_WAIVED_RULES.has(rule);
+const isWaived = (file, rule) => WAIVED_PATHS.has(file) && ARCHIVE_WAIVED_RULES.has(rule);
 
 // ----------------------------------------------------------------------------- identity ---
 
@@ -325,11 +340,11 @@ function main() {
   // an archived record must force the list to be revisited, so the exemption cannot quietly
   // outlive the record it was granted for.
   const tracked = new Set(files);
-  const stale = [...ARCHIVED_SOURCE].filter((rel) => !tracked.has(rel));
+  const stale = [...WAIVED_PATHS].filter((rel) => !tracked.has(rel));
   if (stale.length > 0) {
     console.error(
-      "✗ check-neutral: ARCHIVED_SOURCE lists path(s) that are not tracked text files — a moved or\n" +
-        "  deleted archived record leaves a waiver behind. Update the list in this script:",
+      "✗ check-neutral: ARCHIVED_SOURCE or CREDITS_SOURCE lists path(s) that are not tracked text\n" +
+        "  files — a moved or deleted file leaves a waiver behind. Update the list in this script:",
     );
     for (const rel of stale) console.error(`  ${rel}`);
     process.exit(1);
@@ -361,7 +376,7 @@ function main() {
   console.log(
     `✓ check-neutral: ${scanned} — no tracker IDs, no source branding, ` +
       `no retired or off-domain identifiers, no plaintext ${CANONICAL_HOST} URLs ` +
-      `(${ARCHIVED_SOURCE.size} archived primary sources exempt from the neutrality rule only)`,
+      `(${ARCHIVED_SOURCE.size} archived primary sources and ${CREDITS_SOURCE.size} credits file exempt from the neutrality rule only)`,
   );
 }
 
