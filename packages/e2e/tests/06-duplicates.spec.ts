@@ -43,22 +43,22 @@ function original(label: string) {
  * how verbatim it is.
  *
  * The margins are deliberate and were measured against the shipped featurizer before this fixture
- * was written — cosine 0.664 against a 0.75 threshold, overlap 1.037 against 0.85, and 34 distinct
- * tokens on the shorter side against a floor of 20. There is room in all three directions, so the
+ * was written — cosine 0.679 against a 0.78 threshold, overlap 1.051 against 0.85, and 54 distinct
+ * tokens on the shorter side against a floor of 40. There is room in all three directions, so the
  * test fails when the RULE changes rather than when the corpus breathes. If it ever does fail, the
  * fixture text is what changes.
  */
 function longOriginal(label: string) {
   return {
     title: `Long-Form ${label} Archive Custody Fellowship`,
-    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive, document its provenance and handling history, and publish a machine-readable manifest of every stored section with its interval and collection season. Awards cover maintenance contracts, calibrated logging hardware and the technician time needed to re-inventory a collection that has outlived its original grant. Applicants must show that the archive is at genuine risk of loss through equipment failure or institutional reorganisation, and must commit to depositing the manifest under an open licence. Reviews run twice a year and are decided by working researchers rather than by programme staff.`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive, document its provenance and handling history, and publish a machine-readable manifest of every stored section with its interval and collection season. Awards cover maintenance contracts, calibrated logging hardware and the technician time needed to re-inventory a collection that has outlived its original grant. Applicants must show that the archive is at genuine risk of loss through equipment failure or institutional reorganisation, and must commit to depositing the manifest under an open licence. Reviews run twice a year and are decided by working researchers rather than by programme staff. Eligible archives include herbarium sheets, sediment cores, ice segments, tree-ring slabs, tissue banks and seed vaults, provided that the holding department can name a custodian for the duration of the award. Fellows are expected to attend two curation workshops, contribute their handling protocols to a shared method library, and train at least one graduate student in the inventory procedure. Reporting is light: a short interim note at six months and the finished manifest at the end, with any deviation from the proposed budget explained in a paragraph.`,
   };
 }
 
 function truncatedRelisting(label: string) {
   return {
     title: `${label} Custody Fellowship`,
-    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive and publish a manifest of every stored section.`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive, document its provenance and handling history, and publish a machine-readable manifest of every stored section with its interval and collection season. Awards cover maintenance contracts and calibrated logging hardware.`,
   };
 }
 
