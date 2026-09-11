@@ -39,7 +39,7 @@ export interface ScanResult {
   unreadable: string[];
 }
 
-/** Extensions read as text. Everything else is either a zip (handled) or genuinely opaque. */
+/** Extensions read as UTF-8. Everything else is a zip (handled) or is searched byte-for-byte. */
 const TEXT_LIKE = new Set([
   ".txt",
   ".log",
@@ -102,16 +102,10 @@ export function scan(roots: string[]): ScanResult {
         continue;
       }
 
-      if (!TEXT_LIKE.has(extension)) {
-        // Binary artifacts (screenshots, videos) cannot embed a header string in a way a substring
-        // search would find, but they are COUNTED as unreadable rather than dropped from the
-        // denominator — a "clean" result has to say what it did not look at.
-        result.unreadable.push(`${rel}: not scanned (${extension || "no extension"})`);
-        continue;
-      }
-
       try {
-        const content = readFileSync(file, "utf8");
+        // Binary artifacts (screenshots, videos, the trace viewer's own assets) are searched as
+        // bytes: every registered secret is ASCII, so a latin1 read finds it wherever it sits.
+        const content = readFileSync(file, TEXT_LIKE.has(extension) ? "utf8" : "latin1");
         result.filesScanned++;
         for (const secret of secrets) {
           if (content.includes(secret.value)) {
