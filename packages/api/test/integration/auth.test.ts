@@ -165,7 +165,7 @@ run("M3AUTH identity and credentials", () => {
     expect(messages.size).toBe(1);
   }, 60_000);
 
-  it("provisions an account on the first request an identity ever makes", async () => {
+  it("resolves a stable ordinary account on the first request for a fresh identity", async () => {
     const identity = await signIn(EMAILS.fresh);
     userIds.push(identity.userId);
 

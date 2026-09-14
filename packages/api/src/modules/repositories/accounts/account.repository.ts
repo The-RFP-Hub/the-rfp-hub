@@ -41,8 +41,13 @@ export class AccountRepository {
     return rows[0];
   }
 
-  async insertBySubject(subject: string): Promise<void> {
-    await this.exec.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
+  async insertBySubject(subject: string): Promise<boolean> {
+    const inserted = await this.exec
+      .insert(accounts)
+      .values({ authUserId: subject })
+      .onConflictDoNothing()
+      .returning({ id: accounts.id });
+    return inserted.length === 1;
   }
 
   async findBySubject(subject: string): Promise<AccountRow | undefined> {

@@ -25,7 +25,10 @@ import {
   type OpportunityRow,
   accounts,
   auditLog,
+  notifications,
   opportunities,
+  orgMemberships,
+  organizations,
 } from "../../../db/schema.js";
 import type { Principal } from "../../shared/capabilities.js";
 
@@ -88,6 +91,26 @@ export interface ClaimPublisherUpdate {
   approvedBy: number | null;
   approvedAt: Date | null;
   updatedAt: Date;
+}
+
+export interface StalePublisherListing {
+  opportunity: OpportunityRow;
+  accountId: number;
+  organizationId: number;
+  organizationSlug: string;
+  organizationName: string;
+}
+
+export interface StalePublisherGroup {
+  accountId: number;
+  organizationId: number;
+  organizationSlug: string;
+  organizationName: string;
+}
+
+export interface StalePublisherGroupCursor {
+  accountId: number;
+  organizationId: number;
 }
 
 /** SQL form of submission-or-namespace ownership, usable with the table or one of its aliases. */
@@ -214,6 +237,116 @@ export class OpportunityRepository {
         and(eq(opportunities.submittedBy, accountId), eq(opportunities.reviewStatus, "pending")),
       );
     return counted[0]?.value ?? 0;
+  }
+
+  /**
+   * Page recipient groups rather than joined listing rows.
+   *
+   * The group cursor is `(account, organization)`, so a `limit=1` page cannot strand a second
+   * member of the same listing behind the first member's row. A group is returned when it has any
+   * quiet live listing; the service performs the richer deadline check and payload query under the
+   * membership lock before inserting its event.
+   */
+  async listStalePublisherGroups(
+    inactiveBefore: Date,
+    cooldownBefore: Date,
+    after: StalePublisherGroupCursor,
+    limit: number,
+  ): Promise<StalePublisherGroup[]> {
+    return this.exec
+      .select({
+        accountId: orgMemberships.accountId,
+        organizationId: organizations.id,
+        organizationSlug: organizations.slug,
+        organizationName: organizations.name,
+      })
+      .from(opportunities)
+      .innerJoin(organizations, eq(organizations.slug, opportunities.sourcePublisher))
+      .innerJoin(orgMemberships, eq(orgMemberships.organizationId, organizations.id))
+      .where(
+        and(
+          or(
+            gt(orgMemberships.accountId, after.accountId),
+            and(
+              eq(orgMemberships.accountId, after.accountId),
+              gt(organizations.id, after.organizationId),
+            ),
+          ),
+          eq(opportunities.status, "open"),
+          eq(opportunities.reviewStatus, "approved"),
+          eq(opportunities.isListed, true),
+          isNull(opportunities.mergedIntoId),
+          isNull(opportunities.nextDeadlineAt),
+          eq(organizations.verified, true),
+          lt(
+            sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`,
+            inactiveBefore,
+          ),
+          // This is only a read-side pruning predicate. The service repeats the cooldown check
+          // after taking the membership row lock, because two generators can read this page at
+          // once and only one may insert the next rolling event.
+          sql`not exists (
+            select 1 from ${notifications} as stale_notification
+            where stale_notification.account_id = ${orgMemberships.accountId}
+              and stale_notification.kind = 'stale_listing_reminder'
+              and stale_notification.subject_id = ${orgMemberships.accountId}
+              and stale_notification.payload ->> 'organizationId' = ${organizations.id}::text
+              and greatest(
+                stale_notification.created_at,
+                coalesce(stale_notification.email_dispatched_at, stale_notification.created_at)
+              ) > ${cooldownBefore}
+          )`,
+        ),
+      )
+      .groupBy(orgMemberships.accountId, organizations.id, organizations.slug, organizations.name)
+      .orderBy(asc(orgMemberships.accountId), asc(organizations.id))
+      .limit(limit);
+  }
+
+  /**
+   * Fetch a bounded page of quiet listings for one current recipient group.
+   *
+   * The caller walks `afterId` until the page is short, which means expired rows do not hide valid
+   * tail rows even when the job's configured page size is one. Ownership is represented by the
+   * membership join; the source slug only links an imported listing to its namespace.
+   */
+  async listStalePublisherListingsForRecipient(
+    accountId: number,
+    organizationId: number,
+    inactiveBefore: Date,
+    afterId: number,
+    limit: number,
+  ): Promise<StalePublisherListing[]> {
+    return this.exec
+      .select({
+        opportunity: opportunities,
+        accountId: orgMemberships.accountId,
+        organizationId: organizations.id,
+        organizationSlug: organizations.slug,
+        organizationName: organizations.name,
+      })
+      .from(opportunities)
+      .innerJoin(organizations, eq(organizations.slug, opportunities.sourcePublisher))
+      .innerJoin(orgMemberships, eq(orgMemberships.organizationId, organizations.id))
+      .where(
+        and(
+          eq(orgMemberships.accountId, accountId),
+          eq(orgMemberships.organizationId, organizationId),
+          eq(organizations.verified, true),
+          gt(opportunities.id, afterId),
+          eq(opportunities.status, "open"),
+          eq(opportunities.reviewStatus, "approved"),
+          eq(opportunities.isListed, true),
+          isNull(opportunities.mergedIntoId),
+          isNull(opportunities.nextDeadlineAt),
+          lt(
+            sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`,
+            inactiveBefore,
+          ),
+        ),
+      )
+      .orderBy(asc(opportunities.id))
+      .limit(limit);
   }
 
   async insert(values: OpportunityInsert): Promise<OpportunityRow | undefined> {

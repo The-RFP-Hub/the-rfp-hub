@@ -36,10 +36,18 @@ export interface NotificationRemainingSelection {
   maxAttempts: number;
 }
 
+export interface StaleReminderCooldownSelection {
+  accountId: number;
+  organizationId: number;
+  /** A rolling lower bound; rows active at or after this instant block a new reminder. */
+  cooldownBefore: Date;
+}
+
 export class NotificationRepository {
   constructor(private readonly exec: DbLike) {}
 
-  async recordDuplicate(values: NotificationInsert[]): Promise<number[]> {
+  /** Insert any durable notification event; the composite key is the idempotency guard. */
+  async record(values: NotificationInsert[]): Promise<number[]> {
     if (values.length === 0) return [];
     const inserted = await this.exec
       .insert(notifications)
@@ -47,6 +55,39 @@ export class NotificationRepository {
       .onConflictDoNothing()
       .returning({ id: notifications.id });
     return inserted.map(({ id }) => id);
+  }
+
+  async recordDuplicate(values: NotificationInsert[]): Promise<number[]> {
+    return this.record(values);
+  }
+
+  /**
+   * Whether a stale reminder is still inside its rolling interval.
+   *
+   * `created_at` starts the interval for a queued or terminally failed row; after delivery,
+   * `email_dispatched_at` becomes the newer activity and starts the interval from the actual send.
+   * Keeping this predicate in SQL makes the rule visible to the transaction that holds the
+   * publisher-membership lock. The partial index separately releases terminal rows from the
+   * pending uniqueness guard, so they cannot block the next cadence forever.
+   */
+  async hasRecentStaleReminder(selection: StaleReminderCooldownSelection): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.accountId, selection.accountId),
+          eq(notifications.kind, "stale_listing_reminder"),
+          eq(notifications.subjectId, selection.accountId),
+          sql`${notifications.payload} ->> 'organizationId' = ${String(selection.organizationId)}`,
+          sql`greatest(
+            ${notifications.createdAt},
+            coalesce(${notifications.emailDispatchedAt}, ${notifications.createdAt})
+          ) > ${selection.cooldownBefore}`,
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 
   async listForAccount(
@@ -57,13 +98,20 @@ export class NotificationRepository {
   ): Promise<NotificationInboxPage> {
     const where = and(
       eq(notifications.accountId, accountId),
+      // M5 lifecycle emails share this durable ledger but are intentionally not in-app inbox
+      // notifications. Keeping this predicate preserves the published duplicate-only API.
+      eq(notifications.subjectKind, "duplicate"),
       unread === undefined
         ? undefined
         : unread
           ? isNull(notifications.readAt)
           : isNotNull(notifications.readAt),
     );
-    const unreadWhere = and(eq(notifications.accountId, accountId), isNull(notifications.readAt));
+    const unreadWhere = and(
+      eq(notifications.accountId, accountId),
+      eq(notifications.subjectKind, "duplicate"),
+      isNull(notifications.readAt),
+    );
     const [rows, counted, unreadRows] = await Promise.all([
       this.exec
         .select()
@@ -86,7 +134,13 @@ export class NotificationRepository {
     const rows = await this.exec
       .update(notifications)
       .set({ readAt: sql`coalesce(${notifications.readAt}, now())` })
-      .where(and(eq(notifications.id, notificationId), eq(notifications.accountId, accountId)))
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.accountId, accountId),
+          eq(notifications.subjectKind, "duplicate"),
+        ),
+      )
       .returning();
     return rows[0];
   }
@@ -95,7 +149,13 @@ export class NotificationRepository {
     const rows = await this.exec
       .update(notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(notifications.accountId, accountId), isNull(notifications.readAt)))
+      .where(
+        and(
+          eq(notifications.accountId, accountId),
+          eq(notifications.subjectKind, "duplicate"),
+          isNull(notifications.readAt),
+        ),
+      )
       .returning({ id: notifications.id });
     return rows.length;
   }

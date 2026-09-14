@@ -26,6 +26,7 @@ import {
   NotificationDispatchService,
 } from "../notifications/notification-dispatch.service.js";
 import { VerificationService } from "../verification/verification.service.js";
+import { StaleListingReminderService } from "./stale-listing-reminder.service.js";
 import { StalenessService } from "./staleness.service.js";
 import type { JobResult } from "./types.js";
 
@@ -150,6 +151,21 @@ export const JOBS: JobDefinition[] = [
     describes:
       "Fetch the applicationUrl of entries never checked, edited since, or checked longer ago than VERIFY_RECHECK_DAYS.",
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),
+  },
+  {
+    name: "stale-listing-reminders",
+    shape: "cursor",
+    // Job containers close their pool as soon as the pass resolves. Keep the immediate accelerator
+    // off here; the durable rows are consumed by the following notification-dispatch job.
+    run: (options) =>
+      new StaleListingReminderService(dbOf(options), {
+        notificationQueue: noopNotificationDispatchQueue,
+      }).runBatch({
+        limit: options.limit,
+        now: options.now,
+      }),
+    describes:
+      "Queue one cooldown-limited reminder per verified publisher organization for quiet live listings.",
   },
   {
     name: "notification-dispatch",

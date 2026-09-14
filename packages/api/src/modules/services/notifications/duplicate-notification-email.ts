@@ -5,8 +5,9 @@ import type { OutboundEmail, OutboundEmailPort, SendResult } from "../email/emai
 import type { DuplicateNotificationPayload, NotificationKind } from "./notification.service.js";
 
 type DuplicateNotification = Pick<NotificationRow, "kind" | "payload" | "subjectKind">;
+type DuplicateNotificationKind = Extract<NotificationKind, `duplicate_${string}`>;
 
-const SUBJECTS: Record<NotificationKind, string> = {
+const SUBJECTS: Record<DuplicateNotificationKind, string> = {
   duplicate_suspected: "A possible duplicate was found",
   duplicate_confirmed: "A possible duplicate was reviewed",
   duplicate_dismissed: "A possible duplicate was dismissed",
@@ -33,7 +34,7 @@ export function composeDuplicateNotificationEmail(
   }
   const payload = duplicatePayload(notification.payload);
   const actor = payload.decidedBy === "reviewer" ? "A reviewer" : "The duplicate review workflow";
-  const event = eventCopy(notification.kind, actor);
+  const event = eventCopy(notification.kind as DuplicateNotificationKind, actor);
   const counterpart = payload.otherListing
     ? `The possible counterpart named in your notification is “${payload.otherListing.title}” (${payload.otherListing.id}).`
     : "The possible counterpart is not public, so this email does not name it.";
@@ -46,7 +47,7 @@ export function composeDuplicateNotificationEmail(
 
   return {
     to: recipientEmail,
-    subject: SUBJECTS[notification.kind],
+    subject: SUBJECTS[notification.kind as DuplicateNotificationKind],
     text: [
       event,
       "",
@@ -74,7 +75,7 @@ export class DuplicateNotificationEmailComposer {
   }
 }
 
-function eventCopy(kind: NotificationKind, actor: string): string {
+function eventCopy(kind: DuplicateNotificationKind, actor: string): string {
   switch (kind) {
     case "duplicate_suspected":
       return "A similarity check found a possible match involving your listing. It is waiting for review.";
@@ -89,6 +90,7 @@ function eventCopy(kind: NotificationKind, actor: string): string {
     case "duplicate_reopened":
       return `${actor} reopened the possible match involving your listing for another review.`;
   }
+  throw new Error(`unsupported duplicate notification kind: ${kind}`);
 }
 
 function duplicatePayload(raw: Record<string, unknown>): DuplicateNotificationPayload {

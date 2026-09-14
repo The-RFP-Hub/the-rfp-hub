@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ux_stale_listing_pending_recipient" ON "notifications" USING btree ("account_id",("payload" ->> 'organizationId')) WHERE "notifications"."subject_kind" like 'email:stale-listing:%' and "notifications"."email_dispatched_at" is null and coalesce((("notifications"."payload" -> 'emailDelivery' ->> 'attempts')::integer), 0) < 3;

@@ -1,5 +1,6 @@
 /**
- * Accounts: provisioned on first login, keyed on the session's SUBJECT, and nothing else.
+ * Accounts: provisioned at auth signup (with a lazy fallback for legacy identities), keyed on the
+ * session's SUBJECT, and nothing else.
  *
  * WHAT THE SUBJECT IS. The opaque user id the identity tables mint — never an email address. An
  * address is a routable, transferable, re-assignable thing a person can change; the subject is the
@@ -32,6 +33,11 @@ import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
+import { welcomeNotification } from "../notifications/email-notification-events.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 
 /** A handle is public and appears in `source.submittedBy`, so it is held to slug shape. */
 const HANDLE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -78,12 +84,13 @@ export class AccountService {
   constructor(
     private readonly db: DB = defaultDb,
     private readonly logger: AccountLogger = consoleLogger,
+    private readonly notificationQueue: NotificationDispatchEnqueuer = notificationDispatchQueue,
   ) {
     this.repos = repositories(db);
   }
 
   /**
-   * The account for a verified DID, creating it if this is the first login.
+   * The account for a verified DID, creating it if this is a legacy identity without a row.
    *
    * `ON CONFLICT DO NOTHING` followed by a read rather than a read-then-insert: two tabs logging in
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
@@ -118,6 +125,33 @@ export class AccountService {
     }
 
     return account;
+  }
+
+  /** Provision the app account and persist its one welcome event, best effort after auth signup. */
+  async ensureSignupWelcome(subject: string): Promise<void> {
+    try {
+      const ids = await withTransaction(this.db, async (repos) => {
+        // Better-Auth's post-create hook is the actual signup boundary. Provisioning here means
+        // the welcome event is not deferred until the first /v1 request; resolveBySubject remains
+        // a lazy account fallback for identities created before this hook existed.
+        await repos.accounts.insertBySubject(subject);
+        const account = await repos.accounts.findBySubject(subject);
+        if (!account) return [];
+        return repos.notifications.record([welcomeNotification(account.id)]);
+      });
+      // Enqueue only after the transaction commits. Queue overflow/process loss is covered by the
+      // durable notification-dispatch job, and enqueue itself never throws into authentication.
+      this.notificationQueue.enqueue(ids);
+    } catch (error) {
+      this.logger.error(
+        {
+          operation: "ensure_signup_welcome",
+          subjectFingerprint: subject.slice(0, 12),
+          error: error instanceof Error ? error.name : typeof error,
+        },
+        "signup welcome notification could not be recorded; authentication will continue",
+      );
+    }
   }
 
   /** Apply every still-pending invite for an address during session principal resolution. */

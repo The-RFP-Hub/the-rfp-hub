@@ -34,6 +34,7 @@ describe("the job catalogue", () => {
       "embedding-backfill",
       "notification-dispatch",
       "retention",
+      "stale-listing-reminders",
       "staleness",
       "verification-backfill",
     ]);
@@ -172,6 +173,7 @@ describe("the chain", () => {
       "analytics-rollup",
       "embedding-backfill",
       "verification-backfill",
+      "stale-listing-reminders",
       "notification-dispatch",
       "staleness",
     ]);

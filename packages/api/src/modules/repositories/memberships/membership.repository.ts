@@ -113,6 +113,35 @@ export class MembershipRepository {
     return members.map((member) => member.accountId);
   }
 
+  /** The account ids currently publishing for one organization, without trusting a source slug. */
+  async accountIdsForOrganization(organizationId: number): Promise<number[]> {
+    const members = await this.exec
+      .select({ accountId: orgMemberships.accountId })
+      .from(orgMemberships)
+      .where(eq(orgMemberships.organizationId, organizationId));
+    return members.map((member) => member.accountId);
+  }
+
+  /** Re-prove the recipient still publishes for a verified organization immediately before send. */
+  async hasVerifiedMembershipForOrganization(
+    accountId: number,
+    organizationId: number,
+  ): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: orgMemberships.id })
+      .from(orgMemberships)
+      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
+      .where(
+        and(
+          eq(orgMemberships.accountId, accountId),
+          eq(orgMemberships.organizationId, organizationId),
+          eq(organizations.verified, true),
+        ),
+      )
+      .limit(1);
+    return rows.length === 1;
+  }
+
   async lockForAccountAndOrganization(
     accountId: number,
     organizationId: number,

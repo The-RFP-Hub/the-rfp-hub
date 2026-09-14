@@ -179,6 +179,11 @@ export const notificationKind = pgEnum("notification_kind", [
   "duplicate_merged_away",
   "duplicate_absorbed",
   "duplicate_reopened",
+  // Email-only operational events. These are kept in the same durable delivery ledger as
+  // duplicate notifications, but are deliberately filtered from the in-app duplicate inbox.
+  "welcome",
+  "publisher_verified",
+  "stale_listing_reminder",
 ]);
 
 export const analyticsEvent = pgEnum("analytics_event", [
@@ -778,7 +783,9 @@ export const opportunityDuplicates = pgTable(
  * unique key is the final idempotency guard when a detector re-runs or a reviewer repeats an
  * action. After commit, a bounded in-process queue attempts email without making the request wait;
  * the nightly notification-dispatch job sweeps anything it misses. These timestamps remain the
- * source of truth for both paths.
+ * source of truth for both paths. `welcome`, `publisher_verified` and `stale_listing_reminder`
+ * are email-only rows: their subject kinds are not part of the public in-app notification contract,
+ * so the account inbox filters them out while the delivery ledger keeps their evidence.
  */
 export const notifications = pgTable(
   "notifications",
@@ -798,6 +805,20 @@ export const notifications = pgTable(
   },
   (t) => [
     uniqueIndex("ux_notification_event").on(t.accountId, t.kind, t.subjectKind, t.subjectId),
+    // A rolling cooldown is checked under the publisher-membership row lock by the reminder job.
+    // This partial guard is the second line of defense for a caller that bypasses that service (or
+    // two transactions that reach the insert before either can observe the other's row): only one
+    // in-flight/retryable stale reminder may exist for an account/organization at a time. The
+    // subject-kind prefix avoids referring to the new notification enum value in the same
+    // transaction as its ALTER TYPE migration. A terminal exhausted row leaves this index so the
+    // next rolling interval can create a new audit event.
+    uniqueIndex("ux_stale_listing_pending_recipient")
+      .on(t.accountId, sql`(${t.payload} ->> 'organizationId')`)
+      .where(
+        sql`${t.subjectKind} like 'email:stale-listing:%'
+          and ${t.emailDispatchedAt} is null
+          and coalesce((${t.payload} -> 'emailDelivery' ->> 'attempts')::integer, 0) < 3`,
+      ),
     index("ix_notification_account_created").on(t.accountId, t.createdAt.desc(), t.id.desc()),
     index("ix_notification_account_unread")
       .on(t.accountId, t.createdAt.desc())

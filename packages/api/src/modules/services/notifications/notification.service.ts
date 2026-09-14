@@ -29,6 +29,7 @@ import { paginate } from "../../shared/pagination.js";
 import { mergeOpportunityOwnerAccountIds } from "../opportunities/opportunity-ownership.js";
 
 export type NotificationKind = (typeof notificationKind.enumValues)[number];
+export type DuplicateNotificationKind = Extract<NotificationKind, `duplicate_${string}`>;
 export type DuplicateNotificationAction = "review_match" | "view_match" | "view_survivor";
 
 export interface DuplicateNotificationPayload {
@@ -160,7 +161,7 @@ function toNotificationView(row: NotificationRow): NotificationView {
   );
   return {
     id: row.id,
-    kind: row.kind,
+    kind: row.kind as DuplicateNotificationKind,
     subjectKind: "duplicate",
     subjectId: row.subjectId,
     payload: payload as unknown as DuplicateNotificationPayloadView,
