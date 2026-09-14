@@ -212,7 +212,7 @@ request or the job.
 
 #### M5 lifecycle-email rollout
 
-Apply migrations `0013_m5_email_events.sql` and `0014_petite_changeling.sql` with the migration role before scheduling the new image.
+Apply migrations `0013_m5_email_events.sql` and `0014_stale_listing_pending_guard.sql` with the migration role before scheduling the new image.
 The API then records welcome events at actual auth user creation and publisher-verification events
 at a real `false → true` transition; both are ordinary submitter/member-scoped rows and grant no
 authority. Schedule `node packages/api/dist/jobs.js all --json` once daily at the existing **01:05

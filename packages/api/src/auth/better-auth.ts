@@ -187,7 +187,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
             // Account provisioning and the durable welcome row are best effort. In particular, a
             // provider/database failure here must not turn a successful OTP or OAuth signup into a
             // failed authentication response; legacy identities still provision on first /v1 use.
-            await accountService.ensureSignupWelcome(user.id);
+            await accountService.recordSignupWelcome(user.id);
           },
         },
       },

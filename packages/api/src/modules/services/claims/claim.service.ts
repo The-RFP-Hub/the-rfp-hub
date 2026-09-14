@@ -44,7 +44,7 @@ import { effectiveCaps } from "../../shared/capabilities.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
-import { publisherVerifiedNotificationInserts } from "../notifications/email-notification-events.js";
+import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
@@ -450,7 +450,10 @@ export class ClaimService {
         await repos.organizations.verifyForClaim(found.organization.id, now);
         verified = true;
         publisherVerifiedNotificationIds = await repos.notifications.record(
-          await publisherVerifiedNotificationInserts(repos, found.organization),
+          buildPublisherVerifiedNotifications(
+            await repos.memberships.accountIdsForOrganization(found.organization.id),
+            found.organization,
+          ),
         );
         await repos.audit.record({
           ...reviewerActor,

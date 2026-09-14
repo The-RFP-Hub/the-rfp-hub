@@ -32,7 +32,7 @@ import { badRequest, conflict, forbidden, notFound } from "../../shared/http-err
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
-import { publisherVerifiedNotificationInserts } from "../notifications/email-notification-events.js";
+import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
@@ -147,7 +147,8 @@ export class ReviewService {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
       // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
       const row = await lockOrganization(repos, slug);
-      if (row.verified === verified) return { summary: this.summarize(repos, row), ids: [] };
+      if (row.verified === verified)
+        return { summary: await this.summarize(repos, row), notificationIds: [] };
       const now = new Date();
       const next =
         (await repos.organizations.update(row.id, {
@@ -163,12 +164,17 @@ export class ReviewService {
         action: verified ? "verify_organization" : "unverify_organization",
         patch: { verified: { before: row.verified, after: verified } },
       });
-      const ids = verified
-        ? await repos.notifications.record(await publisherVerifiedNotificationInserts(repos, next))
+      const notificationIds = verified
+        ? await repos.notifications.record(
+            buildPublisherVerifiedNotifications(
+              await repos.memberships.accountIdsForOrganization(next.id),
+              next,
+            ),
+          )
         : [];
-      return { summary: this.summarize(repos, next), ids };
+      return { summary: await this.summarize(repos, next), notificationIds };
     });
-    this.notificationQueue.enqueue(settled.ids);
+    this.notificationQueue.enqueue(settled.notificationIds);
     return settled.summary;
   }
 

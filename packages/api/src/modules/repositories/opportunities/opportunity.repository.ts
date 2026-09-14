@@ -93,7 +93,7 @@ export interface ClaimPublisherUpdate {
   updatedAt: Date;
 }
 
-export interface StalePublisherListing {
+export interface StaleReminderListing {
   opportunity: OpportunityRow;
   accountId: number;
   organizationId: number;
@@ -101,14 +101,14 @@ export interface StalePublisherListing {
   organizationName: string;
 }
 
-export interface StalePublisherGroup {
+export interface StaleReminderRecipient {
   accountId: number;
   organizationId: number;
   organizationSlug: string;
   organizationName: string;
 }
 
-export interface StalePublisherGroupCursor {
+export interface StaleReminderRecipientCursor {
   accountId: number;
   organizationId: number;
 }
@@ -247,12 +247,12 @@ export class OpportunityRepository {
    * quiet live listing; the service performs the richer deadline check and payload query under the
    * membership lock before inserting its event.
    */
-  async listStalePublisherGroups(
+  async listStaleReminderRecipients(
     inactiveBefore: Date,
     cooldownBefore: Date,
-    after: StalePublisherGroupCursor,
+    after: StaleReminderRecipientCursor,
     limit: number,
-  ): Promise<StalePublisherGroup[]> {
+  ): Promise<StaleReminderRecipient[]> {
     return this.exec
       .select({
         accountId: orgMemberships.accountId,
@@ -310,13 +310,13 @@ export class OpportunityRepository {
    * tail rows even when the job's configured page size is one. Ownership is represented by the
    * membership join; the source slug only links an imported listing to its namespace.
    */
-  async listStalePublisherListingsForRecipient(
+  async listStaleReminderListingsForRecipient(
     accountId: number,
     organizationId: number,
     inactiveBefore: Date,
     afterId: number,
     limit: number,
-  ): Promise<StalePublisherListing[]> {
+  ): Promise<StaleReminderListing[]> {
     return this.exec
       .select({
         opportunity: opportunities,

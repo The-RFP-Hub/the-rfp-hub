@@ -39,7 +39,7 @@ export interface NotificationRemainingSelection {
 export interface StaleReminderCooldownSelection {
   accountId: number;
   organizationId: number;
-  /** A rolling lower bound; rows active at or after this instant block a new reminder. */
+  /** A rolling lower bound; rows active strictly after this instant block a new reminder. */
   cooldownBefore: Date;
 }
 
@@ -70,7 +70,7 @@ export class NotificationRepository {
    * publisher-membership lock. The partial index separately releases terminal rows from the
    * pending uniqueness guard, so they cannot block the next cadence forever.
    */
-  async hasRecentStaleReminder(selection: StaleReminderCooldownSelection): Promise<boolean> {
+  async isStaleReminderCooldownActive(selection: StaleReminderCooldownSelection): Promise<boolean> {
     const rows = await this.exec
       .select({ id: notifications.id })
       .from(notifications)

@@ -4,8 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAuth } from "../../src/auth/better-auth.js";
 import { config } from "../../src/config.js";
 import { authUser } from "../../src/db/auth-schema.js";
-import { db, pool } from "../../src/db/client.js";
-import { accounts, notifications, opportunities, orgMemberships } from "../../src/db/schema.js";
+import { type DB, db, pool } from "../../src/db/client.js";
+import {
+  accounts,
+  notifications,
+  opportunities,
+  orgMemberships,
+  organizations,
+} from "../../src/db/schema.js";
 import { AccountService } from "../../src/modules/services/auth/account.service.js";
 import { createEmailTransport } from "../../src/modules/services/email/email-transport.js";
 import type {
@@ -63,8 +69,8 @@ const reminderConfig = {
   ...config,
   notifications: {
     ...config.notifications,
-    staleReminderDays: 60,
-    staleReminderCadenceDays: 30,
+    staleReminderInactivityDays: 60,
+    staleReminderCooldownDays: 30,
   },
 };
 
@@ -314,11 +320,9 @@ describeWithDb("M5 lifecycle email events", () => {
     expect(welcomes).toHaveLength(0);
   }, 60_000);
 
-  it("selects only eligible owned listings and retires the rolling cooldown idempotently", async () => {
-    const queueIds: number[] = [];
+  it("records only eligible listings and suppresses reminders during the rolling cooldown", async () => {
     const service = new StaleListingReminderService(db, {
       config: reminderConfig,
-      notificationQueue: { enqueue: (ids) => queueIds.push(...ids) },
     });
     const first = await service.runBatch({ now: NOW });
     expect(first).toMatchObject({
@@ -330,9 +334,6 @@ describeWithDb("M5 lifecycle email events", () => {
         skippedPastDue: 2,
       },
     });
-    expect(queueIds).toHaveLength(2);
-    staleReminderId = queueIds[0] ?? 0;
-
     const second = await service.runBatch({ now: new Date(NOW.getTime() + 86_400_000) });
     expect(second.processed).toBe(0);
     const rows = await db
@@ -345,6 +346,9 @@ describeWithDb("M5 lifecycle email events", () => {
         ),
       );
     expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.emailDispatchedAt === null)).toBe(true);
+    staleReminderId = rows.find((row) => row.accountId === publisherAccountId)?.id ?? 0;
+    expect(staleReminderId).toBeGreaterThan(0);
     expect(rows.every((row) => row.subjectKind.startsWith("email:stale-listing:"))).toBe(true);
     expect(rows.every((row) => row.payload.organizationId === publisherOrganizationId)).toBe(true);
 
@@ -363,7 +367,6 @@ describeWithDb("M5 lifecycle email events", () => {
     await insertListing("cooldown", ORGS.cooldown);
     const service = new StaleListingReminderService(db, {
       config: reminderConfig,
-      notificationQueue: { enqueue() {} },
     });
 
     // The job scans all publishers. Count this fixture's rows so other parallel suites becoming
@@ -480,7 +483,6 @@ describeWithDb("M5 lifecycle email events", () => {
 
     const service = new StaleListingReminderService(db, {
       config: reminderConfig,
-      notificationQueue: { enqueue() {} },
     });
     const report = await service.runBatch({ now: NOW, limit: 1 });
     expect(report).toMatchObject({ processed: 1, remaining: 0 });
@@ -532,7 +534,6 @@ describeWithDb("M5 lifecycle email events", () => {
     await insertListing("terminal-recovery", ORGS.terminal);
     const service = new StaleListingReminderService(db, {
       config: reminderConfig,
-      notificationQueue: { enqueue() {} },
     });
     const first = await service.runBatch({ now: NOW });
     expect(first.processed).toBe(1);
@@ -557,7 +558,7 @@ describeWithDb("M5 lifecycle email events", () => {
       .set({
         createdAt: NOW,
         emailFailedAt: NOW,
-        payload: { emailDelivery: { attempts: 3, failure: "transport_failure" } },
+        payload: sql`jsonb_set(${notifications.payload}, '{emailDelivery}', '{"attempts":3,"failure":"transport_failure"}'::jsonb)`,
       })
       .where(eq(notifications.id, firstId));
     const recovered = await service.runBatch({
@@ -577,7 +578,6 @@ describeWithDb("M5 lifecycle email events", () => {
     const makeService = () =>
       new StaleListingReminderService(db, {
         config: reminderConfig,
-        notificationQueue: { enqueue() {} },
       });
     const reports = await Promise.all([
       makeService().runBatch({ now: NOW, limit: 1 }),
@@ -597,7 +597,7 @@ describeWithDb("M5 lifecycle email events", () => {
     expect(reports[0].processed + reports[1].processed).toBe(1);
   });
 
-  it("uses the noop queue from the scheduled registry and leaves sending to notification-dispatch", async () => {
+  it("only persists reminders from the scheduled registry and leaves sending to notification-dispatch", async () => {
     const organization = await seedOrganization({
       slug: ORGS.registry,
       name: "M5 Registry",
@@ -615,6 +615,63 @@ describeWithDb("M5 lifecycle email events", () => {
     });
     expect(report.processed).toBe(1);
     expect(notificationDispatchQueue.queueDepth).toBe(depthBefore);
+  });
+
+  it("reports remaining recipients when the event limit is reached inside a short page", async () => {
+    const rollback = new Error("rollback pagination fixtures");
+    await expect(
+      db.transaction(async (tx) => {
+        const [template] = await tx
+          .select()
+          .from(opportunities)
+          .where(eq(opportunities.publicId, "m5email:eligible"));
+        if (!template) throw new Error("missing listing template");
+        const { id: _templateId, ...listingTemplate } = template;
+        // Uncommitted fixtures cannot be closed by another suite's staleness job. The historical
+        // clock excludes all other suites' listings from this recipient walk.
+        for (let index = 0; index < 5; index++) {
+          const slug = `m5email-short-page-${index}`;
+          const [organization] = await tx
+            .insert(organizations)
+            .values({
+              slug,
+              name: slug,
+              verified: true,
+            })
+            .returning();
+          if (!organization) throw new Error("missing pagination organization");
+          await tx.insert(orgMemberships).values({
+            accountId: publisherAccountId,
+            organizationId: organization.id,
+            role: "publisher",
+          });
+          await tx.insert(opportunities).values({
+            ...listingTemplate,
+            publicId: `m5email:short-page-${index}`,
+            sourcePublisher: slug,
+            lastSeenAt: new Date("1999-01-01T00:00:00.000Z"),
+            nextDeadlineAt: null,
+            deadlines:
+              index === 0 ? [{ deadlineType: "fixed", date: "1999-12-01T00:00:00.000Z" }] : [],
+          });
+        }
+        const service = new StaleListingReminderService(tx as unknown as DB, {
+          config: reminderConfig,
+        });
+        const now = new Date("2000-01-01T00:00:00.000Z");
+        // Page one has one expired group and two eligible groups. Page two is short (two groups),
+        // but only its first group fits the remaining event budget. The last group still needs work.
+        expect(await service.runBatch({ now, limit: 3 })).toMatchObject({
+          processed: 3,
+          remaining: 1,
+        });
+        expect(await service.runBatch({ now, limit: 3 })).toMatchObject({
+          processed: 1,
+          remaining: 0,
+        });
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
   });
 
   it("records a publisher verification transition once and dispatches through the current member", async () => {

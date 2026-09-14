@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DB } from "../../src/db/client.js";
 import { AccountService } from "../../src/modules/services/auth/account.service.js";
-import { staleReminderSubject } from "../../src/modules/services/notifications/email-notification-events.js";
+import { staleReminderEventSubjectKind } from "../../src/modules/services/notifications/email-notification-events.js";
 import { composeLifecycleNotificationEmail } from "../../src/modules/services/notifications/lifecycle-notification-email.js";
 
 const APP_BASE_URL = "https://app.example.org";
@@ -73,8 +73,8 @@ describe("lifecycle notification emails", () => {
   });
 
   it("uses a unique audit label without making it the cooldown decision", () => {
-    const beforeMidnight = staleReminderSubject(9, new Date("2026-09-30T23:59:59.000Z"));
-    const afterMidnight = staleReminderSubject(9, new Date("2026-10-01T00:00:00.000Z"));
+    const beforeMidnight = staleReminderEventSubjectKind(9, new Date("2026-09-30T23:59:59.000Z"));
+    const afterMidnight = staleReminderEventSubjectKind(9, new Date("2026-10-01T00:00:00.000Z"));
     expect(beforeMidnight).not.toBe(afterMidnight);
     expect(beforeMidnight).toContain("email:stale-listing:9:");
   });
@@ -91,7 +91,7 @@ describe("lifecycle notification emails", () => {
         brokenDb,
         { error: (_payload, message) => errors.push(message) },
         { enqueue() {} },
-      ).ensureSignupWelcome("m5email-broken-db"),
+      ).recordSignupWelcome("m5email-broken-db"),
     ).resolves.toBeUndefined();
     expect(errors).toContain(
       "signup welcome notification could not be recorded; authentication will continue",

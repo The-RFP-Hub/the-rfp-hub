@@ -1,6 +1,6 @@
 /** Durable email-only notification rows used by M5 lifecycle and publisher messaging. */
 import type { OrganizationRow } from "../../../db/schema.js";
-import type { NotificationInsert, Repositories } from "../../repositories/index.js";
+import type { NotificationInsert } from "../../repositories/index.js";
 
 /** The private subject-kind prefixes are intentionally outside the public in-app inbox contract. */
 export const EMAIL_ONLY_SUBJECTS = {
@@ -10,16 +10,15 @@ export const EMAIL_ONLY_SUBJECTS = {
 } as const;
 
 /** A unique audit label for one reminder event; eligibility uses the rolling DB cooldown, not this label. */
-export function staleReminderSubject(organizationId: number, createdAt: Date): string {
+export function staleReminderEventSubjectKind(organizationId: number, createdAt: Date): string {
   return `${EMAIL_ONLY_SUBJECTS.staleListing}:${organizationId}:${createdAt.toISOString()}`;
 }
 
-/** Notification rows emitted when a reviewer flips an organization to verified. */
-export async function publisherVerifiedNotificationInserts(
-  repos: Pick<Repositories, "memberships">,
+/** Build verification events for the supplied members; the caller owns database reads and writes. */
+export function buildPublisherVerifiedNotifications(
+  accountIds: readonly number[],
   organization: Pick<OrganizationRow, "id" | "slug" | "name">,
-): Promise<NotificationInsert[]> {
-  const accountIds = await repos.memberships.accountIdsForOrganization(organization.id);
+): NotificationInsert[] {
   return accountIds.map((accountId) => ({
     accountId,
     kind: "publisher_verified",
@@ -33,7 +32,7 @@ export async function publisherVerifiedNotificationInserts(
   }));
 }
 
-export function welcomeNotification(accountId: number): NotificationInsert {
+export function buildWelcomeNotification(accountId: number): NotificationInsert {
   return {
     accountId,
     kind: "welcome",

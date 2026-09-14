@@ -53,9 +53,9 @@ export {
   OpportunityRepository,
   type PublicOpportunityQuery,
   type PublisherStatus,
-  type StalePublisherGroup,
-  type StalePublisherGroupCursor,
-  type StalePublisherListing,
+  type StaleReminderRecipient,
+  type StaleReminderRecipientCursor,
+  type StaleReminderListing,
 } from "./opportunities/opportunity.repository.js";
 export {
   OrganizationRepository,

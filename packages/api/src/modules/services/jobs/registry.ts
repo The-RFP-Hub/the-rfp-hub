@@ -155,17 +155,14 @@ export const JOBS: JobDefinition[] = [
   {
     name: "stale-listing-reminders",
     shape: "cursor",
-    // Job containers close their pool as soon as the pass resolves. Keep the immediate accelerator
-    // off here; the durable rows are consumed by the following notification-dispatch job.
+    // This generator only persists events; notification-dispatch sends them in the next job.
     run: (options) =>
-      new StaleListingReminderService(dbOf(options), {
-        notificationQueue: noopNotificationDispatchQueue,
-      }).runBatch({
+      new StaleListingReminderService(dbOf(options)).runBatch({
         limit: options.limit,
         now: options.now,
       }),
     describes:
-      "Queue one cooldown-limited reminder per verified publisher organization for quiet live listings.",
+      "Queue one cooldown-limited reminder per account and verified organization for stale live listings.",
   },
   {
     name: "notification-dispatch",

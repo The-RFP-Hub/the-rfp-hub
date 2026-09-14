@@ -20,6 +20,7 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
+import { createHash } from "node:crypto";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { AccountRow } from "../../../db/schema.js";
 import {
@@ -33,7 +34,7 @@ import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
-import { welcomeNotification } from "../notifications/email-notification-events.js";
+import { buildWelcomeNotification } from "../notifications/email-notification-events.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
@@ -128,25 +129,25 @@ export class AccountService {
   }
 
   /** Provision the app account and persist its one welcome event, best effort after auth signup. */
-  async ensureSignupWelcome(subject: string): Promise<void> {
+  async recordSignupWelcome(subject: string): Promise<void> {
     try {
-      const ids = await withTransaction(this.db, async (repos) => {
+      const notificationIds = await withTransaction(this.db, async (repos) => {
         // Better-Auth's post-create hook is the actual signup boundary. Provisioning here means
         // the welcome event is not deferred until the first /v1 request; resolveBySubject remains
         // a lazy account fallback for identities created before this hook existed.
         await repos.accounts.insertBySubject(subject);
         const account = await repos.accounts.findBySubject(subject);
         if (!account) return [];
-        return repos.notifications.record([welcomeNotification(account.id)]);
+        return repos.notifications.record([buildWelcomeNotification(account.id)]);
       });
       // Enqueue only after the transaction commits. Queue overflow/process loss is covered by the
       // durable notification-dispatch job, and enqueue itself never throws into authentication.
-      this.notificationQueue.enqueue(ids);
+      this.notificationQueue.enqueue(notificationIds);
     } catch (error) {
       this.logger.error(
         {
-          operation: "ensure_signup_welcome",
-          subjectFingerprint: subject.slice(0, 12),
+          operation: "record_signup_welcome",
+          subjectFingerprint: createHash("sha256").update(subject).digest("hex").slice(0, 12),
           error: error instanceof Error ? error.name : typeof error,
         },
         "signup welcome notification could not be recorded; authentication will continue",
