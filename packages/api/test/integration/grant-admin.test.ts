@@ -13,11 +13,13 @@
  *
  * Isolation tag: `M3GRANT` / `m3grant-*@rfphub.invalid`.
  */
+import { randomUUID } from "node:crypto";
 import { and, eq, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { main } from "../../scripts/grant-admin.js";
 import { buildApp } from "../../src/app.js";
+import { authUser } from "../../src/db/auth-schema.js";
 import { type DB, db, pool } from "../../src/db/client.js";
 import { accounts, auditLog } from "../../src/db/schema.js";
 import { AdminService } from "../../src/modules/services/admin/admin.service.js";
@@ -139,10 +141,15 @@ run("M3GRANT the admin ceremony", () => {
     expect(refused.output).not.toContain("--create");
   }, 60_000);
 
-  it("provisions the accounts row with --create for an identity that has never called the API", async () => {
-    // Signed in, so the identity exists — but no `/v1` request was ever made, so JIT provisioning
-    // never ran and there is no `accounts` row yet. That is what `--create` is for.
-    const fresh = await signIn(EMAILS.fresh);
+  it("provisions the accounts row with --create for a legacy identity without an account", async () => {
+    // Legacy identities may predate signup account provisioning. Seed that state directly:
+    // a current signup now creates its account together with the durable welcome event.
+    const fresh = { userId: `m3grant-legacy-${randomUUID()}` };
+    await db.insert(authUser).values({
+      id: fresh.userId,
+      name: "Legacy publisher",
+      email: EMAILS.fresh,
+    });
     expect(await accountFor(fresh.userId)).toBeUndefined();
 
     const refusedWithout = await grantAdmin("--email", EMAILS.fresh, "--yes");

@@ -1,28 +1,26 @@
 /** Text composers for the email-only onboarding and publisher lifecycle events. */
 import { config } from "../../../config.js";
 import type { NotificationRow } from "../../../db/schema.js";
-import type { OutboundEmail, OutboundEmailPort, SendResult } from "../email/email.service.js";
+import type { OutboundEmail } from "../email/email.service.js";
+
+import { EMAIL_ONLY_SUBJECTS } from "./email-notification-events.js";
 
 type LifecycleNotification = Pick<NotificationRow, "kind" | "payload" | "subjectKind">;
-
-export class LifecycleNotificationEmailComposer {
-  constructor(
-    private readonly email: OutboundEmailPort,
-    private readonly appBaseUrl = config.appBaseUrl,
-  ) {}
-
-  send(notification: LifecycleNotification, recipientEmail: string): Promise<SendResult> {
-    return this.email.send(
-      composeLifecycleNotificationEmail(notification, recipientEmail, this.appBaseUrl),
-    );
-  }
-}
 
 export function composeLifecycleNotificationEmail(
   notification: LifecycleNotification,
   recipientEmail: string,
   appBaseUrl = config.appBaseUrl,
 ): OutboundEmail {
+  const validSubject =
+    (notification.kind === "welcome" && notification.subjectKind === EMAIL_ONLY_SUBJECTS.account) ||
+    (notification.kind === "publisher_verified" &&
+      notification.subjectKind === EMAIL_ONLY_SUBJECTS.publisherVerified) ||
+    (notification.kind === "stale_listing_reminder" &&
+      notification.subjectKind.startsWith(`${EMAIL_ONLY_SUBJECTS.staleListing}:`));
+  if (!validSubject) {
+    throw new Error(`invalid subject for lifecycle notification kind: ${notification.kind}`);
+  }
   const destination = new URL(destinationPath(notification), appBaseUrl).href;
   switch (notification.kind) {
     case "welcome":
@@ -60,10 +58,10 @@ export function composeLifecycleNotificationEmail(
         to: recipientEmail,
         subject: `Please review stale listings for ${stale.organizationName}`,
         text: [
-          `The following ${lines.length === 1 ? "listing has" : "listings have"} not been re-asserted for at least ${stale.inactivityDays} days:`,
+          `The following ${lines.length === 1 ? "listing has" : "listings have"} not been updated or confirmed at the source for at least ${stale.inactivityDays} days:`,
           ...lines,
           "",
-          `Please update a listing if it is still active, or unlist it if it is no longer current. Listings with no future fixed deadline are automatically closed after ${stale.closeAfterDays} days without a publisher touch.`,
+          `Please update a listing if it is still active, or unlist it if it is no longer current. Listings with no future fixed deadline are automatically closed after ${stale.closeAfterDays} days without an update or successful source verification.`,
           "",
           `Review ${stale.organizationName}: ${destination}`,
         ].join("\n"),

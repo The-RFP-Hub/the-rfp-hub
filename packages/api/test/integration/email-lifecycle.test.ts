@@ -366,7 +366,26 @@ describeWithDb("M5 lifecycle email events", () => {
       notificationQueue: { enqueue() {} },
     });
 
-    const first = await service.runBatch({ now: boundary });
+    // The job scans all publishers. Count this fixture's rows so other parallel suites becoming
+    // stale at the simulated future dates cannot change the cooldown assertion.
+    const fixtureRows = () =>
+      db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.accountId, publisherAccountId),
+            eq(notifications.kind, "stale_listing_reminder"),
+            sql`${notifications.payload} ->> 'organizationId' = ${String(organization.id)}`,
+          ),
+        );
+    const runForFixture = async (options: { now: Date }) => {
+      const before = (await fixtureRows()).length;
+      await service.runBatch(options);
+      return { processed: (await fixtureRows()).length - before };
+    };
+
+    const first = await runForFixture({ now: boundary });
     expect(first.processed).toBe(1);
     const firstRow = await db
       .select({ id: notifications.id })
@@ -390,16 +409,16 @@ describeWithDb("M5 lifecycle email events", () => {
       .update(notifications)
       .set({ emailDispatchedAt: boundary })
       .where(eq(notifications.id, firstId));
-    const acrossBoundary = await service.runBatch({
+    const acrossBoundary = await runForFixture({
       now: new Date("2026-10-01T00:00:00.000Z"),
     });
     expect(acrossBoundary.processed).toBe(0);
 
-    const beforeExact = await service.runBatch({
+    const beforeExact = await runForFixture({
       now: new Date(boundary.getTime() + 30 * 86_400_000 - 1),
     });
     expect(beforeExact.processed).toBe(0);
-    const exact = await service.runBatch({
+    const exact = await runForFixture({
       now: new Date(boundary.getTime() + 30 * 86_400_000),
     });
     expect(exact.processed).toBe(1);
@@ -427,14 +446,14 @@ describeWithDb("M5 lifecycle email events", () => {
       .where(eq(notifications.id, secondId));
     expect(
       (
-        await service.runBatch({
+        await runForFixture({
           now: new Date(delayedDispatch.getTime() + 30 * 86_400_000 - 1),
         })
       ).processed,
     ).toBe(0);
     expect(
       (
-        await service.runBatch({
+        await runForFixture({
           now: new Date(delayedDispatch.getTime() + 30 * 86_400_000),
         })
       ).processed,
@@ -592,7 +611,7 @@ describeWithDb("M5 lifecycle email events", () => {
       limit: 1,
       maxPasses: 1,
       now: NOW,
-      lockConnectionString: "postgres://rfphub:rfphub@localhost:5439/rfphub",
+      lockConnectionString: config.databaseUrl,
     });
     expect(report.processed).toBe(1);
     expect(notificationDispatchQueue.queueDepth).toBe(depthBefore);

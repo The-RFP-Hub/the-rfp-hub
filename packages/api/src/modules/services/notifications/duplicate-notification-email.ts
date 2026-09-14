@@ -1,7 +1,7 @@
-/** Duplicate-domain email copy and the adapter that sends it through the central email port. */
+/** Pure email templates for duplicate review events. */
 import { config } from "../../../config.js";
 import type { NotificationRow } from "../../../db/schema.js";
-import type { OutboundEmail, OutboundEmailPort, SendResult } from "../email/email.service.js";
+import type { OutboundEmail } from "../email/email.service.js";
 import type { DuplicateNotificationPayload, NotificationKind } from "./notification.service.js";
 
 type DuplicateNotification = Pick<NotificationRow, "kind" | "payload" | "subjectKind">;
@@ -59,20 +59,6 @@ export function composeDuplicateNotificationEmail(
       `Open RFP Hub: ${destination}`,
     ].join("\n"),
   };
-}
-
-/** Domain-owned sender: composition stays here; transport choice stays behind the central port. */
-export class DuplicateNotificationEmailComposer {
-  constructor(
-    private readonly email: OutboundEmailPort,
-    private readonly appBaseUrl = config.appBaseUrl,
-  ) {}
-
-  send(notification: DuplicateNotification, recipientEmail: string): Promise<SendResult> {
-    return this.email.send(
-      composeDuplicateNotificationEmail(notification, recipientEmail, this.appBaseUrl),
-    );
-  }
 }
 
 function eventCopy(kind: DuplicateNotificationKind, actor: string): string {

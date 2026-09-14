@@ -50,7 +50,7 @@ describe("lifecycle notification emails", () => {
     const email = composeLifecycleNotificationEmail(
       {
         kind: "stale_listing_reminder",
-        subjectKind: "2026-08:9",
+        subjectKind: "email:stale-listing:9:2026-08-01T00:00:00.000Z",
         payload: {
           organizationId: 9,
           organizationSlug: "open-grants",
@@ -69,6 +69,7 @@ describe("lifecycle notification emails", () => {
     expect(email.text).toContain("unlist it if it is no longer current");
     expect(email.text).toContain("https://app.example.org/organizations/open-grants");
     expect(email.text).not.toContain("\r");
+    expect(email.text).toContain("without an update or successful source verification");
   });
 
   it("uses a unique audit label without making it the cooldown decision", () => {

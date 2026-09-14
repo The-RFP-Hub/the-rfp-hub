@@ -9,7 +9,7 @@ import {
   recipientFingerprint,
 } from "../email/email.service.js";
 import type { JobResult } from "../jobs/types.js";
-import { NotificationEmailComposer } from "./notification-email.js";
+import { NotificationEmailSender } from "./notification-email-sender.js";
 
 export const NOTIFICATION_EMAIL_MAX_ATTEMPTS = 3;
 export const NOTIFICATION_EMAIL_RETRY_DELAY_MS = 5 * 60_000;
@@ -66,7 +66,7 @@ export interface NotificationDispatchBatchOptions {
 
 export class NotificationDispatchService {
   private readonly repos: Repositories;
-  private readonly composer: NotificationEmailComposer;
+  private readonly emailSender: NotificationEmailSender;
   private readonly enabled: boolean;
   private readonly logger: NotificationDispatchLogger;
   private readonly accountId: number | undefined;
@@ -81,7 +81,7 @@ export class NotificationDispatchService {
     this.logger = options.logger ?? consoleLogger;
     this.accountId = options.accountId;
     this.clock = options.clock;
-    this.composer = new NotificationEmailComposer(
+    this.emailSender = new NotificationEmailSender(
       options.email ?? new EmailService(),
       options.appBaseUrl ?? config.appBaseUrl,
     );
@@ -200,9 +200,9 @@ export class NotificationDispatchService {
         continue;
       }
 
-      let result: Awaited<ReturnType<NotificationEmailComposer["send"]>>;
+      let result: Awaited<ReturnType<NotificationEmailSender["send"]>>;
       try {
-        result = await this.composer.send(notification, recipientEmail);
+        result = await this.emailSender.send(notification, recipientEmail);
       } catch (error) {
         const attemptCompletedAt = completedAt();
         await this.markFailure(

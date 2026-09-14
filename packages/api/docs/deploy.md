@@ -140,7 +140,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `DEDUPE_OVERLAP_MIN_TOKENS` | `20` | Distinct tokens required on the shorter side. The only guard measured to blunt a stub built from a target's rarest terms. Lowering it buys recall on short entries with a real exposure; `pnpm --filter @the-rfp-hub/api dedupe:threshold` prints the current trade rather than this row quoting a number that goes stale |
 | `DEDUPE_OVERLAP_MIN_SIMILARITY` | `0.35` | The overlap arm's cosine floor. **Not** a security control — the arm only sees cosine-ordered ANN candidates and this makes that explicit |
 | `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
-| `STALE_LISTING_REMINDER_DAYS` | `60` | A live listing must have no publisher touch for this many days before a reminder is queued. It must still be open, approved, listed, have no future fixed deadline, and belong to a verified publisher namespace with a current member. |
+| `STALE_LISTING_REMINDER_DAYS` | `60` | A live listing must have no publisher update or successful source verification for this many days before a reminder is queued. It must still be open, approved, listed, have no future fixed deadline, and belong to a verified publisher namespace with a current member. |
 | `STALE_LISTING_REMINDER_CADENCE_DAYS` | `30` | Rolling cooldown in days per publisher account + organization. The interval starts at the later of reminder `created_at` and successful `email_dispatched_at`; in-flight/retryable rows cannot overlap, terminally exhausted rows release the guard, and exact interval expiry is allowed. |
 | `VERIFICATION_ENABLED` | `true` | |
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
