@@ -75,6 +75,12 @@ describe("the directory querystring", () => {
     for (const key of Object.keys(query)) expect(ACCEPTED.has(key)).toBe(true);
   });
 
+  it("never sends the view toggle to the API — it is a rendering choice, not a filter", () => {
+    const query = directoryQuery({ ...DEFAULT_SELECTION, view: "cards" });
+    for (const key of Object.keys(query)) expect(ACCEPTED.has(key)).toBe(true);
+    expect(query).not.toHaveProperty("view");
+  });
+
   it("emits the newer filters — category, organization, award range and deadline range", () => {
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
@@ -456,6 +462,20 @@ describe("the directory's URL state", () => {
     expect(selectionToParams(DEFAULT_SELECTION).has("maxAward")).toBe(false);
     expect(selectionToParams(DEFAULT_SELECTION).has("deadlineAfter")).toBe(false);
     expect(selectionToParams(DEFAULT_SELECTION).has("deadlineBefore")).toBe(false);
+  });
+
+  it("defaults to the table view, omitted from the URL, and round-trips the cards view", () => {
+    expect(DEFAULT_SELECTION.view).toBe("table");
+    expect(selectionToParams(DEFAULT_SELECTION).has("view")).toBe(false);
+
+    const selection = { ...DEFAULT_SELECTION, view: "cards" as const };
+    expect(selectionToParams(selection).get("view")).toBe("cards");
+    expect(roundTrip(selection)).toEqual(selection);
+  });
+
+  it("falls back to table for anything other than 'cards'", () => {
+    expect(selectionFromParams(new URLSearchParams("view=grid")).view).toBe("table");
+    expect(selectionFromParams(new URLSearchParams("")).view).toBe("table");
   });
 });
 

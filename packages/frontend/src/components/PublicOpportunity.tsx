@@ -341,7 +341,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
               <IconLabel icon={GlobeAltIcon}>Program site</IconLabel>
             </a>
           ) : null}
-          <ShareLink />
+          <ShareLink id={entry.id} />
         </p>
         <p className="muted footnote">Applying takes you to the program&rsquo;s own site.</p>
       </div>
@@ -377,7 +377,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             No site was stated either. Everything the listing does carry is below.
           </span>
         )}
-        <ShareLink />
+        <ShareLink id={entry.id} />
       </p>
     </div>
   );
@@ -391,7 +391,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
  * reports what happened rather than assuming: `navigator.clipboard` needs a secure context and a
  * permission, and a control that silently does nothing is worse than one that says it could not.
  */
-function ShareLink() {
+function ShareLink({ id }: { id: string }) {
   const [note, setNote] = useState<string | null>(null);
 
   const copy = async () => {
@@ -408,6 +408,14 @@ function ShareLink() {
       <button type="button" onClick={() => void copy()}>
         <IconLabel icon={LinkIcon}>Copy link</IconLabel>
       </button>
+      <a
+        className="row-action-link"
+        href={`/opportunities/${encodeURIComponent(id)}/card.png`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Share card
+      </a>
       {note ? (
         <output className="muted" aria-live="polite">
           {note}

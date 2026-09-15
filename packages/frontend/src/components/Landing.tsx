@@ -13,18 +13,11 @@
  * arithmetic and a unit test pins it. The open set is small (about a hundred) so it fits in one or
  * two pages of the list route; the loop below stops at a hard cap either way.
  */
-import { UntrustedText } from "@/components/UntrustedText";
+import { OpportunityCard } from "@/components/OpportunityCard";
 import { ResourceView } from "@/components/states";
 import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
-import { formatCount, formatDate, nextFixedDeadline } from "@/lib/format";
-import {
-  type LandingSummary,
-  TILE_TYPES,
-  cardAward,
-  compactUsd,
-  daysUntil,
-  summarizeLanding,
-} from "@/lib/landing";
+import { formatCount } from "@/lib/format";
+import { type LandingSummary, TILE_TYPES, compactUsd, summarizeLanding } from "@/lib/landing";
 import { DIRECTORY, HOW_IT_WORKS } from "@/lib/links";
 import { fundingTypeLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
@@ -273,52 +266,5 @@ function Featured({ summary }: { summary: LandingSummary }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/**
- * One listing as a card: type, deadline, title, organization, award. The same five facts the
- * directory row carries, arranged so the eye reads type + award + deadline together.
- */
-export function OpportunityCard({ item, large }: { item: OpportunitySummary; large?: boolean }) {
-  const operator = item.operatingOrganizations[0];
-  const next = nextFixedDeadline(item.deadlines);
-  const award = cardAward(item);
-  const soon = next ? Date.parse(next.date ?? "") - Date.now() < 7 * 86_400_000 : false;
-  return (
-    <Link
-      className={`opportunity-card${large ? " is-large" : ""}`}
-      href={`/opportunities/${encodeURIComponent(item.id)}`}
-    >
-      <span className="opportunity-card-top">
-        <span className="type-chip" data-type={item.fundingType}>
-          {fundingTypeLabel(item.fundingType)}
-        </span>
-        <span className={`opportunity-card-deadline${soon ? " is-soon" : ""}`}>
-          {next?.date ? (
-            <>
-              {formatDate(next.date)}
-              {soon ? ` · ${daysUntil(next.date)}` : ""}
-            </>
-          ) : (
-            "rolling"
-          )}
-        </span>
-      </span>
-      <span className="opportunity-card-title">
-        <UntrustedText value={item.title} />
-      </span>
-      <span className="opportunity-card-org muted">
-        <UntrustedText value={operator?.name} />
-      </span>
-      {large && item.summary?.trim() ? (
-        <span className="opportunity-card-summary muted">
-          <UntrustedText value={item.summary} />
-        </span>
-      ) : null}
-      <span className="opportunity-card-award">
-        {award ?? <span className="muted">no award stated</span>}
-      </span>
-    </Link>
   );
 }

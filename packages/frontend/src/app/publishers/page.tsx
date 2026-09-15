@@ -9,6 +9,7 @@
  * `logoUrl` NEVER becomes an `<img>`: the CSP never allows a publisher-named host in `img-src`
  * (`src/lib/csp.ts`), because loading it would leak every reader's IP to whatever host it named.
  */
+import { OrgMark } from "@/components/OrgMark";
 import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
 import { formatCount, formatInstant } from "@/lib/format";
@@ -130,9 +131,7 @@ function ListedOrganizations({
               className={`org-card${verified.has(slug) ? " is-verified" : ""}`}
               href={`/directory?organization=${encodeURIComponent(slug)}`}
             >
-              <span className="org-mark" aria-hidden="true">
-                {initials(org.name)}
-              </span>
+              <OrgMark slug={slug} name={org.name} verified={verified.has(slug)} />
               <span>
                 <span className="org-card-name">
                   <UntrustedText value={org.name} fallback={slug} />
@@ -150,18 +149,6 @@ function ListedOrganizations({
   );
 }
 
-function initials(name: string): string {
-  const words = name
-    .replace(/[^\p{L}\p{N} ]/gu, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const [first = "", second = ""] = words;
-  if (first === "") return "?";
-  if (second === "") return first.slice(0, 2).toUpperCase();
-  return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase();
-}
-
 function PublisherCard({ publisher }: { publisher: Publisher }) {
   const directoryHref = `/directory?organization=${encodeURIComponent(publisher.slug)}`;
   const name = publisher.name.trim() || publisher.slug;
@@ -173,6 +160,7 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       data-testid="publisher-card"
       data-publisher-slug={publisher.slug}
     >
+      <OrgMark slug={publisher.slug} name={name} verified className="publisher-card-mark" />
       <h2>
         <UntrustedText value={publisher.name} fallback={publisher.slug} />
       </h2>
