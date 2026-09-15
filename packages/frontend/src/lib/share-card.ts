@@ -31,6 +31,8 @@ export interface ShareCardModel {
   award: string;
   deadline: string;
   url: string;
+  /** The same address without its scheme, which is how it reads on a slide. */
+  displayUrl: string;
   positioning: string;
 }
 
@@ -63,6 +65,7 @@ export function shareCardModel(entry: Opportunity, origin: string): ShareCardMod
     award: cardAward(entry) ?? "Award not stated",
     deadline,
     url: `${origin}/opportunities/${encodeURIComponent(entry.id)}`,
+    displayUrl: `${origin.replace(/^https?:\/\//, "")}/opportunities/${encodeURIComponent(entry.id)}`,
     positioning: POSITIONING,
   };
 }

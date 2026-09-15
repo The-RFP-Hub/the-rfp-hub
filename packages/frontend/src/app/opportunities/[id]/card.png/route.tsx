@@ -29,19 +29,41 @@ const INK = "#1a1917";
 const PAPER = "#fcfcfa";
 const SECONDARY = "#a8a29e";
 
-const FONT_DIR = join(process.cwd(), "src", "assets", "fonts");
-
 let fontsPromise: Promise<{ display: ArrayBuffer; body: ArrayBuffer }> | null = null;
 
-/** Read once per server process — the files never change while it is running. */
+/**
+ * Read from disk, once per server process, from wherever the build put the package: the traced
+ * standalone server `chdir`s into the package directory, a serverless bundle keeps the monorepo
+ * path under its task root. `outputFileTracingIncludes` in `next.config.ts` is what guarantees
+ * the two files are in either bundle at all — a bundled-URL `fetch` resolved to a `/_next/static`
+ * path that a traced server cannot serve to itself.
+ */
+const FONT_DIRS = [
+  join(process.cwd(), "src", "assets", "fonts"),
+  join(process.cwd(), "packages", "frontend", "src", "assets", "fonts"),
+];
+
+async function readFont(name: string): Promise<ArrayBuffer> {
+  let lastError: unknown;
+  for (const dir of FONT_DIRS) {
+    try {
+      const bytes = await readFile(join(dir, name));
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 function loadFonts() {
   fontsPromise ??= Promise.all([
-    readFile(join(FONT_DIR, "LibreFranklin-800.ttf")),
-    readFile(join(FONT_DIR, "PublicSans-400.ttf")),
-  ]).then(([display, body]) => ({
-    display: display.buffer.slice(display.byteOffset, display.byteOffset + display.byteLength),
-    body: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
-  })) as Promise<{ display: ArrayBuffer; body: ArrayBuffer }>;
+    readFont("LibreFranklin-800.ttf"),
+    readFont("PublicSans-400.ttf"),
+  ]).then(([display, body]) => ({ display, body }));
+  fontsPromise.catch(() => {
+    fontsPromise = null;
+  });
   return fontsPromise;
 }
 
@@ -133,7 +155,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
+            flexDirection: "column",
             marginTop: 40,
             paddingTop: 24,
             borderTop: `1px solid ${SECONDARY}`,
@@ -141,8 +163,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
             color: SECONDARY,
           }}
         >
-          <div style={{ display: "flex" }}>{model.url}</div>
-          <div style={{ display: "flex" }}>{model.positioning}</div>
+          <div
+            style={{ display: "flex", fontFamily: "Libre Franklin", fontWeight: 800, color: PAPER }}
+          >
+            {model.positioning}
+          </div>
+          <div style={{ display: "flex", marginTop: 10 }}>{model.displayUrl}</div>
         </div>
       </div>
     </div>,

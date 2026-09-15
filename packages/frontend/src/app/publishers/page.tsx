@@ -14,6 +14,7 @@ import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
 import { formatCount, formatInstant } from "@/lib/format";
 import { PUBLISHERS_DOC } from "@/lib/links";
+import { loadOpenSet } from "@/lib/open-set";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { OpportunitySummary, Publisher } from "@/lib/types";
@@ -24,15 +25,7 @@ export default function PublishersPage() {
   const api = useApi();
   const load = useCallback(() => api.publishers.list(), [api]);
   const { state, reload } = useResource(load);
-  const loadListed = useCallback(async () => {
-    const items: OpportunitySummary[] = [];
-    for (let page = 1; page <= 5; page += 1) {
-      const result = await api.directory.list({ status: "open", page, limit: 100 });
-      items.push(...result.items);
-      if (page >= result.totalPages) break;
-    }
-    return items;
-  }, [api]);
+  const loadListed = useCallback(() => loadOpenSet(api), [api]);
   const listed = useResource(loadListed);
 
   return (

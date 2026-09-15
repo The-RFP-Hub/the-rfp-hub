@@ -19,16 +19,14 @@ import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
 import { formatCount } from "@/lib/format";
 import { type LandingSummary, TILE_TYPES, compactUsd, summarizeLanding } from "@/lib/landing";
 import { DIRECTORY, HOW_IT_WORKS } from "@/lib/links";
+import { loadOpenSet } from "@/lib/open-set";
 import { fundingTypeLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
-import type { FundingType, OpportunitySummary } from "@/lib/types";
+import type { FundingType } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
-
-const PAGE_SIZE = 100;
-const MAX_PAGES = 5;
 
 const TILE_COPY: Readonly<Record<FundingType, string>> = {
   grant: "Rolling and dated programs",
@@ -42,15 +40,7 @@ const TILE_COPY: Readonly<Record<FundingType, string>> = {
 export function Landing() {
   const api = useApi();
 
-  const load = useCallback(async () => {
-    const items: OpportunitySummary[] = [];
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-      const result = await api.directory.list({ status: "open", page, limit: PAGE_SIZE });
-      items.push(...result.items);
-      if (page >= result.totalPages) break;
-    }
-    return summarizeLanding(items);
-  }, [api]);
+  const load = useCallback(async () => summarizeLanding(await loadOpenSet(api)), [api]);
   const { state, reload } = useResource(load);
 
   return (

@@ -2963,3 +2963,184 @@ pre.untrusted-block {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------------ directory bar --- */
+
+/* Search on one line, the type pills under it. The panel background and the disclosure stay. */
+.filters-bar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.filters-bar .field {
+  flex: 1;
+  margin: 0;
+  max-width: none;
+}
+
+.filters-bar input {
+  inline-size: 100%;
+  min-block-size: var(--control-touch);
+}
+
+.type-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.type-pills button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-touch);
+  border-radius: 999px;
+  padding-inline: var(--space-4);
+}
+
+.type-pill-count {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.type-pills button[aria-pressed="true"] .type-pill-count {
+  color: inherit;
+}
+
+.directory-table .type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.directory-table .type-chip .icon-label-icon {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+}
+
+.directory-org {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.directory-table .directory-award {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.directory-table .directory-deadline {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.directory-table .directory-deadline.is-soon {
+  font-weight: 700;
+}
+
+.directory-table .directory-deadline.is-rolling {
+  color: var(--ink-faint);
+}
+
+@media (max-width: 40rem) {
+  .filters-bar {
+    flex-direction: column;
+  }
+
+  .directory-table .type-chip .icon-label-icon {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- opportunity layout --- */
+
+/* The listing reads down the left; the one thing to DO stays in view on the right. */
+.opportunity-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.opportunity-main {
+  min-width: 0;
+}
+
+.opportunity-aside {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.opportunity-aside .card {
+  margin: 0;
+}
+
+.opportunity-aside-meta {
+  margin: 0;
+}
+
+.crumb {
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.opportunity-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.opportunity-head .org-mark {
+  width: 3.25rem;
+  height: 3.25rem;
+  font-size: var(--text-h3);
+}
+
+.opportunity-head h1 {
+  margin-bottom: var(--space-2);
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.action-primary {
+  justify-content: center;
+  inline-size: 100%;
+}
+
+.action-row {
+  margin: 0;
+}
+
+.share-card-preview {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+@media (max-width: 56rem) {
+  .opportunity-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .opportunity-aside {
+    position: static;
+  }
+}

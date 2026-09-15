@@ -285,16 +285,16 @@ export async function checkFrontend(report, ctx) {
 
   try {
     await withPage(ctx.repoRoot, async (page) => {
-      await page.goto(ctx.site, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+      await page.goto(`${ctx.site}/directory`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
       const baseline = await renderedOpportunityIds(page);
       c.expect(
         baseline.length > 0,
-        "baseline result set at / is non-empty",
+        "baseline result set at /directory is non-empty",
         `${baseline.length} item(s) rendered`,
-        "/ rendered ZERO items — every comparison below needs a real baseline, and an empty one would make 'different from baseline' true for the wrong reason",
+        "/directory rendered ZERO items — every comparison below needs a real baseline, and an empty one would make 'different from baseline' true for the wrong reason",
       );
 
-      await page.goto(`${ctx.site}/?q=grant`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+      await page.goto(`${ctx.site}/directory?q=grant`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
       expectResultSetChanged(
         c,
         "search q=grant changes the result set",
@@ -321,7 +321,7 @@ export async function checkFrontend(report, ctx) {
           );
           continue;
         }
-        await page.goto(`${ctx.site}/?${param}=${encodeURIComponent(value)}`, {
+        await page.goto(`${ctx.site}/directory?${param}=${encodeURIComponent(value)}`, {
           waitUntil: "networkidle",
           timeout: ctx.timeoutMs,
         });
@@ -348,7 +348,10 @@ export async function checkFrontend(report, ctx) {
         );
       }
 
-      await page.goto(`${ctx.site}/?page=2`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+      await page.goto(`${ctx.site}/directory?page=2`, {
+        waitUntil: "networkidle",
+        timeout: ctx.timeoutMs,
+      });
       expectResultSetChanged(
         c,
         "page=2 changes the result set",
