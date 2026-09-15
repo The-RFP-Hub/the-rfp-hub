@@ -72,7 +72,9 @@ describe("the how-it-works reference page", () => {
     const { container } = render(<HowItWorksPage />);
     const details = [...container.querySelectorAll("details")];
 
-    expect(details).toHaveLength(3);
+    // The reference material is folded section by section; the three "why" disclosures live
+    // inside one of them. Every fold starts closed.
+    expect(details.length).toBeGreaterThanOrEqual(3);
     for (const detail of details) {
       expect(detail.open).toBe(false);
     }

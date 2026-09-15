@@ -3144,3 +3144,81 @@ pre.untrusted-block {
     position: static;
   }
 }
+
+/* --------------------------------------------------- how it works, folded --- */
+
+.eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hiw > .eyebrow {
+  margin: 0 0 var(--space-2);
+}
+
+.rule-open-heading {
+  font-size: var(--text-h3);
+  margin: var(--space-2) 0;
+}
+
+.hiw h1 {
+  max-width: 22ch;
+}
+
+.rules {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line);
+}
+
+.rules p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--ink-soft);
+}
+
+.rules-nav {
+  display: flex;
+  gap: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+/* One folded section per rule. The summary is the heading; the real h2 stays for the anchor. */
+.rule {
+  border-top: 1px solid var(--line-faint);
+  padding: var(--space-2) 0;
+}
+
+.rule > summary {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: var(--text-h3);
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+
+.rule[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.rule > h2 + * {
+  margin-top: 0;
+}
+
+.hiw-quote {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-h2);
+  letter-spacing: -0.02em;
+  max-width: 24ch;
+  margin: var(--space-12) 0 var(--space-6);
+}

@@ -285,7 +285,10 @@ export async function checkFrontend(report, ctx) {
 
   try {
     await withPage(ctx.repoRoot, async (page) => {
-      await page.goto(`${ctx.site}/directory`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+      await page.goto(`${ctx.site}/directory`, {
+        waitUntil: "networkidle",
+        timeout: ctx.timeoutMs,
+      });
       const baseline = await renderedOpportunityIds(page);
       c.expect(
         baseline.length > 0,
@@ -294,7 +297,10 @@ export async function checkFrontend(report, ctx) {
         "/directory rendered ZERO items — every comparison below needs a real baseline, and an empty one would make 'different from baseline' true for the wrong reason",
       );
 
-      await page.goto(`${ctx.site}/directory?q=grant`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+      await page.goto(`${ctx.site}/directory?q=grant`, {
+        waitUntil: "networkidle",
+        timeout: ctx.timeoutMs,
+      });
       expectResultSetChanged(
         c,
         "search q=grant changes the result set",
