@@ -43,7 +43,7 @@ here so deferred work remains discoverable. The implemented slice lives in
 | `verification_runs` (+ `snapshot_text`, `snapshot_sha256`) | ✅ M3 |
 | `opportunity_embeddings` — `vector(1536)` + HNSW cosine index | ✅ M3 |
 | `opportunity_duplicates` (+ self-pair CHECK + canonical-pair unique index) | ✅ M3 |
-| `notifications` — account inbox for duplicate events; email delivery state pre-provisioned | ✅ M3 |
+| `notifications` — duplicate inbox plus durable lifecycle email ledger (`welcome`, publisher verification, stale-listing reminders) | ✅ M5 |
 | `opportunity_events` (**plain**, not partitioned) + `opportunity_stats_daily` | ✅ M3 |
 | `opportunities.search_tsv` generated `tsvector` column + `gin_opp_search` | ⏳ M4 — `ILIKE`/`pg_trgm` is adequate at this dataset size; add when volume warrants |
 | `gin_opp_typedata` (GIN on `type_data`) | ⏳ M4 — nothing filters inside `type_data` yet |
@@ -168,7 +168,8 @@ CREATE TYPE claim_status       AS ENUM ('pending','approved','rejected','withdra
 CREATE TYPE dup_status         AS ENUM ('suspected','confirmed','dismissed','merged');
 CREATE TYPE notification_kind  AS ENUM (
   'duplicate_suspected','duplicate_confirmed','duplicate_dismissed',
-  'duplicate_merged_away','duplicate_absorbed','duplicate_reopened');
+  'duplicate_merged_away','duplicate_absorbed','duplicate_reopened',
+  'welcome','publisher_verified','stale_listing_reminder');
 CREATE TYPE analytics_event    AS ENUM ('list_view','detail_view','source_click','apply_click');
 ```
 
@@ -584,21 +585,31 @@ CREATE UNIQUE INDEX ux_dup_pair ON opportunity_duplicates
   (least(opportunity_id, duplicate_of_id), greatest(opportunity_id, duplicate_of_id));
 CREATE INDEX ix_dup_status ON opportunity_duplicates (status, detected_at DESC);
 
--- ✅ M3 durable owner inbox. `subject_kind` is an extension seam; this slice writes `duplicate`.
+-- ✅ M5 durable owner inbox + email ledger. Lifecycle rows are email-only and filtered from the
+-- public inbox; `subject_kind` is an extension seam (`duplicate` or an email idempotency key).
 CREATE TABLE notifications (
   id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   account_id          BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   kind                notification_kind NOT NULL,
   subject_kind        TEXT NOT NULL,
-  subject_id          BIGINT NOT NULL,       -- opportunity_duplicates.id when subject_kind=duplicate
+  subject_id          BIGINT NOT NULL,       -- duplicate id, account id, or organization id by kind
   payload             JSONB NOT NULL,        -- structured facts, never rendered prose
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   read_at             TIMESTAMPTZ,
-  email_dispatched_at TIMESTAMPTZ,           -- reserved for the separate email-delivery decision
-  email_failed_at     TIMESTAMPTZ            -- reserved; no dispatcher writes either field yet
+  email_dispatched_at TIMESTAMPTZ,           -- successful provider handoff
+  email_failed_at     TIMESTAMPTZ            -- latest failed/in-flight attempt and retry floor
 );
 CREATE UNIQUE INDEX ux_notification_event ON notifications
   (account_id, kind, subject_kind, subject_id);
+-- A stale reminder is rolling, not UTC-bucketed. Serialize the normal check + insert under the
+-- membership row lock, and keep this partial guard for one in-flight/retryable event per account/
+-- org. Use subject_kind rather than the newly-added enum value: Drizzle applies all pending files
+-- in one transaction, and PostgreSQL cannot use a new enum label before that transaction commits.
+CREATE UNIQUE INDEX ux_stale_listing_pending_recipient ON notifications
+  (account_id, (payload ->> 'organizationId'))
+  WHERE subject_kind LIKE 'email:stale-listing:%'
+    AND email_dispatched_at IS NULL
+    AND COALESCE((payload -> 'emailDelivery' ->> 'attempts')::integer, 0) < 3;
 CREATE INDEX ix_notification_account_created ON notifications
   (account_id, created_at DESC, id DESC);
 CREATE INDEX ix_notification_account_unread ON notifications

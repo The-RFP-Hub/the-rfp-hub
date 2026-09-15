@@ -36,6 +36,7 @@ export {
   type NotificationInsert,
   NotificationRepository,
   type NotificationRemainingSelection,
+  type StaleReminderCooldownSelection,
 } from "./notifications/notification.repository.js";
 export {
   type ClaimInsert,
@@ -52,6 +53,9 @@ export {
   OpportunityRepository,
   type PublicOpportunityQuery,
   type PublisherStatus,
+  type StaleReminderRecipient,
+  type StaleReminderRecipientCursor,
+  type StaleReminderListing,
 } from "./opportunities/opportunity.repository.js";
 export {
   OrganizationRepository,

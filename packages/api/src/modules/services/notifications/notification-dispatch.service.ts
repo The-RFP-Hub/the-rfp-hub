@@ -9,7 +9,7 @@ import {
   recipientFingerprint,
 } from "../email/email.service.js";
 import type { JobResult } from "../jobs/types.js";
-import { DuplicateNotificationEmailComposer } from "./duplicate-notification-email.js";
+import { NotificationEmailSender } from "./notification-email-sender.js";
 
 export const NOTIFICATION_EMAIL_MAX_ATTEMPTS = 3;
 export const NOTIFICATION_EMAIL_RETRY_DELAY_MS = 5 * 60_000;
@@ -22,6 +22,7 @@ const MAX_LIMIT = 1000;
  */
 type FailureReason =
   | "recipient_unavailable"
+  | "recipient_not_publisher"
   | "transport_failure"
   | "invalid_notification"
   | "in_flight";
@@ -65,7 +66,7 @@ export interface NotificationDispatchBatchOptions {
 
 export class NotificationDispatchService {
   private readonly repos: Repositories;
-  private readonly composer: DuplicateNotificationEmailComposer;
+  private readonly emailSender: NotificationEmailSender;
   private readonly enabled: boolean;
   private readonly logger: NotificationDispatchLogger;
   private readonly accountId: number | undefined;
@@ -80,7 +81,7 @@ export class NotificationDispatchService {
     this.logger = options.logger ?? consoleLogger;
     this.accountId = options.accountId;
     this.clock = options.clock;
-    this.composer = new DuplicateNotificationEmailComposer(
+    this.emailSender = new NotificationEmailSender(
       options.email ?? new EmailService(),
       options.appBaseUrl ?? config.appBaseUrl,
     );
@@ -126,6 +127,7 @@ export class NotificationDispatchService {
       failed: 0,
       retried: 0,
       recipientUnavailable: 0,
+      recipientNotPublisher: 0,
       invalidNotification: 0,
       /** Rows this run leased and then lost to another dispatcher before it could send them. */
       leaseLost: 0,
@@ -160,6 +162,25 @@ export class NotificationDispatchService {
         continue;
       }
 
+      if (await this.recipientNoLongerPublisher(notification)) {
+        const attemptCompletedAt = completedAt();
+        await this.markFailure(
+          notification.id,
+          notification.payload,
+          NOTIFICATION_EMAIL_MAX_ATTEMPTS,
+          "recipient_not_publisher",
+          attemptCompletedAt,
+          leaseToken,
+        );
+        details.failed++;
+        details.recipientNotPublisher++;
+        this.logger.error(
+          { notificationId: notification.id, accountId: notification.accountId },
+          "notification email recipient is no longer a verified publisher member",
+        );
+        continue;
+      }
+
       /*
        * Renew the lease IMMEDIATELY BEFORE the send, and treat a refusal as a decision.
        *
@@ -179,9 +200,9 @@ export class NotificationDispatchService {
         continue;
       }
 
-      let result: Awaited<ReturnType<DuplicateNotificationEmailComposer["send"]>>;
+      let result: Awaited<ReturnType<NotificationEmailSender["send"]>>;
       try {
-        result = await this.composer.send(notification, recipientEmail);
+        result = await this.emailSender.send(notification, recipientEmail);
       } catch (error) {
         const attemptCompletedAt = completedAt();
         await this.markFailure(
@@ -269,6 +290,28 @@ export class NotificationDispatchService {
       { ...withoutDeliveryState(payload), emailDelivery: { attempts, failure } },
       now,
       leaseToken,
+    );
+  }
+
+  /** Lifecycle messages must re-prove publisher membership after the row was queued. */
+  private async recipientNoLongerPublisher(notification: {
+    kind: string;
+    accountId: number;
+    payload: Record<string, unknown>;
+  }): Promise<boolean> {
+    if (
+      notification.kind !== "publisher_verified" &&
+      notification.kind !== "stale_listing_reminder"
+    ) {
+      return false;
+    }
+    const organizationId = notification.payload.organizationId;
+    return (
+      typeof organizationId !== "number" ||
+      !(await this.repos.memberships.hasVerifiedMembershipForOrganization(
+        notification.accountId,
+        organizationId,
+      ))
     );
   }
 }

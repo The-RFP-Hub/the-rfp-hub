@@ -72,11 +72,17 @@ enabled with `trustedProviders: []` (nothing links on an unverified address),
 role and history preserved — `test/integration/account-linking.test.ts` is the tripwire that keeps a
 dependency upgrade from quietly forking one person into two.
 
-**Accounts are provisioned just in time, keyed on the identity's SUBJECT and nothing else.** The
-subject is the opaque user id (`accounts.auth_user_id`), never an email address: an address is
-transferable and changeable, and it is what `audit_log` would end up pointing at through
-`accounts.id`. The `/v1/me.email` field is served by joining the identity table at read time, so the
-system keeps exactly one copy of that address.
+**Accounts are provisioned at auth signup, with a lazy fallback for legacy identities, and are
+keyed on the identity's SUBJECT and nothing else.** The subject is the opaque user id
+(`accounts.auth_user_id`), never an email address: an address is transferable and changeable, and
+it is what `audit_log` would end up pointing at through `accounts.id`. The `/v1/me.email` field is
+served by joining the identity table at read time, so the system keeps exactly one copy of that
+address. The post-create hook provisions an ordinary `submitter` row so the durable M5 welcome
+event can be recorded at actual signup; it grants no role or publishing authority. Identities
+created before this hook (or whose hook was unavailable) still provision on their first authenticated
+`/v1` request. The post-commit welcome accelerator is composed from the auth instance's injected
+database, email transport, and runtime URL; it is bounded and best-effort, while the durable row
+remains for `notification-dispatch` if the queue is full or the process exits.
 
 **Logging in grants nothing.** A session resolves to whatever role the database already holds. No
 environment variable promotes anybody, and that is the point: a role re-derived from configuration
@@ -92,16 +98,17 @@ the product.
 | a lockout | the same script | the migration `DATABASE_URL` |
 
 The ceremony is a one-time install step, run with the same credential that creates the tables.
-Bring `--create` by default — the `accounts` row is provisioned lazily (see below), so running this
-right after sign-in, before the dashboard has made its first request, finds no account yet.
+Bring `--create` by default for legacy identities — current auth signup provisions the ordinary
+`accounts` row eagerly so the durable welcome event can be recorded, while older identities may
+still have no row until their first authenticated request.
 
 **The address is a LOOKUP, never the stored value.** An operator knows an email address; the column
 stores the identity's opaque subject. So `--email` resolves through the identity table to that
 subject and reports it, and `--subject <id>` is the alternative for an operator who already has one.
 An address nobody has ever signed in as is a refusal that says so — *that person must sign in once*
 — because an identity is created by signing in, not by this script. `--create` is the other case
-entirely: it provisions the `accounts` row for an identity that exists but has never made a `/v1`
-request, and it cannot conjure an identity.
+entirely: it provisions the `accounts` row for an identity that exists but has no row yet, and it
+cannot conjure an identity.
 
 The script prints what it resolved and which `host:port/database` it is pointed at — never the URL, which carries a password —
 refuses a non-loopback target without `--allow-remote`, refuses to write at all without `--yes`, and

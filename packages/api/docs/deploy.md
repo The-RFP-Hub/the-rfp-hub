@@ -140,6 +140,8 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `DEDUPE_OVERLAP_MIN_TOKENS` | `20` | Distinct tokens required on the shorter side. The only guard measured to blunt a stub built from a target's rarest terms. Lowering it buys recall on short entries with a real exposure; `pnpm --filter @the-rfp-hub/api dedupe:threshold` prints the current trade rather than this row quoting a number that goes stale |
 | `DEDUPE_OVERLAP_MIN_SIMILARITY` | `0.35` | The overlap arm's cosine floor. **Not** a security control — the arm only sees cosine-ordered ANN candidates and this makes that explicit |
 | `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
+| `STALE_LISTING_REMINDER_DAYS` | `60` | A live listing must have no publisher update or successful source verification for this many days before a reminder is queued. It must still be open, approved, listed, have no future fixed deadline, and belong to a verified publisher namespace with a current member. |
+| `STALE_LISTING_REMINDER_CADENCE_DAYS` | `30` | Rolling cooldown in days per publisher account + organization. The interval starts at the later of reminder `created_at` and successful `email_dispatched_at`; in-flight/retryable rows cannot overlap, terminally exhausted rows release the guard, and exact interval expiry is allowed. |
 | `VERIFICATION_ENABLED` | `true` | |
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
 | `VERIFY_TIMEOUT_MS` | `10000` | |
@@ -200,13 +202,26 @@ and DMARC records. Then, whichever one you run:
   different hosts holding different accounts, and the default is the US one.
 
 All senders go through the central outbound-email port. Better-Auth composes OTP content in its
-adapter; the duplicate domain composes notification content; neither selects a provider or controls
-the envelope sender. Newly committed duplicate notifications enter a bounded, best-effort
+adapter; duplicate and lifecycle domains compose notification content; neither selects a provider
+or controls the envelope sender. Newly committed duplicate and lifecycle notifications enter a bounded, best-effort
 in-process queue, which joins `auth_user` for the address and attempts delivery immediately without
 making the request wait. `notification-dispatch` is the daily backstop in the nightly maintenance
 chain ([`jobs.md`](./jobs.md) §2); it retries temporary failures three times with a five-minute
 floor. Provider refusals are recorded on the durable row rather than thrown through either the
 request or the job.
+
+#### M5 lifecycle-email rollout
+
+Apply migrations `0013_m5_email_events.sql` and `0014_stale_listing_pending_guard.sql` with the migration role before scheduling the new image.
+The API then records welcome events at actual auth user creation and publisher-verification events
+at a real `false → true` transition; both are ordinary submitter/member-scoped rows and grant no
+authority. Schedule `node packages/api/dist/jobs.js all --json` once daily at the existing **01:05
+UTC** window: `stale-listing-reminders` queues the 60-day no-touch/no-source-refresh reminders and
+`notification-dispatch` sends them. Validate the rollout with the read-only evidence query in
+[`jobs.md`](./jobs.md) §1, recording the scheduler run id and environment; test runs and queued
+rows are never production-delivery evidence. To pause stale reminders during an incident, raise
+`STALE_LISTING_REMINDER_DAYS` above the maximum expected listing age and redeploy; do not delete
+durable rows, because the normal cooldown/idempotency key and dispatch ledger are the recovery path.
 
 ---
 
@@ -313,9 +328,10 @@ DATABASE_URL=… pnpm --filter @the-rfp-hub/api grant-admin -- --email you@examp
 
 The address is a **lookup**: it resolves through the identity table to the opaque subject the
 `accounts` row stores. An address nobody has signed in as is a refusal that says so. `--create` is
-there because signing in makes the identity but not the `accounts` row — that is provisioned lazily
-on the identity's first authenticated `/v1` request, which has not happened yet immediately after
-sign-in. Without `--create` the same run refuses with "no account for that subject".
+there because signing in makes the identity and the post-create hook normally provisions an
+ordinary `accounts` row; `--create` remains the recovery path for a legacy identity or a hook that
+was unavailable. Without `--create` the same run refuses with "no account for that subject" when no
+row exists.
 
 It echoes the `host:port/database` it resolved (never the URL — that carries a password), refuses a
 non-loopback target without `--allow-remote`, refuses to write without `--yes`, exits non-zero on

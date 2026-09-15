@@ -42,8 +42,8 @@ run("M3LIFE publisher lifecycle", () => {
       role: "reviewer",
     });
     await seedOrganization({ slug: NS, name: "Lifecycle Foundation", verified: false });
-    // NOT seeded: the first case's whole point is that first login is what provisions this
-    // account, from nothing but the identity.
+    // NOT seeded: the first case's whole point is that auth signup provisions this account before
+    // any versioned API request, from nothing but the identity.
     const publisher = await signIn(EMAILS.publisher);
     publisherToken = publisher.token;
     reviewerToken = reviewer.token;
@@ -61,8 +61,8 @@ run("M3LIFE publisher lifecycle", () => {
     await pool.end();
   });
 
-  it("runs the whole path from first login to a published, replaceable entry", async () => {
-    // 1. First login provisions the account, with nothing but the DID known.
+  it("runs the whole path from auth signup to a published, replaceable entry", async () => {
+    // 1. Auth signup provisions the account, with nothing but the DID known.
     const me = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(publisherToken) });
     expect(me.statusCode).toBe(200);
     accountId = me.json().accountId;

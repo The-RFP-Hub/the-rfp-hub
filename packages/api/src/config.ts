@@ -144,6 +144,10 @@ export interface VerificationConfig {
 export interface NotificationConfig {
   /** Waiting email attempts retained by the post-commit, in-process dispatcher. */
   queueMax: number;
+  /** Days without a publisher update or source confirmation before a live listing gets a reminder. */
+  staleReminderInactivityDays: number;
+  /** Minimum days between stale reminders for the same account and organization. */
+  staleReminderCooldownDays: number;
 }
 
 export interface AnalyticsConfig {
@@ -927,6 +931,8 @@ export const config: AppConfig = {
 
   notifications: {
     queueMax: readPositiveInt(process.env.NOTIFICATION_QUEUE_MAX, 100),
+    staleReminderInactivityDays: readPositiveInt(process.env.STALE_LISTING_REMINDER_DAYS, 60),
+    staleReminderCooldownDays: readPositiveInt(process.env.STALE_LISTING_REMINDER_CADENCE_DAYS, 30),
   },
 
   analytics: {

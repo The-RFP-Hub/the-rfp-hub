@@ -5,7 +5,7 @@
  * admin route and the workflow all read one contract. What differs is what `remaining` MEANS, and
  * that difference is the whole of the cursor/sweep split documented in `docs/jobs.md`:
  *
- *   **Cursor jobs** (`staleness`, both backfills, `notification-dispatch`) select rows by a
+ *   **Cursor jobs** (`staleness`, both backfills, `stale-listing-reminders`, `notification-dispatch`) select rows by a
  *   predicate the run retires or deliberately leaves waiting for a later retry. `remaining`
  *   counts what the predicate still matches, so it falls, and the runner may go round again until
  *   a no-progress pass stops it.

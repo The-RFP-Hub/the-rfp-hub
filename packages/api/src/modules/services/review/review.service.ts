@@ -32,6 +32,11 @@ import { badRequest, conflict, forbidden, notFound } from "../../shared/http-err
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
+import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
 
@@ -49,9 +54,14 @@ export interface OrganizationMetadata {
 
 export class ReviewService {
   private readonly repos: Repositories;
+  private readonly notificationQueue: NotificationDispatchEnqueuer;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(
+    private readonly db: DB = defaultDb,
+    options: { notificationQueue?: NotificationDispatchEnqueuer } = {},
+  ) {
     this.repos = repositories(db);
+    this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
   }
 
   // ── opportunities ──────────────────────────────────────────────────────────────
@@ -133,11 +143,12 @@ export class ReviewService {
     slug: string,
     verified: boolean,
   ): Promise<OrganizationSummaryView> {
-    return withTransaction(this.db, async (repos) => {
+    const settled = await withTransaction(this.db, async (repos) => {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
       // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
       const row = await lockOrganization(repos, slug);
-      if (row.verified === verified) return this.summarize(repos, row);
+      if (row.verified === verified)
+        return { summary: await this.summarize(repos, row), notificationIds: [] };
       const now = new Date();
       const next =
         (await repos.organizations.update(row.id, {
@@ -153,8 +164,18 @@ export class ReviewService {
         action: verified ? "verify_organization" : "unverify_organization",
         patch: { verified: { before: row.verified, after: verified } },
       });
-      return this.summarize(repos, next);
+      const notificationIds = verified
+        ? await repos.notifications.record(
+            buildPublisherVerifiedNotifications(
+              await repos.memberships.accountIdsForOrganization(next.id),
+              next,
+            ),
+          )
+        : [];
+      return { summary: await this.summarize(repos, next), notificationIds };
     });
+    this.notificationQueue.enqueue(settled.notificationIds);
+    return settled.summary;
   }
 
   /** Directory metadata. Never the verified flag — that has its own audited verb. */
