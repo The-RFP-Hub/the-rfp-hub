@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RFP Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@700;800&family=Public+Sans:wght@400;600;700&family=Spline+Sans+Mono:wght@500&display=swap">
+<link rel="icon" href="data:,">
+<style>
+@import url('/site.css');
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <a class="brand" href="/"><svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><g opacity=".5"><rect x="11" y="14" width="5" height="5" rx="1"/><rect x="20" y="14" width="33" height="5" rx="2.5"/><rect x="11" y="38" width="5" height="5" rx="1"/><rect x="20" y="38" width="38" height="5" rx="2.5"/><rect x="11" y="50" width="5" height="5" rx="1"/><rect x="20" y="50" width="22" height="5" rx="2.5"/></g><rect x="11" y="26" width="5" height="5" rx="1"/><rect x="20" y="26" width="27" height="5" rx="2.5"/></svg>RFP Hub</a>
+  <nav class="main"><a href="/directory">Directory</a><a href="/publishers">Publishers</a><a href="/how-it-works">How it works</a></nav>
+  <span class="esp">Funded by <b>EF ESP</b></span>
+  <a class="login" href="#">Log in</a>
+</div></header>
+<!-- A: Tally -->
+<section class="hero" id="hero-a"><div class="wrap a-grid">
+  <div>
+    <div class="pos">An open index. Not an application portal.</div>
+    <h1 style="margin-top:10px">Every open grant, hackathon, bounty and RFP on Ethereum, in one place.</h1>
+    <p class="lede">We index the listing, link to the program's site, and stop there. Applications happen where the program runs them.</p>
+    <div class="paths">
+      <a class="path" href="/directory"><span class="k">I'm looking for funding</span><span class="s">Browse 92 open opportunities</span></a>
+      <a class="path pub" href="/how-it-works#publish"><span class="k">I publish a program</span><span class="s">Log in, submit a listing, and verified accounts publish instantly</span></a>
+    </div>
+    <form class="search" onsubmit="return false"><input id="q-a" type="search" placeholder="Search by topic, org or city…" aria-label="Search"><button type="submit">Search</button></form>
+    <div class="data">Open data <a href="#">JSON</a><a href="#">CSV</a><a href="#">RSS</a><span>· CC0 · nightly</span></div>
+  </div>
+  <div class="tally" aria-label="Index at a glance">
+    <div class="row"><span class="big num">92</span><span><span class="unit">open opportunities</span><span class="why">across grants, hackathons, bounties and RFPs</span></span></div>
+    <div class="row"><span class="big num">$143M</span><span><span class="unit">in maximum awards listed</span><span class="why">summed from the structured award field only</span></span></div>
+    <div class="row"><span class="big num">84</span><span><span class="unit">organizations</span><span class="why">from Ethereum Foundation to a NIT hackathon club</span></span></div>
+    <div class="row hot"><span class="big num">6</span><span><span class="unit">closing before October</span><span class="why">ETHOnline, Tokyo, HackNex, Goa, Starknet, Road to Devcon</span></span></div>
+  </div>
+</div></section>
+
+<!-- shared below the fold -->
+<div class="wrap">
+<section class="blk">
+  <div class="hd"><h2>Closing soon</h2><a href="/directory">All by deadline →</a></div>
+  <div class="strip">
+    <a class="card" href="/opportunity"><div class="top"><span class="chip hack">Hackathon</span><span class="dl hot">ends 16 Sep</span></div><div class="ttl">ETHOnline 2026</div><div class="org"><i class="avatar">EG</i>ETHGlobal · online</div><div class="aw">$82,000<small>prize pool</small></div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip hack">Hackathon</span><span class="dl hot">reg. 23 Sep</span></div><div class="ttl">ETHGlobal Tokyo 2026</div><div class="org"><i class="avatar">EG</i>ETHGlobal · Tokyo</div><div class="aw">$45,000<small>prize pool</small></div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip hack">Hackathon</span><span class="dl">25 Sep</span></div><div class="ttl">HackNex Season 2</div><div class="org"><i class="avatar">IC</i>InnovoCon</div><div class="aw">—<small>no award listed</small></div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip bounty">Bounty</span><span class="dl">30 Sep</span></div><div class="ttl">Starknet Bug Bounty</div><div class="org"><i class="avatar">SN</i>Starknet</div><div class="aw">Up to $250,000</div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip hack">Hackathon</span><span class="dl">reg. 30 Sep</span></div><div class="ttl">Hacker House Goa 2026</div><div class="org"><i class="avatar">2S</i>2:47PM Studio · Goa</div><div class="aw">$50,000<small>prize pool</small></div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip rfp">RFP</span><span class="dl">30 Sep</span></div><div class="ttl">Road to Devcon 8 · University Program</div><div class="org"><i class="avatar">EF</i>EF Ecosystem Support</div><div class="aw">Up to $500</div></a>
+  </div>
+</section>
+
+<section class="blk">
+  <div class="hd"><h2>Browse by type</h2></div>
+  <div class="tiles">
+    <a class="tile grant" href="#"><span class="n num">18</span><span class="l">Grants<span>Rolling and dated programs</span></span></a>
+    <a class="tile hack" href="#"><span class="n num">6</span><span class="l">Hackathons<span>Tokyo, Mumbai, Goa, online</span></span></a>
+    <a class="tile bounty" href="#"><span class="n num">62</span><span class="l">Bounties<span>Security, up to $16M</span></span></a>
+    <a class="tile rfp" href="#"><span class="n num">3</span><span class="l">RFPs<span>Plus 3 accelerators and funds</span></span></a>
+  </div>
+</section>
+
+<section class="blk">
+  <div class="hd"><h2>Featured this week</h2><span class="eyebrow">by deadline or award, nothing else</span></div>
+  <div class="feat">
+    <a class="card" href="/opportunity"><div class="top"><span class="chip grant">Grant</span><span class="dl">rolling</span></div><div class="ttl">Starknet Growth Grants</div><div class="org"><i class="avatar">SN</i>Starknet Foundation</div><div class="why">$25k to $1M for teams already shipping on Starknet.</div><div class="aw">Up to $1,000,000</div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip hack">Hackathon</span><span class="dl">3 to 8 Nov</span></div><div class="ttl">ETHGlobal Mumbai</div><div class="org"><i class="avatar">EG</i>ETHGlobal · Mumbai</div><div class="why">Largest hackathon pool on the index this quarter.</div><div class="aw">$100,000<small>prize pool</small></div></a>
+    <a class="card" href="/opportunity"><div class="top"><span class="chip grant">Grant</span><span class="dl">rolling</span></div><div class="ttl">Ecosystem Support Program</div><div class="org"><i class="avatar">EF</i>Ethereum Foundation</div><div class="why">The program that funds this index. Open scope, public goods.</div><div class="aw">Case by case</div></a>
+  </div>
+</section>
+
+<div class="cta-all"><a class="btn ghost" href="/directory">See all 92 open opportunities →</a></div>
+</div>
+
+<footer class="site"><div class="wrap" style="display:flex;gap:18px;flex-wrap:wrap"><span>Funded by EF ESP</span><a href="#">Governance</a><a href="#">Review criteria</a><a href="#">API</a><a href="#">Export (CC0)</a><a href="#">Privacy</a></div></footer>
+</body></html>
