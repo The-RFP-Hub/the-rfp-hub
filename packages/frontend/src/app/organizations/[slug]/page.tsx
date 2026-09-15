@@ -116,7 +116,7 @@ function NotAMember({ slug, me }: { slug: string; me: Me }) {
               Your organizations
             </Link>
           ) : (
-            <Link className="button-primary" href="/">
+            <Link className="button-primary" href="/directory">
               Browse the directory
             </Link>
           )}

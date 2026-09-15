@@ -87,6 +87,11 @@
   --text-h2: 1.25rem;
   --text-h1: 1.95rem;
   --text-metric: 1.6rem;
+  /* The landing and the facts strip: display numbers, and the mono state chip on an org card. */
+  --text-hero: clamp(2.2rem, 4.4vw, 3.4rem);
+  --text-tally: clamp(2.4rem, 5vw, 3.6rem);
+  --text-tile: 2.4rem;
+  --text-state: 0.62rem;
 
   /* A 4px-unit spacing scale. Zero and auto remain layout semantics, not design tokens. */
   --space-1: 0.25rem;
@@ -1762,6 +1767,14 @@ ul.plain {
   color: var(--ink);
 }
 
+/* The directory's card view: the same opportunity-card used on the landing page, in a grid. Three
+ * columns at desktop, narrowing with the viewport; see the 56rem/40rem media queries below. */
+.directory-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 /*
  * The title cell: a bold link, and the publisher's own summary line under it.
  *
@@ -1932,6 +1945,10 @@ pre.untrusted-block {
 .publisher-card h2 {
   margin-top: 0;
   font-size: var(--text-h3);
+}
+
+.publisher-card-mark {
+  margin-bottom: var(--space-2);
 }
 
 .publisher-description {
@@ -2331,4 +2348,877 @@ pre.untrusted-block {
   .shell-menu-toggle {
     padding-inline: var(--space-2);
   }
+}
+
+/* ------------------------------------------------------------- landing --- */
+
+/*
+ * THE FRONT PAGE. Headline, tally, two doors, search; then closing-soon cards, four type tiles and
+ * the largest awards. Nothing here introduces a colour the rest of the sheet does not already own:
+ * the one olive number on the tally is `--accent-ink`, the same step a textual link uses.
+ */
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--space-12);
+  align-items: start;
+  padding: var(--space-8) 0 var(--space-6);
+}
+
+.landing-position {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin: 0 0 var(--space-2);
+}
+
+.landing-hero h1 {
+  font-size: var(--text-hero);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.landing-paths {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.landing-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.landing-path:hover,
+.landing-path:focus-visible {
+  border-color: var(--ink);
+}
+
+.landing-path-publish {
+  background: var(--panel);
+}
+
+.landing-path-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: var(--text-h3);
+  letter-spacing: -0.015em;
+}
+
+.landing-path-note {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.landing-search {
+  display: flex;
+  margin-top: var(--space-6);
+  max-width: 40rem;
+}
+
+.landing-search input {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.landing-search button {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  border-left: 0;
+}
+
+.landing-data {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.landing-data a {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 var(--space-2);
+}
+
+.landing-tally {
+  margin: 0;
+  border-top: 2px solid var(--ink);
+}
+
+.landing-tally-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-4);
+  align-items: baseline;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.landing-tally-row dt {
+  display: contents;
+}
+
+.landing-tally-value {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-tally);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch;
+  text-align: right;
+  grid-row: span 2;
+}
+
+.landing-tally-unit {
+  font-weight: 700;
+}
+
+.landing-tally-why {
+  margin: 0;
+  grid-column: 2;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.landing-tally-row.is-hot .landing-tally-unit {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.landing-block {
+  padding: var(--space-8) 0 0;
+}
+
+.landing-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.landing-block-head h2 {
+  margin: 0;
+}
+
+.landing-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(15rem, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x mandatory;
+}
+
+.landing-strip > li {
+  scroll-snap-align: start;
+  display: flex;
+}
+
+.landing-featured {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.landing-featured > li {
+  display: flex;
+}
+
+.landing-all {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) 0 var(--space-6);
+}
+
+/* One listing as a card. Type, deadline, title, organization, award, in that reading order. */
+.opportunity-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.opportunity-card:hover,
+.opportunity-card:focus-visible {
+  border-color: var(--ink);
+}
+
+.opportunity-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.opportunity-card-deadline {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.opportunity-card-deadline.is-soon {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.opportunity-card-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: var(--text-h3-compact);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.opportunity-card.is-large .opportunity-card-title {
+  font-size: var(--text-h3);
+}
+
+.opportunity-card-org,
+.opportunity-card-summary {
+  font-size: var(--text-sm);
+}
+
+.opportunity-card-org {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.opportunity-card-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.opportunity-card-award {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-faint);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-h2);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.opportunity-card-award .muted {
+  font-family: var(--font-body), sans-serif;
+  font-weight: 400;
+  font-size: var(--text-sm);
+}
+
+/*
+ * THE TYPE CHIP IS INK, LIKE EVERY OTHER BADGE. Type is a category, not a state, and the temptation
+ * to give the four types four hues was real; the sheet's rule that no state depends on hue and no
+ * badge carries the accent wins, and the type is told by its word. Mono and uppercase are what make
+ * it scan as a label rather than as a second title.
+ */
+.type-chip {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--ink-soft);
+  border-radius: 4px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.landing-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.landing-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+  height: 100%;
+}
+
+.landing-tile:hover,
+.landing-tile:focus-visible {
+  border-color: var(--ink);
+}
+
+.landing-tile-count {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-tile);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-tile-label {
+  font-weight: 700;
+}
+
+.landing-tile-note {
+  display: block;
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+/* -------------------------------------------------------- opportunity --- */
+
+/* The three facts an applicant decides on, as one ruled strip under the title. */
+.facts-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: var(--space-4) 0 var(--space-6);
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.facts-strip > div {
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
+}
+
+.facts-strip > div + div {
+  border-left: 1px solid var(--line-faint);
+  padding-left: var(--space-4);
+}
+
+.facts-strip dt {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.facts-strip dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-h2);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.opportunity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* --------------------------------------------------------- publishers --- */
+
+.org-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.org-card {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-12) var(--space-3) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+  position: relative;
+  height: 100%;
+}
+
+.org-card:hover,
+.org-card:focus-visible {
+  border-color: var(--ink);
+}
+
+.org-card.is-verified {
+  border-color: var(--ink);
+  border-width: 2px;
+}
+
+.org-mark {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.org-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  display: block;
+}
+
+/* The compact mark used inline with a card's org name — publisher cards and opportunity cards. */
+.org-mark-small {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: var(--text-xs);
+}
+
+.org-card-name {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.org-card-note {
+  display: block;
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.org-card-state {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-state);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-soft);
+}
+
+.org-card.is-verified .org-card-state {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.org-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  margin: var(--space-3) 0;
+}
+
+/* ------------------------------------------------------- how it works --- */
+
+.acts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: var(--space-6) 0 var(--space-8);
+  border-top: 2px solid var(--ink);
+}
+
+.act {
+  padding: var(--space-4) var(--space-4) var(--space-6) 0;
+}
+
+.act + .act {
+  border-left: 1px solid var(--line);
+  padding-left: var(--space-4);
+}
+
+.act-eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.act h2 {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.act p {
+  color: var(--ink-soft);
+  font-size: var(--text-md);
+  margin: 0 0 var(--space-2);
+}
+
+.act-flow {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0 0 0 var(--space-4);
+  border-left: 1px solid var(--line);
+}
+
+.act-flow li {
+  position: relative;
+  padding: var(--space-1) 0;
+  font-size: var(--text-md);
+}
+
+.act-flow li::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 5px);
+  top: 0.85em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+}
+
+.act-flow li.is-exit::before {
+  background: var(--ink);
+}
+
+.act-after {
+  margin-top: var(--space-3);
+}
+
+.act-flow li small {
+  display: block;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 56rem) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    padding-top: var(--space-6);
+  }
+
+  .landing-featured,
+  .facts-strip,
+  .acts {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .directory-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .facts-strip > div + div,
+  .act + .act {
+    border-left: 0;
+    border-top: 1px solid var(--line-faint);
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 40rem) {
+  .landing-paths,
+  .landing-tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-tally-value {
+    min-width: 4ch;
+  }
+
+  .directory-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------ directory bar --- */
+
+/* Search on one line, the type pills under it. The panel background and the disclosure stay. */
+.filters-bar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.filters-bar .field {
+  flex: 1;
+  margin: 0;
+  max-width: none;
+}
+
+.filters-bar input {
+  inline-size: 100%;
+  min-block-size: var(--control-touch);
+}
+
+.type-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.type-pills button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-touch);
+  border-radius: 999px;
+  padding-inline: var(--space-4);
+}
+
+.type-pill-count {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.type-pills button[aria-pressed="true"] .type-pill-count {
+  color: inherit;
+}
+
+.directory-table .type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.directory-table .type-chip .icon-label-icon {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+}
+
+.directory-org {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.directory-table .directory-award {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.directory-table .directory-deadline {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.directory-table .directory-deadline.is-soon {
+  font-weight: 700;
+}
+
+.directory-table .directory-deadline.is-rolling {
+  color: var(--ink-faint);
+}
+
+@media (max-width: 40rem) {
+  .filters-bar {
+    flex-direction: column;
+  }
+
+  .directory-table .type-chip .icon-label-icon {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- opportunity layout --- */
+
+/* The listing reads down the left; the one thing to DO stays in view on the right. */
+.opportunity-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.opportunity-main {
+  min-width: 0;
+}
+
+.opportunity-aside {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.opportunity-aside .card {
+  margin: 0;
+}
+
+.opportunity-aside-meta {
+  margin: 0;
+}
+
+.crumb {
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.opportunity-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.opportunity-head .org-mark {
+  width: 3.25rem;
+  height: 3.25rem;
+  font-size: var(--text-h3);
+}
+
+.opportunity-head h1 {
+  margin-bottom: var(--space-2);
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.action-primary {
+  justify-content: center;
+  inline-size: 100%;
+}
+
+.action-row {
+  margin: 0;
+}
+
+.share-card-preview {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+@media (max-width: 56rem) {
+  .opportunity-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .opportunity-aside {
+    position: static;
+  }
+}
+
+/* --------------------------------------------------- how it works, folded --- */
+
+.eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hiw > .eyebrow {
+  margin: 0 0 var(--space-2);
+}
+
+.rule-open-heading {
+  font-size: var(--text-h3);
+  margin: var(--space-2) 0;
+}
+
+.hiw h1 {
+  max-width: 22ch;
+}
+
+.rules {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line);
+}
+
+.rules p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--ink-soft);
+}
+
+.rules-nav {
+  display: flex;
+  gap: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+/* One folded section per rule. The summary is the heading; the real h2 stays for the anchor. */
+.rule {
+  border-top: 1px solid var(--line-faint);
+  padding: var(--space-2) 0;
+}
+
+.rule > summary {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: var(--text-h3);
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+
+.rule[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.rule > h2 + * {
+  margin-top: 0;
+}
+
+.hiw-quote {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: var(--text-h2);
+  letter-spacing: -0.02em;
+  max-width: 24ch;
+  margin: var(--space-12) 0 var(--space-6);
 }

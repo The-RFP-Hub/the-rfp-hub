@@ -9,13 +9,15 @@
  * `logoUrl` NEVER becomes an `<img>`: the CSP never allows a publisher-named host in `img-src`
  * (`src/lib/csp.ts`), because loading it would leak every reader's IP to whatever host it named.
  */
+import { OrgMark } from "@/components/OrgMark";
 import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
-import { formatInstant } from "@/lib/format";
+import { formatCount, formatInstant } from "@/lib/format";
 import { PUBLISHERS_DOC } from "@/lib/links";
+import { loadOpenSet } from "@/lib/open-set";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { Publisher } from "@/lib/types";
+import type { OpportunitySummary, Publisher } from "@/lib/types";
 import Link from "next/link";
 import { useCallback } from "react";
 
@@ -23,14 +25,16 @@ export default function PublishersPage() {
   const api = useApi();
   const load = useCallback(() => api.publishers.list(), [api]);
   const { state, reload } = useResource(load);
+  const loadListed = useCallback(() => loadOpenSet(api), [api]);
+  const listed = useResource(loadListed);
 
   return (
     <section>
-      <h1>Verified publishers</h1>
+      <h1>Publishers</h1>
       <p className="lede">
-        Organizations a Hub reviewer has verified. A verified organization decides what publishes in
-        its own namespace, without a second review —{" "}
-        <Link href="/how-it-works#why">who decides, and why</Link> sets out the whole of it.
+        Every organization with an open listing on the index. A <strong>verified</strong> one
+        publishes to its own namespace without a second review; a <strong>listed</strong> one was
+        indexed from public sources and has not claimed its listings yet.
       </p>
 
       <ResourceView resource={state} what="the verified publishers" onRetry={reload}>
@@ -44,27 +48,102 @@ export default function PublishersPage() {
                   <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
                     How to become a verified publisher
                   </a>
-                  <Link href="/">Browse the directory</Link>
+                  <Link href="/directory">Browse the directory</Link>
                 </>
               }
             />
           ) : (
-            <ul className="plain publisher-grid">
-              {data.items.map((publisher) => (
-                <li key={publisher.slug}>
-                  <PublisherCard publisher={publisher} />
-                </li>
-              ))}
-            </ul>
+            <>
+              <h2>Verified</h2>
+              <ul className="plain publisher-grid">
+                {data.items.map((publisher) => (
+                  <li key={publisher.slug}>
+                    <PublisherCard publisher={publisher} />
+                  </li>
+                ))}
+              </ul>
+            </>
           )
         }
       </ResourceView>
+
+      <ResourceView resource={listed.state} what="the listed organizations" onRetry={listed.reload}>
+        {(items) => (
+          <ListedOrganizations
+            items={items}
+            verified={new Set(state.status === "ready" ? state.data.items.map((p) => p.slug) : [])}
+          />
+        )}
+      </ResourceView>
+
+      <p className="card">
+        <strong>Run one of these?</strong> Open your listing in the directory and claim it, or{" "}
+        <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
+          read how verification works
+        </a>
+        . A reviewer grants it.
+      </p>
     </section>
   );
 }
 
+/**
+ * The organizations behind the open set, grouped by operating organization. Not a claim of
+ * endorsement, and the badge says which ones have claimed their namespace.
+ */
+function ListedOrganizations({
+  items,
+  verified,
+}: {
+  items: OpportunitySummary[];
+  verified: Set<string>;
+}) {
+  const groups = new Map<string, { name: string; count: number }>();
+  for (const item of items) {
+    const org = item.operatingOrganizations[0];
+    if (!org) continue;
+    const current = groups.get(org.slug) ?? { name: org.name, count: 0 };
+    current.count += 1;
+    groups.set(org.slug, current);
+  }
+  const rows = [...groups.entries()].sort(
+    (a, b) => b[1].count - a[1].count || a[1].name.localeCompare(b[1].name),
+  );
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <h2>Listed</h2>
+      <p className="org-legend">
+        <span>{formatCount(rows.length)} organizations with an open listing</span>
+        <span>ranked by open listings</span>
+      </p>
+      <ul className="plain org-grid">
+        {rows.map(([slug, org]) => (
+          <li key={slug}>
+            <Link
+              className={`org-card${verified.has(slug) ? " is-verified" : ""}`}
+              href={`/directory?organization=${encodeURIComponent(slug)}`}
+            >
+              <OrgMark slug={slug} name={org.name} verified={verified.has(slug)} />
+              <span>
+                <span className="org-card-name">
+                  <UntrustedText value={org.name} fallback={slug} />
+                </span>
+                <span className="org-card-note">
+                  {formatCount(org.count)} open listing{org.count === 1 ? "" : "s"}
+                </span>
+              </span>
+              <span className="org-card-state">{verified.has(slug) ? "verified" : "listed"}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function PublisherCard({ publisher }: { publisher: Publisher }) {
-  const directoryHref = `/?organization=${encodeURIComponent(publisher.slug)}`;
+  const directoryHref = `/directory?organization=${encodeURIComponent(publisher.slug)}`;
   const name = publisher.name.trim() || publisher.slug;
   return (
     // The two data attributes are this package's only test hooks: an external checker reads the
@@ -74,6 +153,7 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       data-testid="publisher-card"
       data-publisher-slug={publisher.slug}
     >
+      <OrgMark slug={publisher.slug} name={name} verified className="publisher-card-mark" />
       <h2>
         <UntrustedText value={publisher.name} fallback={publisher.slug} />
       </h2>

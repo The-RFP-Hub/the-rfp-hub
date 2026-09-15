@@ -10,7 +10,7 @@ import type { MetadataRoute } from "next";
  * `lastModified` is omitted on the statics, where "now" would be fabricated, and carried only when
  * the API reports one.
  */
-const ROUTES = ["/", "/how-it-works", "/publishers", "/privacy", "/terms"] as const;
+const ROUTES = ["/", "/directory", "/how-it-works", "/publishers", "/privacy", "/terms"] as const;
 
 const MAX_OPPORTUNITY_URLS = 5_000;
 const REVALIDATE_SECONDS = 3_600;

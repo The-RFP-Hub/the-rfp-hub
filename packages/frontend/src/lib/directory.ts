@@ -128,6 +128,9 @@ export interface DirectorySelection {
   deadlineBefore: string;
   ordering: Ordering;
   page: number;
+  /** How the results render — table or a grid of cards. Never sent to the API: `directoryQuery`
+   *  does not read it, and it is not a filter, so it never resets the page or counts as "custom". */
+  view: "table" | "cards";
 }
 
 /**
@@ -154,6 +157,7 @@ export const DEFAULT_SELECTION: DirectorySelection = {
   deadlineBefore: "",
   ordering: "nextDeadlineAt:asc",
   page: 1,
+  view: "table",
 };
 
 /** How many rows a page of the directory holds. The endpoint's own default; its maximum is 100. */
@@ -352,6 +356,7 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
     deadlineBefore: get("deadlineBefore"),
     ordering: ORDERING_VALUES.has(ordering) ? (ordering as Ordering) : DEFAULT_SELECTION.ordering,
     page: safePage,
+    view: get("view") === "cards" ? "cards" : "table",
   };
 }
 
@@ -383,11 +388,12 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
   }
   if (selection.ordering !== DEFAULT_SELECTION.ordering) params.set("sort", selection.ordering);
   if (selection.page > 1) params.set("page", String(selection.page));
+  if (selection.view === "cards") params.set("view", "cards");
   return params;
 }
 
 /** The path plus querystring for a selection — what `router.replace` and a shared link both want. */
-export function selectionToHref(selection: DirectorySelection, path = "/"): string {
+export function selectionToHref(selection: DirectorySelection, path = "/directory"): string {
   const query = selectionToParams(selection).toString();
   return query ? `${path}?${query}` : path;
 }

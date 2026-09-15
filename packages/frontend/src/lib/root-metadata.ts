@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const canonical = await isCanonicalRequest();
   return {
     title: {
-      default: "Directory | RFP Hub",
+      default: "RFP Hub — an open index of Ethereum funding",
       template: "%s | RFP Hub",
     },
     description:

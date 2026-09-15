@@ -53,7 +53,8 @@ export default function DashboardPage() {
           your account. Permissions are checked when you submit or manage a listing.
         </p>
         <p className="muted footnote">
-          Nothing here is needed to read the Hub — <Link href="/">the directory</Link> is public.
+          Nothing here is needed to read the Hub — <Link href="/directory">the directory</Link> is
+          public.
         </p>
       </section>
     );

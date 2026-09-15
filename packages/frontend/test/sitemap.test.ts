@@ -11,6 +11,7 @@ vi.mock("next/headers", () => ({
 
 const STATIC_URLS = [
   "https://ethrfps.app/",
+  "https://ethrfps.app/directory",
   "https://ethrfps.app/how-it-works",
   "https://ethrfps.app/publishers",
   "https://ethrfps.app/privacy",
@@ -71,7 +72,7 @@ afterEach(() => {
 });
 
 describe("the public sitemap", () => {
-  it("lists the five static public routes, then every listed opportunity", async () => {
+  it("lists the six static public routes, then every listed opportunity", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
     await mockHost("ethrfps.app");
     stubDirectory([{ id: "curated:0x-bug-bounty" }, { id: "fundingmap:1496" }]);

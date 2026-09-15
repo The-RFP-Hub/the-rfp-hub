@@ -1,6 +1,7 @@
 "use client";
 
 import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
+import { OpportunityCard } from "@/components/OpportunityCard";
 /**
  * The public directory: every PUBLISHED opportunity, as a visitor with no account reads it.
  *
@@ -29,6 +30,7 @@ import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel
  *      unfiltered first page having lost the search they came for.
  *   3. A FILTERED VIEW COULD NOT BE SHARED OR RELOADED.
  */
+import { OrgMark } from "@/components/OrgMark";
 import { UntrustedText } from "@/components/UntrustedText";
 import { StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView, TechnicalDetails } from "@/components/states";
@@ -49,8 +51,10 @@ import {
   selectionToHref,
   truncateForDisplay,
 } from "@/lib/directory";
-import { describeDirectoryDeadline, formatCount } from "@/lib/format";
+import { describeDirectoryDeadline, formatCount, nextFixedDeadline } from "@/lib/format";
+import { cardAward, daysUntil } from "@/lib/landing";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { countByType, loadOpenSet } from "@/lib/open-set";
 import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
@@ -136,6 +140,11 @@ export function DirectoryList() {
   const load = useCallback(() => api.directory.list(directoryQuery(applied)), [api, applied]);
   const { state, reload } = useResource(load);
 
+  // The per-type counts on the pills. A failure here costs the numbers, never the list.
+  const loadCounts = useCallback(() => loadOpenSet(api).then(countByType), [api]);
+  const countsState = useResource(loadCounts).state;
+  const counts = countsState.status === "ready" ? countsState.data : null;
+
   /**
    * Commit a change. Every commit carries the ENTIRE draft, which is the fix for the discarded-text
    * bug: there is no path through this component that sends one control's value and drops another's.
@@ -168,9 +177,9 @@ export function DirectoryList() {
        */}
       <search>
         <form className="filters" onSubmit={search}>
-          <div className="filters-primary">
+          <div className="filters-bar">
             <div className={`field field-search${draft.q.trim() ? " is-set" : ""}`}>
-              <label htmlFor="directory-q">
+              <label htmlFor="directory-q" className="visually-hidden">
                 <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
               </label>
               <input
@@ -178,57 +187,26 @@ export function DirectoryList() {
                 type="search"
                 value={draft.q}
                 onChange={(event) => setDraft({ ...draft, q: event.target.value })}
-                placeholder="storage, zk, retrieval…"
+                placeholder="Search by topic, org or city…"
               />
             </div>
-
-            <div className={`field${draft.fundingType ? " is-set" : ""}`}>
-              <label htmlFor="directory-type">
-                <IconLabel icon={BanknotesIcon}>Funding type</IconLabel>
-              </label>
-              <select
-                id="directory-type"
-                value={draft.fundingType}
-                onChange={(event) => commit({ fundingType: event.target.value })}
-              >
-                <option value="">Any type</option>
-                {FUNDING_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {fundingTypeLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/*
-             * THE DEFAULT IS VISIBLE. This control opens holding `open` rather than blank, because the
-             * list it is describing is already narrowed to open opportunities — a filter the reader
-             * cannot see is a filter they cannot undo.
-             */}
-            <div className={`field${draft.status ? " is-set" : ""}`}>
-              <label htmlFor="directory-status">
-                <IconLabel icon={SignalIcon}>Status</IconLabel>
-              </label>
-              <select
-                id="directory-status"
-                value={draft.status}
-                onChange={(event) => commit({ status: event.target.value })}
-              >
-                <option value="">Any status</option>
-                {STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {opportunityStatusLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field field-action">
-              <button type="submit">
-                <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
-              </button>
-            </div>
+            <button type="submit">
+              <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
+            </button>
           </div>
+
+          {/*
+           * THE TYPE PILLS ARE THE FIRST FILTER, because type is the first question. Each pill
+           * carries its open count so the row doubles as the index's shape; the counts come from
+           * the shared open set and are omitted, not faked, when the reader is looking at closed
+           * or upcoming listings too. The `<select>` behind them stays in the disclosure for a
+           * reader who wants the other two types.
+           */}
+          <TypePills
+            applied={applied}
+            counts={applied.status === "open" ? counts : null}
+            onPick={(fundingType) => commit({ fundingType })}
+          />
 
           <details
             className="filters-more"
@@ -248,6 +226,47 @@ export function DirectoryList() {
               <fieldset className="filters-group filters-group-details">
                 <legend>Listing details</legend>
                 <div className="filters-group-fields filters-group-fields-details">
+                  <div className={`field${draft.fundingType ? " is-set" : ""}`}>
+                    <label htmlFor="directory-type">
+                      <IconLabel icon={BanknotesIcon}>Funding type</IconLabel>
+                    </label>
+                    <select
+                      id="directory-type"
+                      value={draft.fundingType}
+                      onChange={(event) => commit({ fundingType: event.target.value })}
+                    >
+                      <option value="">Any type</option>
+                      {FUNDING_TYPES.map((value) => (
+                        <option key={value} value={value}>
+                          {fundingTypeLabel(value)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/*
+                   * THE DEFAULT IS VISIBLE. This control opens holding `open` rather than blank,
+                   * because the list it is describing is already narrowed to open opportunities —
+                   * a filter the reader cannot see is a filter they cannot undo.
+                   */}
+                  <div className={`field${draft.status ? " is-set" : ""}`}>
+                    <label htmlFor="directory-status">
+                      <IconLabel icon={SignalIcon}>Status</IconLabel>
+                    </label>
+                    <select
+                      id="directory-status"
+                      value={draft.status}
+                      onChange={(event) => commit({ status: event.target.value })}
+                    >
+                      <option value="">Any status</option>
+                      {STATUSES.map((value) => (
+                        <option key={value} value={value}>
+                          {opportunityStatusLabel(value)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/*
                    * A DATALIST, NOT A SELECT. `ecosystems[]` is free text in the Standard — it is
                    * whatever a publisher called their own ecosystem — so a closed list would hide
@@ -504,32 +523,50 @@ export function DirectoryList() {
                 page={list.page}
                 totalPages={list.totalPages}
                 stale={state.status === "ready" && state.stale}
+                onView={(view) => commit({ view, page: applied.page })}
               />
 
               {list.items.length === 0 ? (
                 <EmptyResult applied={applied} page={list.page} />
               ) : (
                 <>
-                  <div className="table-scroll directory-table-scroll">
-                    <table className="directory-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">Opportunity</th>
-                          <th scope="col">Organization</th>
-                          <th scope="col">Type</th>
-                          <th scope="col">Status</th>
-                          <th scope="col" className="numeric">
-                            Deadline
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.items.map((item) => (
-                          <DirectoryRow key={item.id} item={item} />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {applied.view === "cards" ? (
+                    <ul className="plain directory-cards">
+                      {list.items.map((item) => (
+                        <li key={item.id}>
+                          <OpportunityCard item={item} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="table-scroll directory-table-scroll">
+                      <table className="directory-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Type</th>
+                            <th scope="col">Opportunity</th>
+                            <th scope="col">Organization</th>
+                            <th scope="col" className="numeric">
+                              Award
+                            </th>
+                            {applied.status === "open" ? null : <th scope="col">Status</th>}
+                            <th scope="col" className="numeric">
+                              Closes
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.items.map((item) => (
+                            <DirectoryRow
+                              key={item.id}
+                              item={item}
+                              showStatus={applied.status !== "open"}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
                   <nav className="pagination" aria-label="Directory pages">
                     <button
@@ -560,6 +597,70 @@ export function DirectoryList() {
       )}
     </>
   );
+}
+
+/** The four types a first-time reader thinks in, then everything else behind the select. */
+const PILL_TYPES: readonly FundingType[] = ["grant", "hackathon", "bounty", "rfp"];
+
+const PILL_LABELS: Readonly<Record<string, string>> = {
+  grant: "Grants",
+  hackathon: "Hackathons",
+  bounty: "Bounties",
+  rfp: "RFPs",
+};
+
+function pillLabel(type: FundingType): string {
+  return PILL_LABELS[type] ?? fundingTypeLabel(type);
+}
+
+function TypePills({
+  applied,
+  counts,
+  onPick,
+}: {
+  applied: DirectorySelection;
+  counts: Record<string, number> | null;
+  onPick: (fundingType: string) => void;
+}) {
+  const total = counts ? Object.values(counts).reduce((sum, n) => sum + n, 0) : null;
+  const other = applied.fundingType && !PILL_TYPES.includes(applied.fundingType as FundingType);
+  return (
+    <fieldset className="type-pills">
+      <legend className="visually-hidden">Funding type</legend>
+      <button type="button" aria-pressed={applied.fundingType === ""} onClick={() => onPick("")}>
+        All{total !== null ? <span className="type-pill-count">{formatCount(total)}</span> : null}
+      </button>
+      {PILL_TYPES.map((type) => (
+        <button
+          key={type}
+          type="button"
+          aria-pressed={applied.fundingType === type}
+          onClick={() => onPick(type)}
+        >
+          {pillLabel(type)}
+          {counts ? (
+            <span className="type-pill-count">{formatCount(counts[type] ?? 0)}</span>
+          ) : null}
+        </button>
+      ))}
+      {other ? (
+        <button type="button" aria-pressed onClick={() => onPick(applied.fundingType)}>
+          {fundingTypeLabel(applied.fundingType)}
+        </button>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/** How the result line says the order, as a phrase rather than the control's label. */
+const ORDERING_PHRASES: Readonly<Record<Ordering, string>> = {
+  "nextDeadlineAt:asc": "closing soonest",
+  "postedAt:desc": "newest first",
+  "updatedAt:desc": "recently updated",
+};
+
+function orderingLabel(ordering: Ordering): string {
+  return ORDERING_PHRASES[ordering] ?? "";
 }
 
 /**
@@ -618,12 +719,14 @@ function ResultLine({
   page,
   totalPages,
   stale,
+  onView,
 }: {
   applied: DirectorySelection;
   total: number;
   page: number;
   totalPages: number;
   stale: boolean;
+  onView: (view: DirectorySelection["view"]) => void;
 }) {
   const noun = total === 1 ? "opportunity" : "opportunities";
   const status = applied.status ? `${opportunityStatusLabel(applied.status).toLowerCase()} ` : "";
@@ -632,6 +735,7 @@ function ResultLine({
   return (
     <div className="result-line">
       <p>
+        Showing{" "}
         <strong>
           {formatCount(total)} {status}
           {noun}
@@ -642,12 +746,32 @@ function ResultLine({
             on <UntrustedText value={applied.ecosystem.trim()} />
           </>
         ) : null}{" "}
-        · page {page} of {totalPages}
+        · {orderingLabel(applied.ordering)}
+        {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
         {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
+
+      <fieldset className="segmented">
+        <legend className="visually-hidden">Result view</legend>
+        <button
+          type="button"
+          aria-pressed={applied.view === "table"}
+          onClick={() => onView("table")}
+        >
+          Table
+        </button>
+        <button
+          type="button"
+          aria-pressed={applied.view === "cards"}
+          onClick={() => onView("cards")}
+        >
+          Cards
+        </button>
+      </fieldset>
+
       {narrowed ? (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>
-          Include closed and upcoming
+          Show closed and upcoming too
         </Link>
       ) : applied.status === "" ? (
         <Link href={selectionToHref({ ...applied, status: DEFAULT_SELECTION.status, page: 1 })}>
@@ -674,39 +798,65 @@ function ResultLine({
  * The summary is the sentence the publisher wrote to answer exactly that question. The id is still
  * a click away, in mono, on the listing's own page — where somebody who wants it is looking.
  */
-export function DirectoryRow({ item }: { item: OpportunitySummary }) {
+export function DirectoryRow({
+  item,
+  showStatus = true,
+}: {
+  item: OpportunitySummary;
+  showStatus?: boolean;
+}) {
   const operator = item.operatingOrganizations[0];
   const typeLabel = fundingTypeLabel(item.fundingType);
+  const award = cardAward(item);
+  const next = nextFixedDeadline(item.deadlines);
+  const soon = next?.date ? Date.parse(next.date) - Date.now() < 7 * 86_400_000 : false;
   return (
     <tr>
+      <td className="directory-type" data-label="Type">
+        <span className="type-chip" title={typeLabel}>
+          <DecorativeIcon icon={FUNDING_TYPE_ICONS[item.fundingType]} />
+          {typeLabel}
+        </span>
+      </td>
       <th scope="row">
-        <div className="opportunity-cell">
-          <span className="opportunity-type-icon" title={typeLabel} aria-hidden="true">
-            <DecorativeIcon icon={FUNDING_TYPE_ICONS[item.fundingType]} />
-          </span>
-          <div className="opportunity-cell-copy">
-            <Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">
-              <UntrustedText value={item.title} />
-            </Link>
-            {item.summary?.trim() ? (
-              <div className="row-summary">
-                <UntrustedText value={item.summary} />
-              </div>
-            ) : null}
-          </div>
+        <div className="opportunity-cell-copy">
+          <Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">
+            <UntrustedText value={item.title} />
+          </Link>
+          {item.summary?.trim() ? (
+            <div className="row-summary">
+              <UntrustedText value={item.summary} />
+            </div>
+          ) : null}
         </div>
       </th>
       <td className="muted directory-organization" data-label="Organization">
-        <UntrustedText value={operator?.name} />
+        {operator ? (
+          <span className="directory-org">
+            <OrgMark
+              slug={operator.slug}
+              name={operator.name}
+              verified={false}
+              className="org-mark-small"
+            />
+            <UntrustedText value={operator.name} />
+          </span>
+        ) : null}
       </td>
-      <td className="directory-type" data-label="Type">
-        {typeLabel}
+      <td className="numeric directory-award" data-label="Award">
+        {award ? <UntrustedText value={award} /> : <span className="muted">—</span>}
       </td>
-      <td className="directory-status" data-label="Status">
-        <StatusBadge status={item.status} />
-      </td>
-      <td className="numeric directory-deadline" data-label="Deadline">
+      {showStatus ? (
+        <td className="directory-status" data-label="Status">
+          <StatusBadge status={item.status} />
+        </td>
+      ) : null}
+      <td
+        className={`numeric directory-deadline${soon ? " is-soon" : ""}${next ? "" : " is-rolling"}`}
+        data-label="Closes"
+      >
         {describeDirectoryDeadline(item.deadlines)}
+        {soon && next?.date ? ` · ${daysUntil(next.date)}` : ""}
       </td>
     </tr>
   );

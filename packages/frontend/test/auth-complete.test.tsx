@@ -172,7 +172,7 @@ describe("when the handoff cannot reach the API", () => {
     fireEvent.click(again);
     expect(openSignIn).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("link", { name: "Back to the directory" }).getAttribute("href")).toBe(
-      "/",
+      "/directory",
     );
   });
 

@@ -6,7 +6,15 @@ import { generateMetadata as opportunityMetadata } from "@/app/opportunities/[id
 import { generateMetadata as organizationMetadata } from "@/app/organizations/[slug]/layout";
 import { metadata as organizationsMetadata } from "@/app/organizations/layout";
 import { NOINDEX_ROBOTS, NOINDEX_ROUTE_PREFIXES } from "@/lib/noindex-routes";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The opportunity layout's `generateMetadata` builds the share-card image URL from the request's
+// own origin (`lib/site-origin.ts`), so it needs a `Host` header even outside a real request.
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue({
+    get: (key: string) => (key === "host" ? "rfphub.example" : null),
+  }),
+}));
 
 const appRoot = join(process.cwd(), "src", "app");
 
@@ -28,6 +36,7 @@ function pageRoutes(directory = appRoot): string[] {
  */
 const PUBLIC_ROUTES = [
   "/",
+  "/directory",
   "/how-it-works",
   "/opportunities/[id]",
   "/privacy",
@@ -73,7 +82,7 @@ describe("route metadata", () => {
     const source =
       readFileSync(join(appRoot, "layout.tsx"), "utf8") +
       readFileSync(join(process.cwd(), "src", "lib", "root-metadata.ts"), "utf8");
-    expect(source).toContain('default: "Directory | RFP Hub"');
+    expect(source).toContain('default: "RFP Hub — an open index of Ethereum funding"');
     expect(source).toContain('template: "%s | RFP Hub"');
   });
 
@@ -84,6 +93,7 @@ describe("route metadata", () => {
       "/admin",
       "/auth/complete",
       "/dashboard",
+      "/directory",
       "/duplicates",
       "/how-it-works",
       "/keys",
@@ -107,7 +117,7 @@ describe("route metadata", () => {
       expect(source, `${route} needs server-owned metadata`).toMatch(
         /export (?:const metadata|async function generateMetadata)/,
       );
-      expect(source).not.toContain('title: "Directory | RFP Hub"');
+      expect(source).not.toContain('title: "RFP Hub — an open index of Ethereum funding"');
     }
   });
 
@@ -119,7 +129,22 @@ describe("route metadata", () => {
     });
     await expect(
       opportunityMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
-    ).resolves.toEqual({ title: "acme:round-4" });
+    ).resolves.toEqual({
+      title: "acme:round-4",
+      openGraph: {
+        images: [
+          {
+            url: "https://rfphub.example/opportunities/acme%3Around-4/card.png",
+            width: 1200,
+            height: 630,
+          },
+        ],
+      },
+      twitter: {
+        card: "summary_large_image",
+        images: ["https://rfphub.example/opportunities/acme%3Around-4/card.png"],
+      },
+    });
     await expect(
       organizationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
     ).resolves.toEqual({ title: "Organization acme-foundation" });

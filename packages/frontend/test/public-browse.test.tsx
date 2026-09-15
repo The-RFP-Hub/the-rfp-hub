@@ -202,8 +202,15 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     await screen.findByText("Acme Foundation");
-    expect(list).toHaveBeenCalledTimes(1);
-    expect(list.mock.calls[0]?.[0]).toEqual({
+    // Two reads: the page being shown, and the open set behind the type pills' counts. Both carry
+    // only declared parameters; the counts read is pinned separately below.
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls.map((call) => call[0])).toContainEqual({
+      status: "open",
+      page: 1,
+      limit: 100,
+    });
+    expect(list.mock.calls.map((call) => call[0])).toContainEqual({
       q: undefined,
       fundingType: undefined,
       // THE DEFAULT NARROWS, and it goes on the wire as a real filter rather than being applied in
@@ -226,7 +233,7 @@ describe("the public directory list", () => {
     // objection to a hidden default, and the reason this assertion exists next to the one above.
     const status = screen.getByLabelText("Status") as HTMLSelectElement;
     expect(status.value).toBe("open");
-    expect(screen.getByRole("link", { name: "Include closed and upcoming" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Show closed and upcoming too" })).toBeTruthy();
   });
 
   it("pairs filter icons with text labels instead of replacing their accessible names", async () => {
@@ -267,9 +274,9 @@ describe("the public directory list", () => {
     // The operating organization — entry 0, the party that runs the intake.
     expect(screen.getByText("Acme Foundation")).toBeTruthy();
 
-    // Status is its own column now, as a word. Scoped to the badge, because "open" is also an
-    // option in the Status control — which is exactly the point of that control being visible.
-    expect(screen.getAllByText("Open", { selector: ".badge" })).toHaveLength(2);
+    // The list opens narrowed to open listings, so a Status column would say "Open" on every row;
+    // it appears only once the reader widens the status filter (pinned in the closed-status test).
+    expect(screen.queryAllByText("Open", { selector: ".badge" })).toHaveLength(0);
 
     // The next FIXED deadline, derived from the array, not the last entry in it.
     expect(screen.getByText("Sep 30, 2099")).toBeTruthy();
@@ -278,7 +285,7 @@ describe("the public directory list", () => {
 
     // The count line names the narrowing it is describing.
     expect(screen.getByText(/2 open opportunities/)).toBeTruthy();
-    expect(screen.getByText(/page 1 of 1/)).toBeTruthy();
+    expect(screen.queryByText(/page 1 of 1/)).toBeNull();
   });
 
   it("adds the matching opportunity-type icon without replacing the written type", async () => {
@@ -287,9 +294,9 @@ describe("the public directory list", () => {
 
     await screen.findByText("Acme Foundation");
     for (const type of ["Grant", "Bounty"]) {
-      const icon = container.querySelector(`.opportunity-type-icon[title="${type}"]`);
-      expect(icon?.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
-      expect(screen.getByText(type, { selector: "td" })).toBeTruthy();
+      const chip = container.querySelector(`.type-chip[title="${type}"]`);
+      expect(chip?.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+      expect(chip?.textContent).toBe(type);
     }
   });
 
@@ -300,6 +307,7 @@ describe("the public directory list", () => {
       total: 1,
     };
     const { client } = stub({ list: async () => closed });
+    navigation.params = new URLSearchParams("status=any");
     const { container } = mount(client, <DirectoryList />);
 
     const badge = await screen.findByText("Closed", { selector: ".badge" });
@@ -325,7 +333,11 @@ describe("the public directory list", () => {
     await screen.findByText(HOSTILE_TITLE);
     // No element was created from it, and the source shows why: the angle brackets are escaped, so
     // the browser parsed a string rather than a tag with an event handler on it.
-    expect(container.querySelector("img")).toBeNull();
+    // The only images on the page are this origin's own: the organization mark and the share
+    // card, both served from `/`. Nothing a publisher wrote becomes an element or a fetch.
+    for (const img of container.querySelectorAll("img")) {
+      expect(img.getAttribute("src")?.startsWith("/")).toBe(true);
+    }
     expect(container.querySelector("script")).toBeNull();
     expect(container.innerHTML).toContain("&lt;img src=x");
   });
@@ -428,7 +440,7 @@ describe("the public directory list", () => {
     expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
     // "Clear the filters" would also throw away the search that produced the result.
     const back = screen.getByRole("link", { name: "Back to page 1" });
-    expect(back.getAttribute("href")).toBe("/?q=zk");
+    expect(back.getAttribute("href")).toBe("/directory?q=zk");
   });
 
   it("shows the API's own failure rather than an empty table", async () => {
@@ -537,7 +549,9 @@ describe("the directory's filters", () => {
     const activeDisclosure = screen.getByText("More filters").closest("details");
     expect(activeDisclosure?.open).toBe(true);
     expect(screen.getByText("2 set")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe(
+      "/directory",
+    );
   });
 
   it("keeps related advanced controls in named groups with one explanation per range", async () => {
@@ -607,6 +621,41 @@ describe("the directory's filters", () => {
     expect(applied.get("q")).toBe("zk proofs");
     expect(applied.get("ecosystem")).toBe("Optimism");
     expect(applied.get("type")).toBe("grant");
+  });
+
+  it("renders cards instead of the table when ?view=cards is in the address bar", async () => {
+    navigation.params = new URLSearchParams("view=cards");
+    const { client } = stub();
+    const { container } = mount(client, <DirectoryList />);
+
+    await screen.findByText("Acme Foundation");
+    expect(container.querySelectorAll("a.opportunity-card").length).toBe(page.items.length);
+    expect(container.querySelector("table.directory-table")).toBeNull();
+  });
+
+  it("keeps the table by default, and the toggle switches the URL to the other view", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect(screen.getByRole("table")).toBeTruthy();
+    const cardsButton = screen.getByRole("button", { name: "Cards" });
+    const tableButton = screen.getByRole("button", { name: "Table" });
+    expect(tableButton.getAttribute("aria-pressed")).toBe("true");
+    expect(cardsButton.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(cardsButton);
+    expect(navigation.push).toHaveBeenCalledWith("/directory?view=cards");
+  });
+
+  it("switching views does not reset the page or count as a filter change", async () => {
+    navigation.params = new URLSearchParams("page=3");
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cards" }));
+    expect(navigation.push).toHaveBeenCalledWith("/directory?page=3&view=cards");
   });
 
   it("returns to page 1 when a filter changes, because page 4 is not page 4 of a new result", async () => {
@@ -774,8 +823,8 @@ describe("the directory's filters", () => {
 
     // A link, not a button: it can be middle-clicked, bookmarked and sent to somebody, and the
     // back button out of it works for free.
-    const toggle = screen.getByRole("link", { name: "Include closed and upcoming" });
-    expect(toggle.getAttribute("href")).toBe("/?status=any");
+    const toggle = screen.getByRole("link", { name: "Show closed and upcoming too" });
+    expect(toggle.getAttribute("href")).toBe("/directory?status=any");
   });
 
   it("follows the address bar when it changes underneath — the back button", async () => {
@@ -871,6 +920,16 @@ describe("the public opportunity page", () => {
     await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`));
   });
 
+  it("links Share card to this listing's card.png", async () => {
+    const { client } = stub();
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    const shareCard = await screen.findByRole("link", { name: "Share card" });
+    expect(shareCard.getAttribute("href")).toBe("/opportunities/acme%3Around-4/card.png");
+    expect(shareCard.getAttribute("target")).toBe("_blank");
+    expect(shareCard.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   it("renders the record's public fields", async () => {
     const { client } = stub();
     mount(client, <PublicOpportunity id="acme:round-4" />);
@@ -895,9 +954,10 @@ describe("the public opportunity page", () => {
     expect(screen.getByText("5,000–50,000 USD per award")).toBeTruthy();
     expect(screen.getByText("120,000 USD")).toBeTruthy();
 
-    // Operating and sponsoring organizations, kept apart. The operator is named twice — in the
-    // identity line and under "Runs this opportunity" — and the sponsor only in its own column.
-    expect(screen.getAllByText("Acme Foundation")).toHaveLength(2);
+    // Operating and sponsoring organizations, kept apart. The operator is named three times — in
+    // the breadcrumb, the identity line and under "Runs this opportunity" — and the sponsor only
+    // in its own column.
+    expect(screen.getAllByText("Acme Foundation")).toHaveLength(3);
     expect(screen.getByText("Beta Collective")).toBeTruthy();
 
     // The milestone sequence, denominated in the document-wide currency.
@@ -1016,7 +1076,7 @@ describe("the public opportunity page", () => {
 
     // NAMED FOR WHERE IT GOES. The action this page exists for is leaving it, and the label says
     // whose site the reader lands on before they click rather than after.
-    const apply = await screen.findByRole("link", { name: /Apply on the program’s own site/ });
+    const apply = await screen.findByRole("link", { name: /Apply on .*’s site/ });
     expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
     expect(apply.getAttribute("target")).toBe("_blank");
     expect(apply.getAttribute("rel")).toBe("noopener noreferrer");
@@ -1058,7 +1118,11 @@ describe("the public opportunity page", () => {
     const { container } = mount(client, <PublicOpportunity id="acme:round-4" />);
 
     await screen.findByText(HOSTILE_TITLE);
-    expect(container.querySelector("img")).toBeNull();
+    // The only images on the page are this origin's own: the organization mark and the share
+    // card, both served from `/`. Nothing a publisher wrote becomes an element or a fetch.
+    for (const img of container.querySelectorAll("img")) {
+      expect(img.getAttribute("src")?.startsWith("/")).toBe(true);
+    }
     expect(container.querySelector("script")).toBeNull();
     expect(container.innerHTML).toContain("&lt;img src=x");
   });

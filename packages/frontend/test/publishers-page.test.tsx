@@ -104,10 +104,26 @@ describe("the public publishers page", () => {
     mount(c);
 
     await screen.findByText(HOSTILE);
-    expect(document.querySelectorAll("img")).toHaveLength(0);
+    // A verified card's mark does render an <img> now, but it is always the proxy path — the
+    // publisher's raw logoUrl host never appears as a src, only as the "linked, not embedded" href.
+    for (const img of document.querySelectorAll("img")) {
+      const src = img.getAttribute("src") ?? "";
+      expect(src.startsWith("/logos/")).toBe(true);
+      expect(src).not.toContain(filecoin.logoUrl ?? "\0");
+    }
     expect(screen.getByText("linked, not embedded").closest("a")?.getAttribute("href")).toBe(
       filecoin.logoUrl,
     );
+  });
+
+  it("renders a verified publisher's mark through the /logos proxy, never the raw logoUrl", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    await screen.findByText(HOSTILE);
+    const card = document.querySelector('[data-publisher-slug="filecoin"]');
+    const img = card?.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(`/logos/${encodeURIComponent(filecoin.slug)}`);
   });
 
   it("links the http(s) website, and shows the unsafe one as inert text", async () => {
@@ -135,8 +151,8 @@ describe("the public publishers page", () => {
     await screen.findByText(HOSTILE);
     const links = screen.getAllByRole("link", { name: "View this publisher’s listings" });
     const hrefs = links.map((link) => link.getAttribute("href"));
-    expect(hrefs).toContain("/?organization=filecoin");
-    expect(hrefs).toContain("/?organization=beta");
+    expect(hrefs).toContain("/directory?organization=filecoin");
+    expect(hrefs).toContain("/directory?organization=beta");
   });
 
   it("says on the page what that filtered directory link will match", async () => {

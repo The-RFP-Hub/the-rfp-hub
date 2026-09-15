@@ -41,7 +41,7 @@ export default function PublicOpportunityPage() {
           <button type="button" onClick={() => router.back()}>
             <IconLabel icon={ArrowLeftIcon}>Back to your search</IconLabel>
           </button>
-          <Link href="/">All opportunities</Link>
+          <Link href="/directory">All opportunities</Link>
         </p>
       )}
       <PublicOpportunity id={id} />
