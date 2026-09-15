@@ -387,7 +387,7 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
 }
 
 /** The path plus querystring for a selection — what `router.replace` and a shared link both want. */
-export function selectionToHref(selection: DirectorySelection, path = "/"): string {
+export function selectionToHref(selection: DirectorySelection, path = "/directory"): string {
   const query = selectionToParams(selection).toString();
   return query ? `${path}?${query}` : path;
 }

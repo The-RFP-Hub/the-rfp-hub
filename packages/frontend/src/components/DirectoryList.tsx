@@ -50,6 +50,7 @@ import {
   truncateForDisplay,
 } from "@/lib/directory";
 import { describeDirectoryDeadline, formatCount } from "@/lib/format";
+import { cardAward } from "@/lib/landing";
 import { HOW_IT_WORKS } from "@/lib/links";
 import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
@@ -178,7 +179,7 @@ export function DirectoryList() {
                 type="search"
                 value={draft.q}
                 onChange={(event) => setDraft({ ...draft, q: event.target.value })}
-                placeholder="storage, zk, retrieval…"
+                placeholder="Search by topic, org or city…"
               />
             </div>
 
@@ -517,6 +518,9 @@ export function DirectoryList() {
                           <th scope="col">Opportunity</th>
                           <th scope="col">Organization</th>
                           <th scope="col">Type</th>
+                          <th scope="col" className="numeric">
+                            Award
+                          </th>
                           <th scope="col">Status</th>
                           <th scope="col" className="numeric">
                             Deadline
@@ -641,13 +645,13 @@ function ResultLine({
             {" "}
             on <UntrustedText value={applied.ecosystem.trim()} />
           </>
-        ) : null}{" "}
-        · page {page} of {totalPages}
+        ) : null}
+        {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
         {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
       {narrowed ? (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>
-          Include closed and upcoming
+          Show closed and upcoming too
         </Link>
       ) : applied.status === "" ? (
         <Link href={selectionToHref({ ...applied, status: DEFAULT_SELECTION.status, page: 1 })}>
@@ -677,6 +681,7 @@ function ResultLine({
 export function DirectoryRow({ item }: { item: OpportunitySummary }) {
   const operator = item.operatingOrganizations[0];
   const typeLabel = fundingTypeLabel(item.fundingType);
+  const award = cardAward(item);
   return (
     <tr>
       <th scope="row">
@@ -701,6 +706,9 @@ export function DirectoryRow({ item }: { item: OpportunitySummary }) {
       </td>
       <td className="directory-type" data-label="Type">
         {typeLabel}
+      </td>
+      <td className="numeric directory-award" data-label="Award">
+        {award ? <UntrustedText value={award} /> : <span className="muted">—</span>}
       </td>
       <td className="directory-status" data-label="Status">
         <StatusBadge status={item.status} />

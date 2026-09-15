@@ -158,39 +158,82 @@ const BANDS: { label: string; actions: Action[] }[] = [
 export default function HowItWorksPage() {
   return (
     <section>
-      <h1>How the Hub works</h1>
+      <h1>Who is funding what on Ethereum, and where to apply</h1>
       <p className="lede">
-        The RFP Hub is an open index of funding opportunities. It <strong>republishes</strong> what
-        programs state, under one open standard, and links every reader out to the program&rsquo;s
-        own application page. It takes no applications, holds no money, and decides nobody&rsquo;s
-        funding.
+        RFP Hub lists grants, hackathons, bounties and RFPs from any organization building on
+        Ethereum, under one open standard. It does not rank programs, take applications or decide
+        who gets funded. It points you at the programs that are open.
       </p>
 
-      <section id="publish" className="card card-strong">
-        <h2>Publish your first opportunity</h2>
-        <ol>
-          <li>
-            <Link href="/dashboard">Sign in.</Link> The first sign-in creates the account — there is
-            no separate signup.
-          </li>
-          <li>
-            <Link href="/listings/new">Submit the opportunity.</Link> It waits for a Hub reviewer
-            unless your organization is already verified.
-          </li>
-          <li>
-            <Link href="/organizations">
-              Get your organization verified — optional, and it is what removes the wait.
-            </Link>{" "}
-            A reviewer grants membership and verification. After that, your listings publish the
-            moment you submit them.
-          </li>
-        </ol>
-        <p className="muted footnote">
-          Already listed by somebody else? <Link href="/">Open it in the directory</Link> and claim
-          it — a reviewer decides who owns it.
-        </p>
-      </section>
+      <div className="acts">
+        <section className="act" aria-labelledby="act-what">
+          <p className="act-eyebrow">What it is</p>
+          <h2 id="act-what">A public index, not a portal</h2>
+          <p>
+            Every listing points back to the program&rsquo;s own site. The data is open: exported
+            nightly as JSON and CSV under CC0, and readable through the API.
+          </p>
+          <p>
+            Any organization can be listed. A verified organization manages its own listings
+            directly. Nobody here decides anybody&rsquo;s funding.
+          </p>
+        </section>
+        <section className="act" aria-labelledby="act-build">
+          <p className="act-eyebrow">If you&rsquo;re building</p>
+          <h2 id="act-build">Search, read, apply there</h2>
+          <ol className="act-flow">
+            <li>
+              <strong>Search</strong>
+              <small>by topic, organization, city, type or award</small>
+            </li>
+            <li>
+              <strong>Read the listing</strong>
+              <small>award, deadline, eligibility, references</small>
+            </li>
+            <li className="is-exit">
+              <strong>Apply on the program&rsquo;s site</strong>
+              <small>this is where RFP Hub hands off</small>
+            </li>
+          </ol>
+          <p className="act-after">
+            No account needed. <Link href="/directory">Open the directory</Link>.
+          </p>
+        </section>
+        <section className="act" id="publish" aria-labelledby="act-publish">
+          <p className="act-eyebrow">If you run a program</p>
+          <h2 id="act-publish">Log in, submit, publish</h2>
+          <ol className="act-flow">
+            <li>
+              <strong>
+                <Link href="/dashboard">Log in</Link>
+              </strong>
+              <small>the first sign-in creates the account</small>
+            </li>
+            <li>
+              <strong>
+                <Link href="/listings/new">Submit a listing</Link>
+              </strong>
+              <small>reviewed against the public criteria unless you are verified</small>
+            </li>
+            <li className="is-exit">
+              <strong>
+                <Link href="/organizations">Get verified</Link>
+              </strong>
+              <small>then your organization publishes the moment it submits</small>
+            </li>
+          </ol>
+          <p className="act-after">
+            Already listed by somebody else? <Link href="/directory">Open it in the directory</Link>{" "}
+            and claim it. A reviewer decides who owns it.
+          </p>
+        </section>
+      </div>
 
+      <h2 id="rules">Read the rules</h2>
+      <p className="prose muted">
+        The full spec: the words this site uses, five roles and what each may do, what verification
+        means, and how decisions get made.
+      </p>
       <SectionNav
         label="On this page"
         items={[
@@ -412,7 +455,7 @@ export default function HowItWorksPage() {
         <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
           The source, on GitHub
         </a>
-        <Link href="/">Back to the directory</Link>
+        <Link href="/directory">Back to the directory</Link>
       </p>
 
       {/* A named region, so "the four governance links are in this section" is a checkable claim

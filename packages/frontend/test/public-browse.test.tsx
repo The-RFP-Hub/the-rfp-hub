@@ -226,7 +226,7 @@ describe("the public directory list", () => {
     // objection to a hidden default, and the reason this assertion exists next to the one above.
     const status = screen.getByLabelText("Status") as HTMLSelectElement;
     expect(status.value).toBe("open");
-    expect(screen.getByRole("link", { name: "Include closed and upcoming" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Show closed and upcoming too" })).toBeTruthy();
   });
 
   it("pairs filter icons with text labels instead of replacing their accessible names", async () => {
@@ -278,7 +278,7 @@ describe("the public directory list", () => {
 
     // The count line names the narrowing it is describing.
     expect(screen.getByText(/2 open opportunities/)).toBeTruthy();
-    expect(screen.getByText(/page 1 of 1/)).toBeTruthy();
+    expect(screen.queryByText(/page 1 of 1/)).toBeNull();
   });
 
   it("adds the matching opportunity-type icon without replacing the written type", async () => {
@@ -428,7 +428,7 @@ describe("the public directory list", () => {
     expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
     // "Clear the filters" would also throw away the search that produced the result.
     const back = screen.getByRole("link", { name: "Back to page 1" });
-    expect(back.getAttribute("href")).toBe("/?q=zk");
+    expect(back.getAttribute("href")).toBe("/directory?q=zk");
   });
 
   it("shows the API's own failure rather than an empty table", async () => {
@@ -537,7 +537,9 @@ describe("the directory's filters", () => {
     const activeDisclosure = screen.getByText("More filters").closest("details");
     expect(activeDisclosure?.open).toBe(true);
     expect(screen.getByText("2 set")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe(
+      "/directory",
+    );
   });
 
   it("keeps related advanced controls in named groups with one explanation per range", async () => {
@@ -774,8 +776,8 @@ describe("the directory's filters", () => {
 
     // A link, not a button: it can be middle-clicked, bookmarked and sent to somebody, and the
     // back button out of it works for free.
-    const toggle = screen.getByRole("link", { name: "Include closed and upcoming" });
-    expect(toggle.getAttribute("href")).toBe("/?status=any");
+    const toggle = screen.getByRole("link", { name: "Show closed and upcoming too" });
+    expect(toggle.getAttribute("href")).toBe("/directory?status=any");
   });
 
   it("follows the address bar when it changes underneath — the back button", async () => {

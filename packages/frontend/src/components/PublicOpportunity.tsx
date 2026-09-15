@@ -30,6 +30,7 @@ import {
   describeDeadlineEntry,
   formatAmount,
   formatInstant,
+  hasRollingDeadline,
 } from "@/lib/format";
 import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
@@ -128,31 +129,49 @@ export function OpportunityView({
       <h1>
         <UntrustedText value={entry.title} />
       </h1>
-      <p className="muted">
-        {fundingTypeLabel(entry.fundingType)} · <StatusBadge status={entry.status} />
+      <p className="opportunity-meta muted">
+        <span className="type-chip">{fundingTypeLabel(entry.fundingType)}</span>
+        <StatusBadge status={entry.status} />
         {operator ? (
-          <>
-            {" "}
-            · run by <UntrustedText value={operator.name} />
-          </>
+          <span>
+            run by <UntrustedText value={operator.name} />
+          </span>
         ) : null}
       </p>
+      {(entry.ecosystems ?? []).length > 0 ? (
+        <ul className="plain chip-list" aria-label="Ecosystems">
+          {(entry.ecosystems ?? []).map((ecosystem) => (
+            <li key={ecosystem} className="chip">
+              <UntrustedText value={ecosystem} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-      {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
-
-      <ApplyAction entry={entry} baseUrl={baseUrl} />
-
-      {claimControl}
-
-      <dl className="grid-2 card">
+      {/* The three facts an applicant decides on, before any prose: award, next date, and how
+          the program takes applications. */}
+      <dl className="facts-strip">
+        <div>
+          <dt>Award</dt>
+          <dd>
+            {award ? <UntrustedText value={award} /> : <span className="muted">not stated</span>}
+          </dd>
+        </div>
         <div>
           <dt>Next deadline</dt>
           <dd>{describeDeadline(entry.deadlines)}</dd>
         </div>
         <div>
-          <dt>Award</dt>
-          <dd>{award ? <UntrustedText value={award} /> : <span className="muted">—</span>}</dd>
+          <dt>Applications</dt>
+          <dd>{hasRollingDeadline(entry.deadlines) ? "Rolling" : "Fixed dates"}</dd>
         </div>
+      </dl>
+
+      {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
+
+      <ApplyAction entry={entry} baseUrl={baseUrl} />
+
+      <dl className="grid-2 card">
         <div>
           <dt>Applications open</dt>
           <dd>{formatInstant(entry.opensAt)}</dd>
@@ -186,6 +205,10 @@ export function OpportunityView({
       <Organizations entry={entry} />
       <Tags entry={entry} />
       <Links entry={entry} />
+
+      {/* Claiming is a publisher's action on a page written for applicants, so it sits after the
+          listing rather than between the title and the apply button. */}
+      {claimControl}
 
       {/*
        * NAMED FOR WHO IT IS FOR. This block is raw JSON in a page otherwise written for applicants,
@@ -320,11 +343,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           ) : null}
           <ShareLink />
         </p>
-        <p className="muted footnote">
-          The Hub does not take applications and never sees yours — you land on the program&rsquo;s
-          own page. The hop goes through the Hub so the publisher can see their listing was acted
-          on.
-        </p>
+        <p className="muted footnote">Applying takes you to the program&rsquo;s own site.</p>
       </div>
     );
   }

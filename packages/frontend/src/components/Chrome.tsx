@@ -27,6 +27,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { BUILT_BY, FUNDED_BY } from "@/lib/credits";
 import {
+  DIRECTORY,
   HOW_IT_WORKS,
   HOW_IT_WORKS_ROLES,
   PUBLISHERS,
@@ -90,7 +91,7 @@ function badgeText(count: number): string {
 
 /** Readable to everybody, session or not. */
 const PUBLIC_NAV: NavItem[] = [
-  { href: "/", label: "Directory", icon: ListBulletIcon },
+  { href: DIRECTORY, label: "Directory", icon: ListBulletIcon },
   { href: PUBLISHERS, label: "Publishers", icon: CheckBadgeIcon },
   { href: HOW_IT_WORKS, label: "How it works", icon: BookOpenIcon },
 ];

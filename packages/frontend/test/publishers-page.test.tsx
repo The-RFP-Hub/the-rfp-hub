@@ -135,8 +135,8 @@ describe("the public publishers page", () => {
     await screen.findByText(HOSTILE);
     const links = screen.getAllByRole("link", { name: "View this publisher’s listings" });
     const hrefs = links.map((link) => link.getAttribute("href"));
-    expect(hrefs).toContain("/?organization=filecoin");
-    expect(hrefs).toContain("/?organization=beta");
+    expect(hrefs).toContain("/directory?organization=filecoin");
+    expect(hrefs).toContain("/directory?organization=beta");
   });
 
   it("says on the page what that filtered directory link will match", async () => {

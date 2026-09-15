@@ -262,7 +262,7 @@ describe("ErrorState", () => {
 
     expect(screen.getByText(/We couldn’t find this listing/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Search the directory" }).getAttribute("href")).toBe(
-      "/",
+      "/directory",
     );
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
@@ -437,6 +437,7 @@ describe("the accent never carries state", () => {
       '.section-nav a[aria-current="page"]',
       ".shell-footer a",
       "tbody tr:hover",
+      ".landing-tile:hover,\n.landing-tile:focus-visible",
     ];
     const normalise = (selector: string) => selector.replace(/\s+/g, " ").trim();
     const allowlist = new Set(allowed.map(normalise));
