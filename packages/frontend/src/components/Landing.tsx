@@ -20,7 +20,7 @@ import { formatCount } from "@/lib/format";
 import { type LandingSummary, TILE_TYPES, compactUsd, summarizeLanding } from "@/lib/landing";
 import { DIRECTORY, HOW_IT_WORKS } from "@/lib/links";
 import { loadOpenSet } from "@/lib/open-set";
-import { fundingTypeLabel } from "@/lib/presentation";
+import { fundingTypePlural } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { FundingType } from "@/lib/types";
@@ -98,9 +98,7 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
           </Link>
           <Link className="landing-path landing-path-publish" href={publishHref}>
             <span className="landing-path-title">I publish a program →</span>
-            <span className="landing-path-note">
-              Log in, submit a listing, and a verified organization publishes instantly
-            </span>
+            <span className="landing-path-note">Log in and submit a listing</span>
           </Link>
         </div>
 
@@ -131,30 +129,25 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
 
       <dl className="landing-tally" aria-label="The index at a glance">
         <TallyRow value={summary ? formatCount(summary.open) : "—"} unit="open opportunities">
-          across grants, hackathons, bounties and RFPs
+          grants, hackathons, bounties, RFPs
         </TallyRow>
         <TallyRow
           value={summary ? compactUsd(summary.awardsUsd) : "—"}
           unit="in maximum awards listed"
         >
           {summary
-            ? `summed from the ${formatCount(summary.awardsCounted)} listings that state a USD amount`
-            : "summed from listings that state a USD amount"}
+            ? `USD ceilings of ${formatCount(summary.awardsCounted)} listings`
+            : "USD ceilings only"}
         </TallyRow>
         <TallyRow value={summary ? formatCount(summary.organizations) : "—"} unit="organizations">
-          running at least one open program
+          with an open program
         </TallyRow>
         <TallyRow
           value={summary ? formatCount(summary.closingSoonTotal) : "—"}
           unit="closing in the next 30 days"
           hot
         >
-          {summary && summary.closingSoon.length > 0
-            ? summary.closingSoon
-                .slice(0, 4)
-                .map((item) => item.title)
-                .join(", ")
-            : "Only fixed deadlines. Rolling programs stay open."}
+          fixed deadlines only
         </TallyRow>
       </dl>
     </section>
@@ -229,7 +222,7 @@ function TypeTiles({ summary }: { summary: LandingSummary }) {
             >
               <span className="landing-tile-count">{formatCount(summary.byType[type] ?? 0)}</span>
               <span className="landing-tile-label">
-                {type === "rfp" ? "RFPs" : `${fundingTypeLabel(type)}s`}
+                {fundingTypePlural(type)}
                 <span className="landing-tile-note">{TILE_COPY[type]}</span>
               </span>
             </Link>

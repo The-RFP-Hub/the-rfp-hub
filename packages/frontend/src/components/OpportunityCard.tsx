@@ -2,9 +2,9 @@
 
 import { OrgMark } from "@/components/OrgMark";
 import { UntrustedText } from "@/components/UntrustedText";
-import { formatDate, nextFixedDeadline } from "@/lib/format";
+import { formatShortDate, nextFixedDeadline } from "@/lib/format";
 import { cardAward, daysUntil } from "@/lib/landing";
-import { fundingTypeLabel } from "@/lib/presentation";
+import { fundingTypeChipLabel } from "@/lib/presentation";
 import type { OpportunitySummary } from "@/lib/types";
 import Link from "next/link";
 
@@ -27,12 +27,12 @@ export function OpportunityCard({ item, large }: { item: OpportunitySummary; lar
     >
       <span className="opportunity-card-top">
         <span className="type-chip" data-type={item.fundingType}>
-          {fundingTypeLabel(item.fundingType)}
+          {fundingTypeChipLabel(item.fundingType)}
         </span>
         <span className={`opportunity-card-deadline${soon ? " is-soon" : ""}`}>
           {next?.date ? (
             <>
-              {formatDate(next.date)}
+              {formatShortDate(next.date)}
               {soon ? ` · ${daysUntil(next.date)}` : ""}
             </>
           ) : (

@@ -31,6 +31,17 @@ export function formatInstant(value: string | null | undefined): string {
 }
 
 /** An RFC 3339 instant as a plain, human-readable UTC calendar date. */
+/** "Sep 23", or "Sep 23, 2027" when the year is not the current one. For cards and rows. */
+export function formatShortDate(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const day = `${MONTHS[parsed.getUTCMonth()]} ${parsed.getUTCDate()}`;
+  return parsed.getUTCFullYear() === now.getUTCFullYear()
+    ? day
+    : `${day}, ${parsed.getUTCFullYear()}`;
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
   const parsed = new Date(value);

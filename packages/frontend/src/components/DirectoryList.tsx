@@ -55,7 +55,12 @@ import { describeDirectoryDeadline, formatCount, nextFixedDeadline } from "@/lib
 import { cardAward, daysUntil } from "@/lib/landing";
 import { HOW_IT_WORKS } from "@/lib/links";
 import { countByType, loadOpenSet } from "@/lib/open-set";
-import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
+import {
+  fundingTypeChipLabel,
+  fundingTypeLabel,
+  fundingTypePlural,
+  opportunityStatusLabel,
+} from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { FundingType, OpportunitySummary } from "@/lib/types";
@@ -602,15 +607,8 @@ export function DirectoryList() {
 /** The four types a first-time reader thinks in, then everything else behind the select. */
 const PILL_TYPES: readonly FundingType[] = ["grant", "hackathon", "bounty", "rfp"];
 
-const PILL_LABELS: Readonly<Record<string, string>> = {
-  grant: "Grants",
-  hackathon: "Hackathons",
-  bounty: "Bounties",
-  rfp: "RFPs",
-};
-
 function pillLabel(type: FundingType): string {
-  return PILL_LABELS[type] ?? fundingTypeLabel(type);
+  return fundingTypePlural(type);
 }
 
 function TypePills({
@@ -815,7 +813,7 @@ export function DirectoryRow({
       <td className="directory-type" data-label="Type">
         <span className="type-chip" title={typeLabel}>
           <DecorativeIcon icon={FUNDING_TYPE_ICONS[item.fundingType]} />
-          {typeLabel}
+          {fundingTypeChipLabel(item.fundingType)}
         </span>
       </td>
       <th scope="row">
