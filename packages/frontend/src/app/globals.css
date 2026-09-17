@@ -2397,6 +2397,10 @@ pre.untrusted-block {
   margin: 0 0 var(--space-2);
 }
 
+.landing-position a {
+  color: inherit;
+}
+
 .landing-hero h1 {
   font-size: var(--text-hero);
   letter-spacing: -0.03em;
@@ -3258,13 +3262,4 @@ pre.untrusted-block {
 
 .rule > h2 + * {
   margin-top: 0;
-}
-
-.hiw-quote {
-  font-family: var(--font-display), sans-serif;
-  font-weight: 800;
-  font-size: var(--text-h2);
-  letter-spacing: -0.02em;
-  max-width: 24ch;
-  margin: var(--space-12) 0 var(--space-6);
 }

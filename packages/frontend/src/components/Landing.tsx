@@ -15,6 +15,7 @@
  */
 import { OpportunityCard } from "@/components/OpportunityCard";
 import { ResourceView } from "@/components/states";
+import { FUNDED_BY } from "@/lib/credits";
 import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
 import { formatCount } from "@/lib/format";
 import { type LandingSummary, TILE_TYPES, compactUsd, summarizeLanding } from "@/lib/landing";
@@ -79,7 +80,12 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
   return (
     <section className="landing-hero" aria-labelledby="landing-heading">
       <div className="landing-hero-copy">
-        <p className="landing-position">An open index. Not an application portal.</p>
+        <p className="landing-position">
+          Funded by the{" "}
+          <a href={FUNDED_BY.href} target="_blank" rel="noopener noreferrer">
+            {FUNDED_BY.name}
+          </a>
+        </p>
         <h1 id="landing-heading">
           Find what&rsquo;s open on Ethereum: grants, hackathons, bounties, RFPs.
         </h1>

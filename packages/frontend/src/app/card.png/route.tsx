@@ -14,7 +14,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
 
-const POSITIONING = "An open index. Not an application portal.";
+const CREDIT = "Funded by the Ethereum Foundation Ecosystem Support Program";
 
 export async function GET() {
   const config = readConfig({ apiUrl: process.env.NEXT_PUBLIC_API_URL });
@@ -103,7 +103,7 @@ export async function GET() {
           <div
             style={{ display: "flex", fontFamily: "Libre Franklin", fontWeight: 800, color: PAPER }}
           >
-            {POSITIONING}
+            {CREDIT}
           </div>
           <div style={{ display: "flex", marginTop: 8 }}>{host}</div>
         </div>

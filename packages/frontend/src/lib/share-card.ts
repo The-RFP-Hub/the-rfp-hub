@@ -38,7 +38,7 @@ export interface ShareCardModel {
   positioning: string;
 }
 
-const POSITIONING = "An open index. Not an application portal.";
+const CREDIT = "Funded by the Ethereum Foundation Ecosystem Support Program";
 
 /**
  * The card's content for one listing, at the given site origin.
@@ -80,6 +80,6 @@ export function shareCardModel(entry: Opportunity, origin: string): ShareCardMod
     url: `${origin}/opportunities/${encodeURIComponent(entry.id)}`,
     // The id keeps its colon on the card: a person reads this line, nothing parses it.
     displayUrl: `${origin.replace(/^https?:\/\//, "")}/opportunities/${entry.id}`,
-    positioning: POSITIONING,
+    positioning: CREDIT,
   };
 }

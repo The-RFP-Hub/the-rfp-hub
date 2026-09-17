@@ -511,8 +511,6 @@ export default function HowItWorksPage() {
           </p>
         </section>
       </details>
-
-      <p className="hiw-quote">An open index. Not an application portal.</p>
     </section>
   );
 }

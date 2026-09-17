@@ -52,7 +52,7 @@ describe("shareCardModel", () => {
     expect(model.award).toBe("$5k to $50k");
     expect(model.deadline).toBe("Sep 30, 2099");
     expect(model.url).toBe("https://ethrfps.app/opportunities/acme%3Around-4");
-    expect(model.positioning).toBe("An open index. Not an application portal.");
+    expect(model.positioning).toBe("Funded by the Ethereum Foundation Ecosystem Support Program");
   });
 
   it("truncates a long title to 120 characters with an ellipsis", () => {
