@@ -156,8 +156,7 @@ export function OpportunityView({
             <h1>
               <UntrustedText value={entry.title} />
             </h1>
-            {/* One line, one voice: type, who runs it, where. The only badge on the page is the
-                status, and only when it is not the one a reader assumes. */}
+            {/* One line, one voice: type, who runs it, where, and the status as the one badge. */}
             <p className="opportunity-meta muted">
               <span>
                 {typeLabel}
@@ -174,7 +173,7 @@ export function OpportunityView({
                   </>
                 ) : null}
               </span>
-              {entry.status !== "open" ? <StatusBadge status={entry.status} /> : null}
+              <StatusBadge status={entry.status} />
             </p>
           </div>
         </div>

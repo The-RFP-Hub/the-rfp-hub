@@ -892,9 +892,7 @@ describe("the public opportunity page", () => {
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
     // The identity line keeps applicant-facing facts only. The join key remains available inside
     // the developer disclosure rather than competing with status and operator here.
-    // An open listing carries no status badge: open is what a reader assumes. Closed and
-    // upcoming listings get the one badge on the page.
-    expect(screen.queryByText("Open", { selector: ".badge" })).toBeNull();
+    expect(screen.getByText("Open", { selector: ".badge" }).className).toContain("badge-open");
     const listingId = screen.getByText("acme:round-4", { selector: "code" });
     expect(listingId.closest("details")?.textContent).toContain(
       "Machine-readable details (for developers)",
