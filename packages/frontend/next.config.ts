@@ -109,6 +109,8 @@ const nextConfig: NextConfig = {
   // The share-card renderer reads two font files from disk at request time; tracing cannot see a
   // path built at runtime, so they are named here for the standalone and serverless bundles alike.
   outputFileTracingIncludes: {
+    "/card.png": ["./src/assets/fonts/*.ttf"],
+    "/card.png/route": ["./src/assets/fonts/*.ttf"],
     "/opportunities/[id]/card.png": ["./src/assets/fonts/*.ttf"],
     "/opportunities/[id]/card.png/route": ["./src/assets/fonts/*.ttf"],
   },

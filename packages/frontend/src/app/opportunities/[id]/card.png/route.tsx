@@ -16,56 +16,13 @@
  * with `fonttools varLib.instancer`) keeps every byte on this origin — the file ships in the
  * function bundle, not on the wire to a stranger's DNS.
  */
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ApiError, createApiClient } from "@/lib/api";
+import { INK, PAPER, SECONDARY, loadCardFonts } from "@/lib/card-fonts";
 import { shareCardModel } from "@/lib/share-card";
 import { requestOrigin } from "@/lib/site-origin";
 import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
-
-const INK = "#1a1917";
-const PAPER = "#fcfcfa";
-const SECONDARY = "#a8a29e";
-
-let fontsPromise: Promise<{ display: ArrayBuffer; body: ArrayBuffer }> | null = null;
-
-/**
- * Read from disk, once per server process, from wherever the build put the package: the traced
- * standalone server `chdir`s into the package directory, a serverless bundle keeps the monorepo
- * path under its task root. `outputFileTracingIncludes` in `next.config.ts` is what guarantees
- * the two files are in either bundle at all — a bundled-URL `fetch` resolved to a `/_next/static`
- * path that a traced server cannot serve to itself.
- */
-const FONT_DIRS = [
-  join(process.cwd(), "src", "assets", "fonts"),
-  join(process.cwd(), "packages", "frontend", "src", "assets", "fonts"),
-];
-
-async function readFont(name: string): Promise<ArrayBuffer> {
-  let lastError: unknown;
-  for (const dir of FONT_DIRS) {
-    try {
-      const bytes = await readFile(join(dir, name));
-      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
-}
-
-function loadFonts() {
-  fontsPromise ??= Promise.all([
-    readFont("LibreFranklin-800.ttf"),
-    readFont("PublicSans-400.ttf"),
-  ]).then(([display, body]) => ({ display, body }));
-  fontsPromise.catch(() => {
-    fontsPromise = null;
-  });
-  return fontsPromise;
-}
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -86,7 +43,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
   const origin = (await requestOrigin()) ?? new URL(apiUrl).origin;
   const model = shareCardModel(entry, origin);
-  const { display, body } = await loadFonts();
+  const { display, body } = await loadCardFonts();
 
   return new ImageResponse(
     <div
@@ -125,32 +82,21 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", gap: 96 }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 22, color: SECONDARY }}>Award</div>
-            <div
-              style={{
-                marginTop: 8,
-                fontFamily: "Libre Franklin",
-                fontWeight: 800,
-                fontSize: 44,
-              }}
-            >
-              {model.award}
+          {model.figures.map((figure) => (
+            <div key={figure.label} style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 22, color: SECONDARY }}>{figure.label}</div>
+              <div
+                style={{
+                  marginTop: 8,
+                  fontFamily: "Libre Franklin",
+                  fontWeight: 800,
+                  fontSize: 44,
+                }}
+              >
+                {figure.value}
+              </div>
             </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 22, color: SECONDARY }}>Next deadline</div>
-            <div
-              style={{
-                marginTop: 8,
-                fontFamily: "Libre Franklin",
-                fontWeight: 800,
-                fontSize: 44,
-              }}
-            >
-              {model.deadline}
-            </div>
-          </div>
+          ))}
         </div>
         <div
           style={{
@@ -179,9 +125,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         { name: "Libre Franklin", data: display, weight: 800, style: "normal" },
         { name: "Public Sans", data: body, weight: 400, style: "normal" },
       ],
-      headers: {
-        "Cache-Control": "public, max-age=3600, s-maxage=86400",
-      },
+      headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
     },
   );
 }

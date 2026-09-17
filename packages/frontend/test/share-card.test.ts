@@ -88,13 +88,14 @@ describe("shareCardModel", () => {
     );
 
     expect(model.eyebrow).toBe("Grant");
-    expect(model.award).toBe("Award not stated");
+    expect(model.award).toBeNull();
     expect(model.deadline).toBe("Rolling");
+    expect(model.figures.map((f) => f.label)).toEqual(["Status", "Applications"]);
   });
 
-  it("shows an em dash when there is no deadline at all", () => {
+  it("says so when there is no deadline at all", () => {
     const model = shareCardModel({ ...base, deadlines: [] }, "https://ethrfps.app");
-    expect(model.deadline).toBe("—");
+    expect(model.deadline).toBe("No deadline");
   });
 
   it("hides the ecosystems line when the listing states none", () => {

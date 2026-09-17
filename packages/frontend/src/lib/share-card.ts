@@ -10,7 +10,7 @@
 import { formatDate } from "./format";
 import { nextFixedDeadline } from "./format";
 import { cardAward } from "./landing";
-import { fundingTypeLabel } from "./presentation";
+import { fundingTypeLabel, opportunityStatusLabel } from "./presentation";
 import type { Opportunity } from "./types";
 
 const TITLE_LIMIT = 120;
@@ -28,8 +28,10 @@ export interface ShareCardModel {
   eyebrow: string;
   title: string;
   ecosystems: string;
-  award: string;
+  award: string | null;
   deadline: string;
+  /** The two big figures, chosen from what the listing actually states. */
+  figures: { label: string; value: string }[];
   url: string;
   /** The same address without its scheme, which is how it reads on a slide. */
   displayUrl: string;
@@ -56,16 +58,28 @@ export function shareCardModel(entry: Opportunity, origin: string): ShareCardMod
     ? formatDate(next.date)
     : (entry.deadlines ?? []).some((d) => d?.deadlineType === "rolling")
       ? "Rolling"
-      : "—";
+      : "No deadline";
+  const award = cardAward(entry);
+  const figures = award
+    ? [
+        { label: "Award", value: award },
+        { label: "Next deadline", value: deadline },
+      ]
+    : [
+        { label: "Status", value: opportunityStatusLabel(entry.status) },
+        { label: "Applications", value: deadline },
+      ];
 
   return {
     eyebrow,
     title: truncate(entry.title, TITLE_LIMIT),
     ecosystems,
-    award: cardAward(entry) ?? "Award not stated",
+    award,
     deadline,
+    figures,
     url: `${origin}/opportunities/${encodeURIComponent(entry.id)}`,
-    displayUrl: `${origin.replace(/^https?:\/\//, "")}/opportunities/${encodeURIComponent(entry.id)}`,
+    // The id keeps its colon on the card: a person reads this line, nothing parses it.
+    displayUrl: `${origin.replace(/^https?:\/\//, "")}/opportunities/${entry.id}`,
     positioning: POSITIONING,
   };
 }
