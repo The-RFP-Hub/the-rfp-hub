@@ -32,7 +32,7 @@ export default function PublishersPage() {
     <section>
       <h1>Publishers</h1>
       <p className="lede">
-        Every organization currently running an open listing. A <strong>verified</strong>{" "}
+        Organizations with at least one open listing right now. A <strong>verified</strong>{" "}
         organization publishes straight to its own namespace, no second review. A{" "}
         <strong>listed</strong> one was indexed from public sources and hasn&rsquo;t claimed its
         listings yet.
