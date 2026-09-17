@@ -170,7 +170,7 @@ export default function HowItWorksPage() {
       <div className="acts">
         <section className="act" aria-labelledby="act-what">
           <p className="act-eyebrow">What it is</p>
-          <h2 id="act-what">A public index, not a portal</h2>
+          <h2 id="act-what">A public index. Programs run their own intake.</h2>
           <p>
             Every listing points back to the program&rsquo;s own site. The data is open: exported
             nightly as JSON and CSV under CC0, and readable through the API.
@@ -253,7 +253,7 @@ export default function HowItWorksPage() {
         <dl className="grid-2">
           <div>
             <dt>Opportunity</dt>
-            <dd>The thing in the world — a grant round, a hackathon, a bounty, an RFP.</dd>
+            <dd>The thing in the world: a grant round, a hackathon, a bounty, an RFP.</dd>
           </div>
           <div>
             <dt>Listing</dt>
@@ -269,8 +269,8 @@ export default function HowItWorksPage() {
           <div>
             <dt>Namespace</dt>
             <dd>
-              The part of an id before the colon — <code>acme:round-4</code> is in <code>acme</code>
-              . It names the organization a listing is published under.
+              The part of an id before the colon. In <code>acme:round-4</code>, that is{" "}
+              <code>acme</code>. It names the organization a listing is published under.
             </dd>
           </div>
         </dl>
@@ -291,7 +291,7 @@ export default function HowItWorksPage() {
             <dt>Submitter</dt>
             <dd>
               Any signed-in account. Submits opportunities and edits its own. Everything it files
-              waits for a decision — including a listing about a program you run — and{" "}
+              waits for a decision, even a listing about a program you run, and{" "}
               <strong>five</strong> can be waiting at a time.
             </dd>
           </div>
@@ -300,8 +300,8 @@ export default function HowItWorksPage() {
             <dd>
               An account a reviewer has attached to an organization. Sees everything filed in that
               organization&rsquo;s name, published or not. If the organization is{" "}
-              <strong>verified</strong>, its members publish into its namespace instantly and decide
-              — approve or reject — what anybody else files there.
+              <strong>verified</strong>, its members publish into its namespace instantly. They also
+              approve or reject what anybody else files there.
             </dd>
           </div>
           <div>
@@ -329,8 +329,8 @@ export default function HowItWorksPage() {
         </h2>
         <p className="footnote muted prose">
           A dot is an unqualified yes. A phrase is a real limit, and the limits are the interesting
-          part. Every row describes what the <strong>API</strong> enforces — this page is a
-          description of that, never a second permission system.
+          part. Every row describes what the <strong>API</strong> enforces. This page only describes
+          that.
         </p>
 
         <div className="table-scroll">
@@ -412,17 +412,17 @@ export default function HowItWorksPage() {
           Why it works this way
         </h2>
         <p className="prose">
-          A verified organization decides what publishes in its own namespace — approving or
-          rejecting whatever anybody files there. Everything past its own namespace stays with Hub
+          A verified organization decides what publishes in its own namespace. It approves or
+          rejects whatever anybody files there. Everything past its own namespace stays with Hub
           staff.
         </p>
         <details>
           <summary>Why an organization decides in its own namespace</summary>
           <p className="prose">
-            A verified organization decides what publishes in its own namespace. Somebody outside
-            the organization files a listing about your program; a member approves it — the
-            organization saying <em>yes, this is ours and it is right</em> — or rejects it. Nobody
-            is better placed to know.
+            A verified organization decides what publishes in its own namespace. Say somebody
+            outside the organization files a listing about your program. A member approves it, the
+            organization saying <em>yes, this is ours and it is right</em>, or rejects it. Nobody is
+            better placed to know.
           </p>
           <p className="prose">
             <strong>Decisions in your organization&rsquo;s name carry your name.</strong> A
@@ -449,8 +449,8 @@ export default function HowItWorksPage() {
           <summary>Why five submissions at a time</summary>
           <p className="prose">
             An account with no verified membership can hold <strong>five</strong> submissions
-            awaiting a decision. A slot frees as soon as one is decided — by a Hub reviewer, or by
-            the organization the listing names.
+            awaiting a decision. A slot frees as soon as one is decided, either by a Hub reviewer or
+            by the organization the listing names.
           </p>
           <p className="muted prose">
             It keeps the queue honest. A queue anybody can fill without limit is a queue where the

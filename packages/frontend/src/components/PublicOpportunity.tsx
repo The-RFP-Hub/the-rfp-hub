@@ -423,7 +423,7 @@ function ShareLink() {
       await navigator.clipboard.writeText(window.location.href);
       setNote("Link copied");
     } catch {
-      setNote("Could not copy — use the address bar");
+      setNote("Could not copy. Use the address bar.");
     }
   };
 

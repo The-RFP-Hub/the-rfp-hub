@@ -13,9 +13,7 @@ export default function NotFound() {
   return (
     <section className="state empty">
       <h1 className="empty-title">There is nothing at this address.</h1>
-      <p className="muted">
-        The link may be old, or the page may have moved when the directory got its own address.
-      </p>
+      <p className="muted">The link may be old, or the page may have moved.</p>
       <p className="row">
         <Link className="button-primary" href={DIRECTORY}>
           Open the directory

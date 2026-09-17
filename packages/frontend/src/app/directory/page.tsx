@@ -68,8 +68,7 @@ function PublisherInvitation() {
       <p className="footnote">
         Submit your programs and keep them current here. Signing in creates your account the first
         time. To publish without review, you also need to be a verified member of your organization,
-        which a reviewer grants. <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole
-        of it.
+        which a reviewer grants. Full rules: <Link href={HOW_IT_WORKS}>Who can do what</Link>.
       </p>
       {/*
        * The governance link belongs on the page, not only in the global footer: what a listing is

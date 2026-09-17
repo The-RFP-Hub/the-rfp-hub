@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s | RFP Hub",
     },
     description:
-      "An open index of funding opportunities under one standard. Read it without an account. Publishers can sign in to submit and maintain listings, check their traffic, and run their review queues.",
+      "An open index of funding opportunities under one standard. Read it without an account. Publishers sign in to manage their own listings.",
     robots: { index: canonical, follow: canonical },
   };
 }
