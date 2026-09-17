@@ -731,7 +731,7 @@ function ResultLine({
           </>
         ) : null}{" "}
         · {orderingLabel(applied.ordering)}
-        {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
+        {totalPages > 1 && page <= totalPages ? ` · page ${page} of ${totalPages}` : ""}
         {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
 

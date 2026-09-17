@@ -123,6 +123,12 @@ const nextConfig: NextConfig = {
   // ESM `dist`. They are pure (JSON Schema + ajv, no Node built-ins), so they bundle for the
   // browser; this tells Next to transpile them rather than treat them as opaque externals.
   transpilePackages: ["rfphub-validate", "@the-rfp-hub/standard"],
+  async redirects() {
+    return [
+      { source: "/organisations", destination: "/organizations", permanent: true },
+      { source: "/organisations/:path*", destination: "/organizations/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

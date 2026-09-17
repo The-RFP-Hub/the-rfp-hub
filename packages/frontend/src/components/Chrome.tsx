@@ -554,7 +554,7 @@ export function RequireSession({
   if (!session.authenticated) {
     return (
       <div className="state empty">
-        <p className="empty-title">{gate?.title ?? "You are not signed in."}</p>
+        <h1 className="empty-title">{gate?.title ?? "You are not signed in."}</h1>
         <p className="muted">
           {gate?.detail ??
             "This page shows one account’s own listings and traffic, so it needs a session."}
@@ -586,7 +586,7 @@ export function RequireSession({
   if (capability && !capability.needs(me)) {
     return (
       <div className="state empty">
-        <p className="empty-title">{capability.title}</p>
+        <h1 className="empty-title">{capability.title}</h1>
         <p className="muted">{capability.detail}</p>
         <p className="row">
           <GuardedLink href="/account">Check your account</GuardedLink>
