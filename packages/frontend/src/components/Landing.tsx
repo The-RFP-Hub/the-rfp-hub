@@ -32,7 +32,7 @@ const TILE_COPY: Readonly<Record<FundingType, string>> = {
   grant: "Rolling and dated programs",
   hackathon: "In person and online",
   bounty: "Security, paid by severity",
-  rfp: "They know what they want",
+  rfp: "Fixed scope, named budget",
   accelerator: "",
   vc_fund: "",
 };
