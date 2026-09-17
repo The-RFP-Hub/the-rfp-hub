@@ -183,6 +183,12 @@ export function OpportunityView({
             <dt>Award</dt>
             <dd>
               {award ? <UntrustedText value={award} /> : <span className="muted">not stated</span>}
+              {funding?.allocated ? (
+                <small className="facts-note">
+                  <UntrustedText value={formatAmount(funding.allocated, funding.currency)} />{" "}
+                  committed so far
+                </small>
+              ) : null}
             </dd>
           </div>
           <div>
@@ -197,27 +203,6 @@ export function OpportunityView({
 
         {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
 
-        <dl className="grid-2 card">
-          <div>
-            <dt>Applications open</dt>
-            <dd>{formatInstant(entry.opensAt)}</dd>
-          </div>
-          <div>
-            <dt>Announced</dt>
-            <dd>{formatInstant(entry.postedAt)}</dd>
-          </div>
-          <div>
-            <dt>Committed to date</dt>
-            <dd>
-              <UntrustedText value={formatAmount(funding?.allocated, funding?.currency)} />
-            </dd>
-          </div>
-          <div>
-            <dt>Last updated here</dt>
-            <dd>{formatInstant(entry.updatedAt)}</dd>
-          </div>
-        </dl>
-
         <h2>About this opportunity</h2>
         <UntrustedBlock value={entry.description} />
 
@@ -231,27 +216,6 @@ export function OpportunityView({
         <Organizations entry={entry} />
         <Tags entry={entry} />
         <Links entry={entry} />
-
-        <section aria-labelledby="share-heading">
-          <h2 id="share-heading">Share card</h2>
-          <p className="muted footnote">
-            Title, organization, award and deadline as one image, for a group chat or a slide.
-          </p>
-          <a
-            href={`/opportunities/${encodeURIComponent(entry.id)}/card.png`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <img
-              className="share-card-preview"
-              src={`/opportunities/${encodeURIComponent(entry.id)}/card.png`}
-              width={1200}
-              height={630}
-              alt={`Share card for ${entry.title}`}
-              loading="lazy"
-            />
-          </a>
-        </section>
 
         {/*
          * NAMED FOR WHO IT IS FOR. This block is raw JSON in a page otherwise written for applicants,
@@ -397,7 +361,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
               <IconLabel icon={GlobeAltIcon}>Program site</IconLabel>
             </a>
           ) : null}
-          <ShareLink id={entry.id} />
+          <ShareLink />
         </p>
       </div>
     );
@@ -430,7 +394,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             No site was stated either. Everything the listing does carry is below.
           </span>
         )}
-        <ShareLink id={entry.id} />
+        <ShareLink />
       </p>
     </div>
   );
@@ -444,7 +408,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
  * reports what happened rather than assuming: `navigator.clipboard` needs a secure context and a
  * permission, and a control that silently does nothing is worse than one that says it could not.
  */
-function ShareLink({ id }: { id: string }) {
+function ShareLink() {
   const [note, setNote] = useState<string | null>(null);
 
   const copy = async () => {
@@ -461,14 +425,6 @@ function ShareLink({ id }: { id: string }) {
       <button type="button" onClick={() => void copy()}>
         <IconLabel icon={LinkIcon}>Copy link</IconLabel>
       </button>
-      <a
-        className="row-action-link"
-        href={`/opportunities/${encodeURIComponent(id)}/card.png`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Share card
-      </a>
       {note ? (
         <output className="muted" aria-live="polite">
           {note}

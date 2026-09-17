@@ -1,7 +1,6 @@
 "use client";
 
 import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
-import { OpportunityCard } from "@/components/OpportunityCard";
 /**
  * The public directory: every PUBLISHED opportunity, as a visitor with no account reads it.
  *
@@ -528,50 +527,39 @@ export function DirectoryList() {
                 page={list.page}
                 totalPages={list.totalPages}
                 stale={state.status === "ready" && state.stale}
-                onView={(view) => commit({ view, page: applied.page })}
               />
 
               {list.items.length === 0 ? (
                 <EmptyResult applied={applied} page={list.page} />
               ) : (
                 <>
-                  {applied.view === "cards" ? (
-                    <ul className="plain directory-cards">
-                      {list.items.map((item) => (
-                        <li key={item.id}>
-                          <OpportunityCard item={item} />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="table-scroll directory-table-scroll">
-                      <table className="directory-table">
-                        <thead>
-                          <tr>
-                            <th scope="col">Type</th>
-                            <th scope="col">Opportunity</th>
-                            <th scope="col">Organization</th>
-                            <th scope="col" className="numeric">
-                              Award
-                            </th>
-                            {applied.status === "open" ? null : <th scope="col">Status</th>}
-                            <th scope="col" className="numeric">
-                              Closes
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {list.items.map((item) => (
-                            <DirectoryRow
-                              key={item.id}
-                              item={item}
-                              showStatus={applied.status !== "open"}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  <div className="table-scroll directory-table-scroll">
+                    <table className="directory-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Type</th>
+                          <th scope="col">Opportunity</th>
+                          <th scope="col">Organization</th>
+                          <th scope="col" className="numeric">
+                            Award
+                          </th>
+                          {applied.status === "open" ? null : <th scope="col">Status</th>}
+                          <th scope="col" className="numeric">
+                            Closes
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {list.items.map((item) => (
+                          <DirectoryRow
+                            key={item.id}
+                            item={item}
+                            showStatus={applied.status !== "open"}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   <nav className="pagination" aria-label="Directory pages">
                     <button
@@ -717,14 +705,12 @@ function ResultLine({
   page,
   totalPages,
   stale,
-  onView,
 }: {
   applied: DirectorySelection;
   total: number;
   page: number;
   totalPages: number;
   stale: boolean;
-  onView: (view: DirectorySelection["view"]) => void;
 }) {
   const noun = total === 1 ? "opportunity" : "opportunities";
   const status = applied.status ? `${opportunityStatusLabel(applied.status).toLowerCase()} ` : "";
@@ -748,24 +734,6 @@ function ResultLine({
         {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
         {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
-
-      <fieldset className="segmented">
-        <legend className="visually-hidden">Result view</legend>
-        <button
-          type="button"
-          aria-pressed={applied.view === "table"}
-          onClick={() => onView("table")}
-        >
-          Table
-        </button>
-        <button
-          type="button"
-          aria-pressed={applied.view === "cards"}
-          onClick={() => onView("cards")}
-        >
-          Cards
-        </button>
-      </fieldset>
 
       {narrowed ? (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>

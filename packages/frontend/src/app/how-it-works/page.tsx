@@ -1,3 +1,4 @@
+import { OpenRuleOnHash } from "@/components/OpenRuleOnHash";
 /**
  * HOW THE HUB WORKS, ordered as a lookup surface and readable as a short essay.
  *
@@ -157,6 +158,7 @@ const BANDS: { label: string; actions: Action[] }[] = [
 export default function HowItWorksPage() {
   return (
     <section className="hiw">
+      <OpenRuleOnHash />
       <p className="eyebrow">How it works</p>
       <h1>Who&rsquo;s funding what on Ethereum, and where to apply.</h1>
       <p className="lede">

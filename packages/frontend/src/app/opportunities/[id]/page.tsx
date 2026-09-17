@@ -1,6 +1,5 @@
 "use client";
 
-import { IconLabel } from "@/components/IconLabel";
 /**
  * The public detail page for one published opportunity.
  *
@@ -17,13 +16,10 @@ import { IconLabel } from "@/components/IconLabel";
  */
 import { PublicOpportunity } from "@/components/PublicOpportunity";
 import { ReturnLink, useHasReturnLink } from "@/components/ReturnLink";
-import { ArrowLeftIcon } from "@heroicons/react/20/solid";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 export default function PublicOpportunityPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const id = decodeURIComponent(String(params.id ?? ""));
   /*
    * A NAMED ORIGIN WINS OVER THE GENERIC PAIR. Arriving from a review surface, the reader was told
@@ -34,16 +30,7 @@ export default function PublicOpportunityPage() {
 
   return (
     <>
-      {fromElsewhere ? (
-        <ReturnLink />
-      ) : (
-        <p className="row muted">
-          <button type="button" onClick={() => router.back()}>
-            <IconLabel icon={ArrowLeftIcon}>Back to your search</IconLabel>
-          </button>
-          <Link href="/directory">All opportunities</Link>
-        </p>
-      )}
+      {fromElsewhere ? <ReturnLink /> : null}
       <PublicOpportunity id={id} />
     </>
   );

@@ -623,41 +623,6 @@ describe("the directory's filters", () => {
     expect(applied.get("type")).toBe("grant");
   });
 
-  it("renders cards instead of the table when ?view=cards is in the address bar", async () => {
-    navigation.params = new URLSearchParams("view=cards");
-    const { client } = stub();
-    const { container } = mount(client, <DirectoryList />);
-
-    await screen.findByText("Acme Foundation");
-    expect(container.querySelectorAll("a.opportunity-card").length).toBe(page.items.length);
-    expect(container.querySelector("table.directory-table")).toBeNull();
-  });
-
-  it("keeps the table by default, and the toggle switches the URL to the other view", async () => {
-    const { client } = stub();
-    mount(client, <DirectoryList />);
-    await screen.findByText("Acme Foundation");
-
-    expect(screen.getByRole("table")).toBeTruthy();
-    const cardsButton = screen.getByRole("button", { name: "Cards" });
-    const tableButton = screen.getByRole("button", { name: "Table" });
-    expect(tableButton.getAttribute("aria-pressed")).toBe("true");
-    expect(cardsButton.getAttribute("aria-pressed")).toBe("false");
-
-    fireEvent.click(cardsButton);
-    expect(navigation.push).toHaveBeenCalledWith("/directory?view=cards");
-  });
-
-  it("switching views does not reset the page or count as a filter change", async () => {
-    navigation.params = new URLSearchParams("page=3");
-    const { client } = stub();
-    mount(client, <DirectoryList />);
-    await screen.findByText("Acme Foundation");
-
-    fireEvent.click(screen.getByRole("button", { name: "Cards" }));
-    expect(navigation.push).toHaveBeenCalledWith("/directory?page=3&view=cards");
-  });
-
   it("returns to page 1 when a filter changes, because page 4 is not page 4 of a new result", async () => {
     navigation.params = new URLSearchParams("page=4");
     const { client } = stub();
@@ -918,16 +883,6 @@ describe("the public opportunity page", () => {
     await screen.findByText(HOSTILE_TITLE);
     expect(find).toHaveBeenCalledWith("acme:round-4");
     await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`));
-  });
-
-  it("links Share card to this listing's card.png", async () => {
-    const { client } = stub();
-    mount(client, <PublicOpportunity id="acme:round-4" />);
-
-    const shareCard = await screen.findByRole("link", { name: "Share card" });
-    expect(shareCard.getAttribute("href")).toBe("/opportunities/acme%3Around-4/card.png");
-    expect(shareCard.getAttribute("target")).toBe("_blank");
-    expect(shareCard.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
   it("renders the record's public fields", async () => {
