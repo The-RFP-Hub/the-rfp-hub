@@ -281,8 +281,8 @@ export function OpportunityView({
           <h2 id="provenance-heading">Where this listing came from</h2>
           <p className="muted footnote">
             The Hub republishes what a publisher or a submitter stated. The check below is a{" "}
-            <strong>low-bar anti-spam signal</strong> — the linked page exists and its title is
-            about the same program — and never a fact-check of the amounts or the dates.
+            <strong>low-bar anti-spam signal</strong>: it only confirms the linked page exists and
+            its title matches the program. It never fact-checks the amounts or the dates.
           </p>
           <p>
             <MatchBadge matched={source.verifiedAgainstSource ?? null} />{" "}
@@ -409,9 +409,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
         <strong>This listing states no application link.</strong>
       </p>
       <p className="muted footnote">
-        That is what the publisher filed, not something missing from this page. Applications for
-        this program are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
-        says — start from the program&rsquo;s own site.
+        The publisher filed it this way. Start from the program&rsquo;s own site.
       </p>
       <p className="row">
         {entry.website ? (

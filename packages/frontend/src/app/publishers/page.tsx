@@ -32,9 +32,10 @@ export default function PublishersPage() {
     <section>
       <h1>Publishers</h1>
       <p className="lede">
-        Every organization with an open listing on the index. A <strong>verified</strong> one
-        publishes to its own namespace without a second review; a <strong>listed</strong> one was
-        indexed from public sources and has not claimed its listings yet.
+        Every organization currently running an open listing. A <strong>verified</strong>{" "}
+        organization publishes straight to its own namespace, no second review. A{" "}
+        <strong>listed</strong> one was indexed from public sources and hasn&rsquo;t claimed its
+        listings yet.
       </p>
 
       <ResourceView resource={state} what="the verified publishers" onRetry={reload}>
@@ -42,7 +43,7 @@ export default function PublishersPage() {
           data.items.length === 0 ? (
             <EmptyState
               title="No organization is verified yet."
-              detail="Every listing here still publishes — verification only removes the review wait for an organization's own future submissions."
+              detail="Every listing here still publishes. Verification just skips the review wait for an organization's own future submissions."
               action={
                 <>
                   <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">

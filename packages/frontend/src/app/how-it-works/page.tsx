@@ -161,8 +161,8 @@ export default function HowItWorksPage() {
       <h1>Who&rsquo;s funding what on Ethereum, and where to apply.</h1>
       <p className="lede">
         RFP Hub lists grants, hackathons, bounties and RFPs from any organization building on
-        Ethereum. We don&rsquo;t rank programs, review applications or decide who gets funded. We
-        point you to the ones that are open.
+        Ethereum. We don&rsquo;t review applications or pick winners. We just point you to
+        what&rsquo;s open.
       </p>
 
       <div className="acts">

@@ -9,11 +9,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const canonical = await isCanonicalRequest();
   return {
     title: {
-      default: "RFP Hub — an open index of Ethereum funding",
+      default: "RFP Hub: an open index of Ethereum funding",
       template: "%s | RFP Hub",
     },
     description:
-      "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
+      "An open index of funding opportunities under one standard. Read it without an account. Publishers can sign in to submit and maintain listings, check their traffic, and run their review queues.",
     robots: { index: canonical, follow: canonical },
   };
 }

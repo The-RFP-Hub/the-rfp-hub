@@ -120,7 +120,7 @@ describe("the root layout's robots metadata", () => {
 
     const metadata = await generateMetadata();
     expect(metadata.title).toEqual({
-      default: "RFP Hub — an open index of Ethereum funding",
+      default: "RFP Hub: an open index of Ethereum funding",
       template: "%s | RFP Hub",
     });
     expect(typeof metadata.description).toBe("string");

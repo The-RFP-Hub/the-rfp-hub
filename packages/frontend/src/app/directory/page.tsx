@@ -31,7 +31,7 @@ export default function DirectoryPage() {
     <section>
       <h1>Directory</h1>
       <p className="lede">
-        Every open grant, hackathon, bounty and RFP we have indexed. Apply on the program&rsquo;s
+        Grants, hackathons, bounties and RFPs that are open right now. Apply on the program&rsquo;s
         own site.
       </p>
 
@@ -66,10 +66,10 @@ function PublisherInvitation() {
     <section className="card" aria-labelledby="publish-heading">
       <h2 id="publish-heading">Do you run one of these programs?</h2>
       <p className="footnote">
-        Submit your opportunities, keep them current, and see what they get read and applied for.
-        Signing in creates an account the first time; publishing without review additionally
-        requires membership of a verified organization, which a reviewer grants.{" "}
-        <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it.
+        Submit your programs and keep them current here. Signing in creates your account the first
+        time. To publish without review, you also need to be a verified member of your organization,
+        which a reviewer grants. <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole
+        of it.
       </p>
       {/*
        * The governance link belongs on the page, not only in the global footer: what a listing is
@@ -104,9 +104,9 @@ function PublisherInvitation() {
             </button>
           </p>
           <p className="muted footnote">
-            Signing in is a one-time code emailed to you by this service. There is no password to
-            choose or lose and no key to hand over. This browser stores a session so you can manage
-            your account. Permissions are checked when you submit or manage a listing.
+            Signing in is a one-time code we email you, no password to set up. This browser stores a
+            session so you can manage your account. Permissions are checked when you submit or
+            manage a listing.
           </p>
         </>
       )}

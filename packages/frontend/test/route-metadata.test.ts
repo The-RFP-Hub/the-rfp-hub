@@ -82,7 +82,7 @@ describe("route metadata", () => {
     const source =
       readFileSync(join(appRoot, "layout.tsx"), "utf8") +
       readFileSync(join(process.cwd(), "src", "lib", "root-metadata.ts"), "utf8");
-    expect(source).toContain('default: "RFP Hub — an open index of Ethereum funding"');
+    expect(source).toContain('default: "RFP Hub: an open index of Ethereum funding"');
     expect(source).toContain('template: "%s | RFP Hub"');
   });
 
@@ -117,7 +117,7 @@ describe("route metadata", () => {
       expect(source, `${route} needs server-owned metadata`).toMatch(
         /export (?:const metadata|async function generateMetadata)/,
       );
-      expect(source).not.toContain('title: "RFP Hub — an open index of Ethereum funding"');
+      expect(source).not.toContain('title: "RFP Hub: an open index of Ethereum funding"');
     }
   });
 

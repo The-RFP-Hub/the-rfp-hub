@@ -32,7 +32,7 @@ const TILE_COPY: Readonly<Record<FundingType, string>> = {
   grant: "Rolling and dated programs",
   hackathon: "In person and online",
   bounty: "Security, paid by severity",
-  rfp: "A program asking for a specific thing",
+  rfp: "They know what they want",
   accelerator: "",
   vc_fund: "",
 };
@@ -81,10 +81,10 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
       <div className="landing-hero-copy">
         <p className="landing-position">An open index. Not an application portal.</p>
         <h1 id="landing-heading">
-          Every open grant, hackathon, bounty and RFP on Ethereum, in one place.
+          Find what&rsquo;s open on Ethereum: grants, hackathons, bounties, RFPs.
         </h1>
         <p className="lede">
-          Each listing links to the program that runs it. Applications happen there, not here.
+          Every listing links out to the program&rsquo;s own site. You apply there.
         </p>
 
         <div className="landing-paths">
@@ -154,7 +154,7 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
                 .slice(0, 4)
                 .map((item) => item.title)
                 .join(", ")
-            : "fixed deadlines only; rolling programs stay open"}
+            : "Only fixed deadlines. Rolling programs stay open."}
         </TallyRow>
       </dl>
     </section>

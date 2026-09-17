@@ -344,7 +344,7 @@ export function Chrome({ children }: { children: ReactNode }) {
           <BrandMark className="brand-mark" />
           <span className="brand-text">
             RFP Hub
-            <span className="brand-tagline">an open index of funding opportunities</span>
+            <span className="brand-tagline">an open index of Ethereum funding</span>
           </span>
         </GuardedLink>
 
