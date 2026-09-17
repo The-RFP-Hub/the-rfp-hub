@@ -21,7 +21,8 @@ import { PublicClaimControl } from "@/components/ClaimForm";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { IconLabel } from "@/components/IconLabel";
 import { OrgMark } from "@/components/OrgMark";
-import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
+import { UntrustedMarkdown } from "@/components/UntrustedMarkdown";
+import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError, linkOutUrl } from "@/lib/api";
@@ -203,10 +204,10 @@ export function OpportunityView({
           </div>
         </dl>
 
-        {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
+        {entry.summary ? <UntrustedMarkdown value={entry.summary} /> : null}
 
         <h2>About this opportunity</h2>
-        <UntrustedBlock value={entry.description} />
+        <UntrustedMarkdown value={entry.description} />
 
         <Prose title="Who may apply" value={entry.eligibility} />
         <Prose title="What a proposal must contain" value={entry.prerequisites} />
@@ -447,7 +448,7 @@ function Prose({ title, value }: { title: string; value: string | null | undefin
   return (
     <>
       <h2>{title}</h2>
-      <UntrustedBlock value={value} />
+      <UntrustedMarkdown value={value} />
     </>
   );
 }

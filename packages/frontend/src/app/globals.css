@@ -1882,6 +1882,30 @@ tbody:first-of-type .matrix-band th {
   max-width: 70ch;
 }
 
+/* Publisher prose with its markdown rendered: reading measure, list indents, no stray margins. */
+.untrusted-markdown {
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+}
+
+.untrusted-markdown > :first-child {
+  margin-top: 0;
+}
+
+.untrusted-markdown p,
+.untrusted-markdown ul,
+.untrusted-markdown ol {
+  margin: 0 0 var(--space-3);
+}
+
+.untrusted-markdown h3 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.untrusted-markdown li {
+  margin-bottom: var(--space-1);
+}
+
 pre.untrusted-block {
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
   font-size: var(--text-xs);
