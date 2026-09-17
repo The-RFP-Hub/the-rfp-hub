@@ -30,6 +30,7 @@ import {
   describeDeadline,
   describeDeadlineEntry,
   formatAmount,
+  formatDate,
   formatInstant,
   hasRollingDeadline,
 } from "@/lib/format";
@@ -154,25 +155,26 @@ export function OpportunityView({
             <h1>
               <UntrustedText value={entry.title} />
             </h1>
+            {/* One line, one voice: type, who runs it, where. The only badge on the page is the
+                status, and only when it is not the one a reader assumes. */}
             <p className="opportunity-meta muted">
-              <span className="type-chip">{typeLabel}</span>
-              <StatusBadge status={entry.status} />
-              {operator ? (
-                <span>
-                  by <UntrustedText value={operator.name} />
-                </span>
-              ) : null}
-              <span>· {claimed ? "published by its organization" : "listed, not yet claimed"}</span>
+              <span>
+                {typeLabel}
+                {operator ? (
+                  <>
+                    {" "}
+                    by <UntrustedText value={operator.name} />
+                  </>
+                ) : null}
+                {(entry.ecosystems ?? []).length > 0 ? (
+                  <>
+                    {" "}
+                    · <UntrustedText value={(entry.ecosystems ?? []).join(", ")} />
+                  </>
+                ) : null}
+              </span>
+              {entry.status !== "open" ? <StatusBadge status={entry.status} /> : null}
             </p>
-            {(entry.ecosystems ?? []).length > 0 ? (
-              <ul className="plain chip-list" aria-label="Ecosystems">
-                {(entry.ecosystems ?? []).map((ecosystem) => (
-                  <li key={ecosystem} className="chip">
-                    <UntrustedText value={ecosystem} />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
           </div>
         </div>
 
@@ -303,7 +305,10 @@ export function OpportunityView({
       <aside className="opportunity-aside">
         <ApplyAction entry={entry} baseUrl={baseUrl} />
         <p className="muted footnote opportunity-aside-meta">
-          Indexed {formatInstant(entry.postedAt)} · updated {formatInstant(entry.updatedAt)} ·{" "}
+          {claimed
+            ? "Published by its organization"
+            : "Listed from public sources, not yet claimed"}
+          . Indexed {formatDate(entry.postedAt)}, updated {formatDate(entry.updatedAt)} ·{" "}
           <a href={`${baseUrl}/v1/opportunities/${encodeURIComponent(entry.id)}`}>JSON</a>
         </p>
         {/* Claiming is a publisher's action on a page written for applicants: last in the action
@@ -346,7 +351,9 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           rel="noopener noreferrer"
         >
           <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-            {operator ? `Apply on ${operator.name}’s site` : "Apply on the program’s site"}
+            {operator && operator.name.length <= 24
+              ? `Apply on ${operator.name}’s site`
+              : "Apply on the program’s site"}
           </IconLabel>
         </a>
         <p className="muted footnote">Applying takes you to the program&rsquo;s own site.</p>
