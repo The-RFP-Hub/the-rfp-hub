@@ -169,6 +169,7 @@ export class ReviewService {
             buildPublisherVerifiedNotifications(
               await repos.memberships.accountIdsForOrganization(next.id),
               next,
+              now,
             ),
           )
         : [];
@@ -259,7 +260,7 @@ export class ReviewService {
   ): Promise<MembershipResultView> {
     const orgRole = normalizeOrgRole(role);
     try {
-      return await withTransaction(this.db, async (repos) => {
+      const settled = await withTransaction(this.db, async (repos) => {
         const org = await findOrganization(repos, slug);
         const account = await repos.accounts.findById(accountId);
         if (!account) throw notFound(`no account ${accountId}.`);
@@ -268,14 +269,23 @@ export class ReviewService {
         // Without the lock, DELETE can remove the row after this read; the UPDATE then affects
         // zero rows while the endpoint still audits and reports a membership that does not exist.
         const existing = await repos.memberships.lockForAccountAndOrganization(accountId, org.id);
+        let notificationIds: number[] = [];
 
         if (existing) {
           if (existing.role === orgRole) {
-            return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+            return {
+              result: { organizationSlug: org.slug, accountId, role: orgRole, member: true },
+              notificationIds,
+            };
           }
           await repos.memberships.updateRole(existing.id, orgRole);
         } else {
           await repos.memberships.insertRole(accountId, org.id, orgRole);
+          if (org.verified) {
+            notificationIds = await repos.notifications.record(
+              buildPublisherVerifiedNotifications([accountId], org, new Date()),
+            );
+          }
         }
 
         await repos.audit.record({
@@ -289,8 +299,13 @@ export class ReviewService {
             role: { before: existing?.role ?? null, after: orgRole },
           },
         });
-        return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+        return {
+          result: { organizationSlug: org.slug, accountId, role: orgRole, member: true },
+          notificationIds,
+        };
       });
+      this.notificationQueue.enqueue(settled.notificationIds);
+      return settled.result;
     } catch (error) {
       // TWO REVIEWERS, ONE GRANT. The read above and the insert are not one atomic step, so two
       // concurrent grants of the same previously-absent membership can both see no row and both

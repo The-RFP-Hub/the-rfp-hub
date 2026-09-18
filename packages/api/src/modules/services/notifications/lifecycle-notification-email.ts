@@ -15,7 +15,8 @@ export function composeLifecycleNotificationEmail(
   const validSubject =
     (notification.kind === "welcome" && notification.subjectKind === EMAIL_ONLY_SUBJECTS.account) ||
     (notification.kind === "publisher_verified" &&
-      notification.subjectKind === EMAIL_ONLY_SUBJECTS.publisherVerified) ||
+      (notification.subjectKind === EMAIL_ONLY_SUBJECTS.publisherVerified ||
+        notification.subjectKind.startsWith(`${EMAIL_ONLY_SUBJECTS.publisherVerified}:`))) ||
     (notification.kind === "stale_listing_reminder" &&
       notification.subjectKind.startsWith(`${EMAIL_ONLY_SUBJECTS.staleListing}:`));
   if (!validSubject) {

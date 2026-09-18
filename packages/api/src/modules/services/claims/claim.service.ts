@@ -453,6 +453,7 @@ export class ClaimService {
           buildPublisherVerifiedNotifications(
             await repos.memberships.accountIdsForOrganization(found.organization.id),
             found.organization,
+            now,
           ),
         );
         await repos.audit.record({

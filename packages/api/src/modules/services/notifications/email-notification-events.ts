@@ -14,15 +14,21 @@ export function staleReminderEventSubjectKind(organizationId: number, createdAt:
   return `${EMAIL_ONLY_SUBJECTS.staleListing}:${organizationId}:${createdAt.toISOString()}`;
 }
 
+/** One label per verification transition (or member joining), so re-verification is a new event. */
+export function publisherVerifiedEventSubjectKind(organizationId: number, at: Date): string {
+  return `${EMAIL_ONLY_SUBJECTS.publisherVerified}:${organizationId}:${at.toISOString()}`;
+}
+
 /** Build verification events for the supplied members; the caller owns database reads and writes. */
 export function buildPublisherVerifiedNotifications(
   accountIds: readonly number[],
   organization: Pick<OrganizationRow, "id" | "slug" | "name">,
+  at: Date,
 ): NotificationInsert[] {
   return accountIds.map((accountId) => ({
     accountId,
     kind: "publisher_verified",
-    subjectKind: EMAIL_ONLY_SUBJECTS.publisherVerified,
+    subjectKind: publisherVerifiedEventSubjectKind(organization.id, at),
     subjectId: organization.id,
     payload: {
       organizationId: organization.id,

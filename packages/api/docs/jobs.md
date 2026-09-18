@@ -46,7 +46,9 @@ failure is logged and does not reject authentication.
 
 Publisher verification records one `publisher_verified` row per current organization member when a
 real `false → true` transition commits, whether the transition came from the review endpoint or an
-approved claim. Repeating verification is a no-op. Delivery re-checks that the recipient is still a
+approved claim. Repeating verification is a no-op; unverify → verify is a new transition and a new
+row (the subject kind carries the organization and transition time). A member who joins an
+already-verified organization — a reviewer grant or a redeemed invite — gets the same email. Delivery re-checks that the recipient is still a
 member of the still-verified organization, so a stale membership cannot receive a lifecycle email.
 
 `stale-listing-reminders` defaults to 60 days of no publisher write or successful source-verification

@@ -99,6 +99,15 @@ export class OrganizationRepository {
       .limit(limit);
   }
 
+  async findById(id: number): Promise<OrganizationRow | undefined> {
+    const rows = await this.exec
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, id))
+      .limit(1);
+    return rows[0];
+  }
+
   async lockByIdForClaim(id: number): Promise<OrganizationRow | undefined> {
     const rows = await this.exec
       .select()

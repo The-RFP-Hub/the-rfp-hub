@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { DB } from "../../src/db/client.js";
 import { AccountService } from "../../src/modules/services/auth/account.service.js";
-import { staleReminderEventSubjectKind } from "../../src/modules/services/notifications/email-notification-events.js";
+import {
+  publisherVerifiedEventSubjectKind,
+  staleReminderEventSubjectKind,
+} from "../../src/modules/services/notifications/email-notification-events.js";
 import { composeLifecycleNotificationEmail } from "../../src/modules/services/notifications/lifecycle-notification-email.js";
 
 const APP_BASE_URL = "https://app.example.org";
@@ -70,6 +73,22 @@ describe("lifecycle notification emails", () => {
     expect(email.text).toContain("https://app.example.org/organizations/open-grants");
     expect(email.text).not.toContain("\r");
     expect(email.text).toContain("without an update or successful source verification");
+  });
+
+  it("accepts one publisher_verified label per transition", () => {
+    const at = new Date("2026-09-01T00:00:00.000Z");
+    const subjectKind = publisherVerifiedEventSubjectKind(9, at);
+    expect(subjectKind).not.toBe(publisherVerifiedEventSubjectKind(9, new Date(at.getTime() + 1)));
+    const email = composeLifecycleNotificationEmail(
+      {
+        kind: "publisher_verified",
+        subjectKind,
+        payload: { organizationId: 9, organizationSlug: "open-grants", organizationName: "Open" },
+      },
+      RECIPIENT,
+      APP_BASE_URL,
+    );
+    expect(email.subject).toContain("Open");
   });
 
   it("uses a unique audit label without making it the cooldown decision", () => {

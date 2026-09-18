@@ -34,7 +34,10 @@ import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
-import { buildWelcomeNotification } from "../notifications/email-notification-events.js";
+import {
+  buildPublisherVerifiedNotifications,
+  buildWelcomeNotification,
+} from "../notifications/email-notification-events.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
@@ -110,9 +113,10 @@ export class AccountService {
         // when JavaScript catches it; keeping redemption in the provisioning transaction could
         // return an account whose insert was silently rolled back. Redemption is retryable, so its
         // own transaction may roll back while this committed account still resolves the session.
-        await withTransaction(this.db, (repos) =>
+        const notificationIds = await withTransaction(this.db, (repos) =>
           this.redeemMembershipInvites(repos, account, verifiedEmail.trim().toLowerCase()),
         );
+        this.notificationQueue.enqueue(notificationIds);
       } catch (error) {
         this.logger.error(
           {
@@ -160,8 +164,9 @@ export class AccountService {
     repos: Repositories,
     account: AccountRow,
     email: string,
-  ): Promise<void> {
+  ): Promise<number[]> {
     const invites = await repos.membershipInvites.lockPendingForEmail(email);
+    const notificationIds: number[] = [];
 
     for (const invite of invites) {
       const existing = await repos.memberships.lockForAccountAndOrganization(
@@ -182,6 +187,14 @@ export class AccountService {
           invite.organizationId,
           invite.role,
         );
+        const organization = await repos.organizations.findById(invite.organizationId);
+        if (organization?.verified) {
+          notificationIds.push(
+            ...(await repos.notifications.record(
+              buildPublisherVerifiedNotifications([account.id], organization, new Date()),
+            )),
+          );
+        }
       }
       if (actualRole === null) throw new Error("membership vanished while accepting invite");
 
@@ -202,6 +215,7 @@ export class AccountService {
         },
       });
     }
+    return notificationIds;
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */

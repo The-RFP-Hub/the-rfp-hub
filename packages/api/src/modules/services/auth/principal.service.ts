@@ -71,9 +71,8 @@ export class PrincipalService {
     const verified = await this.sessions.verify(token);
     // One message for every way a token can fail to be a session — see `SessionService`.
     if (!verified) throw unauthorized("the session token could not be verified.");
-    // JIT provisioning happens here, on the first `/v1` request an identity ever makes, rather than
-    // in a database hook on user creation: an account is what this API decides about a person, and
-    // it is created when they first act on it.
+    // Accounts are provisioned by the Better-Auth user-create hook; this is the fallback for
+    // identities that predate it or whose hook failed.
     // An email may redeem an invite only after Better-Auth says it is verified. For the primary
     // email-OTP path, the successful one-time code exchange is the proof of mailbox ownership.
     const account = await this.accounts.resolveBySubject(
