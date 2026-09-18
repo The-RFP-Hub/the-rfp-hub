@@ -53,6 +53,21 @@ export default function PrivacyPage() {
         history of changes and decisions.
       </p>
 
+      <h2>Email we send</h2>
+      <p>
+        Besides sign-in codes, the Hub sends a few emails to the address on your account: a welcome
+        when you first sign in, a notice when an organization you publish for is verified (or when
+        you join one that already is), and notices about possible duplicates of your listings.
+        Publishers also get an occasional <strong>stale listing reminder</strong> when their live
+        listings have not been updated for a while — at most one per organization every 30 days by
+        default.
+      </p>
+      <p>
+        Every reminder carries an unsubscribe link, and mail clients that support one-click
+        unsubscribe show it as a button. Using it stops reminders for your account; it does not
+        affect sign-in codes or the other notices above. We record only the time you opted out.
+      </p>
+
       <h2>Analytics without addresses</h2>
       <p>
         Publishers see <strong>event counts</strong> for their listings — recorded API list and
@@ -102,8 +117,8 @@ export default function PrivacyPage() {
         The Hub runs on infrastructure providers that process data to provide the service: the site
         is hosted on Vercel, the API and database on AWS, and public dataset snapshots are published
         to GitHub. The email delivery provider sees your address in order to carry your sign-in
-        codes, the way any mail carrier does. Google is involved if you choose Google sign-in, and
-        through Google Analytics as described above.
+        codes and the emails described above, the way any mail carrier does. Google is involved if
+        you choose Google sign-in, and through Google Analytics as described above.
       </p>
       <p>
         Listing text is processed for duplicate detection{" "}

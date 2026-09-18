@@ -62,6 +62,15 @@ only queues rows; `notification-dispatch` owns provider
 calls, a five-minute retry floor, three bounded attempts, terminal recipient failures, and
 `email_dispatched_at`/`email_failed_at` evidence.
 
+Stale reminders are the one bulk message, so they carry an opt-out. Each email has a footer link and
+RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers pointing at
+`{BETTER_AUTH_URL}/v1/email/unsubscribe?token=…`. The token is an HMAC of the account id under a key
+derived from `BETTER_AUTH_SECRET`, so rotating that secret invalidates links already sent. `GET`
+only renders a confirmation form (link scanners prefetch); `POST` sets
+`accounts.stale_reminders_opted_out_at` idempotently. The generator skips opted-out accounts, and
+`notification-dispatch` terminally fails an already-queued reminder with `recipient_opted_out`.
+Welcome and publisher-verification emails are transactional and ignore the opt-out.
+
 For a production evidence check, run the following read-only query against the runtime database
 (never against a production database from a local workstation) after the scheduler has run. It
 counts successful dispatches, not tests or queued rows, and reports the two M5 acceptance measures:

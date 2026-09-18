@@ -146,6 +146,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
       dispatcher: new NotificationDispatchService(db, {
         email: outboundEmail,
         appBaseUrl: cfg.appBaseUrl,
+        unsubscribe: { apiBaseUrl: cfg.betterAuth.url, secret: cfg.betterAuth.secret },
         enabled: deliversEmail(cfg.email),
         logger,
       }),

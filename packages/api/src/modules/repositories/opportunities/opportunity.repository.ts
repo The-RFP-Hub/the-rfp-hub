@@ -263,8 +263,10 @@ export class OpportunityRepository {
       .from(opportunities)
       .innerJoin(organizations, eq(organizations.slug, opportunities.sourcePublisher))
       .innerJoin(orgMemberships, eq(orgMemberships.organizationId, organizations.id))
+      .innerJoin(accounts, eq(accounts.id, orgMemberships.accountId))
       .where(
         and(
+          isNull(accounts.staleRemindersOptedOutAt),
           or(
             gt(orgMemberships.accountId, after.accountId),
             and(

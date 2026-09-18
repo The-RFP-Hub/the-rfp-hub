@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ADD COLUMN "stale_reminders_opted_out_at" timestamp with time zone;

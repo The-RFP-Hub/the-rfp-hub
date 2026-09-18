@@ -1,4 +1,4 @@
-import { eq, getTableColumns, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, getTableColumns, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import { type AccountRow, type AuthUserRow, accounts, authUser } from "../../../db/schema.js";
 
@@ -125,5 +125,24 @@ export class AccountRepository {
       .from(accounts)
       .leftJoin(authUser, eq(accounts.authUserId, authUser.id))
       .where(inArray(accounts.id, accountIds));
+  }
+
+  async hasOptedOutOfStaleReminders(accountId: number): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.id, accountId), isNotNull(accounts.staleRemindersOptedOutAt)))
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /** Idempotent: the first opt-out instant is kept. False when the account no longer exists. */
+  async optOutOfStaleReminders(accountId: number, at: Date): Promise<boolean> {
+    const rows = await this.exec
+      .update(accounts)
+      .set({ staleRemindersOptedOutAt: sql`coalesce(${accounts.staleRemindersOptedOutAt}, ${at})` })
+      .where(eq(accounts.id, accountId))
+      .returning({ id: accounts.id });
+    return rows.length > 0;
   }
 }

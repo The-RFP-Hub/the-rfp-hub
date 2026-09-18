@@ -9,7 +9,10 @@ import {
   recipientFingerprint,
 } from "../email/email.service.js";
 import type { JobResult } from "../jobs/types.js";
-import { NotificationEmailSender } from "./notification-email-sender.js";
+import {
+  NotificationEmailSender,
+  type UnsubscribeLinkConfig,
+} from "./notification-email-sender.js";
 
 export const NOTIFICATION_EMAIL_MAX_ATTEMPTS = 3;
 export const NOTIFICATION_EMAIL_RETRY_DELAY_MS = 5 * 60_000;
@@ -23,6 +26,7 @@ const MAX_LIMIT = 1000;
 type FailureReason =
   | "recipient_unavailable"
   | "recipient_not_publisher"
+  | "recipient_opted_out"
   | "transport_failure"
   | "invalid_notification"
   | "in_flight";
@@ -47,6 +51,7 @@ const consoleLogger: NotificationDispatchLogger = {
 export interface NotificationDispatchOptions {
   email?: OutboundEmailPort;
   appBaseUrl?: string;
+  unsubscribe?: UnsubscribeLinkConfig;
   /** Test seam. Environment-backed jobs derive this from `deliversEmail`. */
   enabled?: boolean;
   logger?: NotificationDispatchLogger;
@@ -84,6 +89,7 @@ export class NotificationDispatchService {
     this.emailSender = new NotificationEmailSender(
       options.email ?? new EmailService(),
       options.appBaseUrl ?? config.appBaseUrl,
+      options.unsubscribe,
     );
   }
 
@@ -128,6 +134,7 @@ export class NotificationDispatchService {
       retried: 0,
       recipientUnavailable: 0,
       recipientNotPublisher: 0,
+      recipientOptedOut: 0,
       invalidNotification: 0,
       /** Rows this run leased and then lost to another dispatcher before it could send them. */
       leaseLost: 0,
@@ -159,6 +166,23 @@ export class NotificationDispatchService {
         );
         details.failed++;
         details.recipientUnavailable++;
+        continue;
+      }
+
+      if (
+        notification.kind === "stale_listing_reminder" &&
+        (await this.repos.accounts.hasOptedOutOfStaleReminders(notification.accountId))
+      ) {
+        await this.markFailure(
+          notification.id,
+          notification.payload,
+          NOTIFICATION_EMAIL_MAX_ATTEMPTS,
+          "recipient_opted_out",
+          completedAt(),
+          leaseToken,
+        );
+        details.failed++;
+        details.recipientOptedOut++;
         continue;
       }
 

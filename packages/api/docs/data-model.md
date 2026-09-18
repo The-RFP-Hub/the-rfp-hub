@@ -36,7 +36,7 @@ here so deferred work remains discoverable. The implemented slice lives in
 | `opportunities.next_deadline_at` (derived, denormalized) + `ix_opp_next_deadline` | ✅ M2 |
 | `dataset_snapshots` (nightly export bookkeeping) | ✅ M2 |
 | `organizations.verified`/`verified_at` + public `GET /v1/publishers` | ✅ M3 |
-| `accounts` (+ `handle`, `direct_create`, `auth_user_id`), `api_keys`, `org_memberships` (auth tiers T1–T4), and the four `auth_*` identity tables | ✅ M3 |
+| `accounts` (+ `handle`, `direct_create`, `auth_user_id`, `stale_reminders_opted_out_at`), `api_keys`, `org_memberships` (auth tiers T1–T4), and the four `auth_*` identity tables | ✅ M3 |
 | `opportunities.submitted_by`/`approved_by`/`approved_at`/`last_seen_at`/`merged_into_id` | ✅ M3 |
 | **`audit_log`** — one generalized, database-enforced append-only trail (replaces `opportunity_audit`) | ✅ M3 |
 | `opportunity_claims` | ✅ M3 |

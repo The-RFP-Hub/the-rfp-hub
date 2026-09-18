@@ -212,7 +212,11 @@ request or the job.
 
 #### M5 lifecycle-email rollout
 
-Apply migrations `0013_m5_email_events.sql` and `0014_stale_listing_pending_guard.sql` with the migration role before scheduling the new image.
+Apply migrations `0013_m5_email_events.sql`, `0014_stale_listing_pending_guard.sql` and
+`0015_stale_reminder_opt_out.sql` with the migration role before scheduling the new image.
+Reminder unsubscribe links are built from `BETTER_AUTH_URL` and signed with a key derived from
+`BETTER_AUTH_SECRET`, so both must be set in the task definition the dispatcher inherits; no new
+variable is needed.
 The API then records welcome events at actual auth user creation and publisher-verification events
 at a real `false → true` transition; both are ordinary submitter/member-scoped rows and grant no
 authority. Schedule `node packages/api/dist/jobs.js all --json` once daily at the existing **01:05

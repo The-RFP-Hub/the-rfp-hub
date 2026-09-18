@@ -254,6 +254,8 @@ export const accounts = pgTable("accounts", {
    * without the other.
    */
   directCreate: boolean().notNull().default(false),
+  /** Set by the signed one-click unsubscribe link; transactional email is unaffected. */
+  staleRemindersOptedOutAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

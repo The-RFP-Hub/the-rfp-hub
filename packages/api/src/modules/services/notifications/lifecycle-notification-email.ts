@@ -11,6 +11,7 @@ export function composeLifecycleNotificationEmail(
   notification: LifecycleNotification,
   recipientEmail: string,
   appBaseUrl = config.appBaseUrl,
+  unsubscribeUrl?: string,
 ): OutboundEmail {
   const validSubject =
     (notification.kind === "welcome" && notification.subjectKind === EMAIL_ONLY_SUBJECTS.account) ||
@@ -51,6 +52,9 @@ export function composeLifecycleNotificationEmail(
       };
     }
     case "stale_listing_reminder": {
+      if (unsubscribeUrl === undefined) {
+        throw new Error("stale listing reminder requires an unsubscribe link");
+      }
       const stale = stalePayload(notification.payload);
       const lines = stale.listings.map(
         (listing) => `- ${safeText(listing.title)} (${safeText(listing.id)})`,
@@ -65,7 +69,14 @@ export function composeLifecycleNotificationEmail(
           `Please update a listing if it is still active, or unlist it if it is no longer current. Listings with no future fixed deadline are automatically closed after ${stale.closeAfterDays} days without an update or successful source verification.`,
           "",
           `Review ${stale.organizationName}: ${destination}`,
+          "",
+          "--",
+          `Stop these reminders: ${unsubscribeUrl}`,
         ].join("\n"),
+        headers: {
+          "List-Unsubscribe": `<${unsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       };
     }
     default:

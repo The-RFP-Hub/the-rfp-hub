@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { admin } from "./admin/index.js";
 import { canonical } from "./canonical/index.js";
+import { email } from "./email/index.js";
 import { datasetExport } from "./export/index.js";
 import { feeds } from "./feeds/index.js";
 import { health } from "./health/index.js";
@@ -40,6 +41,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(publishers, { prefix: "/v1/publishers" });
   await app.register(organizations, { prefix: "/v1/organizations" });
   await app.register(insights, { prefix: "/v1/insights" });
+  await app.register(email, { prefix: "/v1/email" });
   // Short on purpose: `/v1/r/:id/apply` is a URL that ends up in emails, newsletters and social
   // posts, and every character of it is carried by whoever pastes it.
   await app.register(redirects, { prefix: "/v1/r" });
