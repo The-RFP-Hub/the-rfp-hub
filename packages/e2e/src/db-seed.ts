@@ -57,10 +57,8 @@ function base32(length: number): string {
  * ordering is what keeps the pair coherent.
  *
  * DIRECT SQL, FOR DETERMINISM. Signing in would produce a real identity, but with an id the library
- * chooses; these rows need an id the caller already knows so a later assertion can name it. It
- * bypasses no hooks, because there are none — the account row is created just-in-time by the API on
- * first `/v1/me`, which is a documented M3 criterion and is precisely why no `databaseHooks` were
- * added on the API side.
+ * chooses; these rows need an id the caller already knows so a later assertion can name it. Inserting
+ * directly skips the API's signup hook, so this writes the `accounts` row itself.
  *
  * Idempotent on the identity id.
  */

@@ -136,9 +136,8 @@ a one-off audited event (`actor_kind: "job"`, `action: "assign_role"`, `reason:
 "operator_grant_admin"`), revocable afterwards over the ordinary admin route, rather than a standing
 rule re-applied on every login.
 
-Two consequences worth knowing. The administrator's account exists **before** its first request
-(`--create`), which is why the just-in-time provisioning assertion deliberately watches a
-non-administrator identity. And because the grant is per-run against a database destroyed with its
+Two consequences worth knowing. The signup-provisioning assertion deliberately watches a
+non-administrator identity, so the ceremony's role grant cannot mask what signup alone created. And because the grant is per-run against a database destroyed with its
 container, an identity that was an administrator in one run comes back with nothing in the next —
 which the cross-run assertion in `tests/00-acceptance.setup.ts` checks rather than assumes.
 
