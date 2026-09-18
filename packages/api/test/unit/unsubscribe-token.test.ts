@@ -37,4 +37,10 @@ describe("unsubscribe token", () => {
       "https://api.example.org/v1/email/unsubscribe?token=1.x",
     );
   });
+
+  it("refuses a loopback origin in production", () => {
+    expect(() => unsubscribeUrl("http://127.0.0.1:3001", "1.x", true)).toThrow(/BETTER_AUTH_URL/);
+    expect(() => unsubscribeUrl("http://localhost:3001", "1.x", true)).toThrow(/BETTER_AUTH_URL/);
+    expect(unsubscribeUrl("http://127.0.0.1:3001", "1.x", false)).toContain("127.0.0.1");
+  });
 });

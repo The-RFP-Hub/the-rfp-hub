@@ -46,7 +46,7 @@ describe("lifecycle notification emails", () => {
     expect(email.to).toBe(RECIPIENT);
     expect(email.subject).toContain("Open Grants");
     expect(email.text).toContain("https://app.example.org/organizations/open-grants");
-    expect(email.text).toContain("now verified");
+    expect(email.text).toContain("is verified on RFP Hub");
   });
 
   it("groups stale listings in actionable copy and strips line controls", () => {

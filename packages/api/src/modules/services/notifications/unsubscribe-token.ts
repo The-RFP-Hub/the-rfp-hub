@@ -38,8 +38,18 @@ export function verifyUnsubscribeToken(
   return accountId;
 }
 
-export function unsubscribeUrl(apiBaseUrl: string, token: string): string {
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+export function unsubscribeUrl(
+  apiBaseUrl: string,
+  token: string,
+  production = process.env.NODE_ENV === "production",
+): string {
   const url = new URL(UNSUBSCRIBE_PATH, apiBaseUrl);
+  // An unset BETTER_AUTH_URL falls back to loopback; a dead opt-out link must not reach a recipient.
+  if (production && LOOPBACK.has(url.hostname)) {
+    throw new Error("unsubscribe link would point at a loopback host; set BETTER_AUTH_URL");
+  }
   url.searchParams.set("token", token);
   return url.href;
 }
