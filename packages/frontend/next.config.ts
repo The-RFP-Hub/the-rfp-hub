@@ -106,6 +106,14 @@ const nextConfig: NextConfig = {
   // worktree, where a second lockfile sits one directory up — the inference is ambiguous and the
   // build says so; a wrong guess would trace the wrong node_modules into the standalone output.
   outputFileTracingRoot: join(packageDir, "../.."),
+  // The share-card renderer reads two font files from disk at request time; tracing cannot see a
+  // path built at runtime, so they are named here for the standalone and serverless bundles alike.
+  outputFileTracingIncludes: {
+    "/card.png": ["./src/assets/fonts/*.ttf"],
+    "/card.png/route": ["./src/assets/fonts/*.ttf"],
+    "/opportunities/[id]/card.png": ["./src/assets/fonts/*.ttf"],
+    "/opportunities/[id]/card.png/route": ["./src/assets/fonts/*.ttf"],
+  },
   // NO `webpack` OVERRIDE. There used to be one, aliasing an optional wallet integration to `false`
   // to silence a "module not found" warning the previous auth SDK produced on every build. The SDK
   // is gone and so is the warning: the auth client this package now uses pulls in no chain or
@@ -115,6 +123,12 @@ const nextConfig: NextConfig = {
   // ESM `dist`. They are pure (JSON Schema + ajv, no Node built-ins), so they bundle for the
   // browser; this tells Next to transpile them rather than treat them as opaque externals.
   transpilePackages: ["rfphub-validate", "@the-rfp-hub/standard"],
+  async redirects() {
+    return [
+      { source: "/organisations", destination: "/organizations", permanent: true },
+      { source: "/organisations/:path*", destination: "/organizations/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

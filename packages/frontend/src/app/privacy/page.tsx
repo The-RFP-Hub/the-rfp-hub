@@ -12,11 +12,11 @@ export default function PrivacyPage() {
     <section>
       <h1>Privacy</h1>
       <p className="lede">
-        The RFP Hub is an open index of funding opportunities. No account is required to read the
-        directory; like any web service, it still processes request metadata, described below. This
-        page says what the Hub stores, what leaves its servers, what is public forever, and how to
-        leave. Effective 31&nbsp;August&nbsp;2026.
+        RFP Hub is an open index of Ethereum funding. You need no account to read it, but like any
+        web service it processes request metadata, described below. This page says what the Hub
+        stores, what leaves its servers, what is public forever, and how to leave.
       </p>
+      <p className="muted footnote">Effective 31&nbsp;August&nbsp;2026.</p>
 
       <h2>What we store when you sign in</h2>
       <p>

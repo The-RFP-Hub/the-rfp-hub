@@ -504,12 +504,16 @@ async function main() {
     confirmedUp = true;
 
     const results = await Promise.all([
-      checkRoute(base, "/", { label: "directory", allow404: false }),
+      checkRoute(base, "/", { label: "landing", allow404: false }),
+      checkRoute(base, "/directory", { label: "directory", allow404: false }),
       checkRoute(base, "/publishers", {
         label: requirePublishers ? "publishers" : "publishers (absent from this copy)",
         allow404: !requirePublishers,
       }),
-      checkRoute(base, "/?q=grant", { label: "directory, filtered by search", allow404: false }),
+      checkRoute(base, "/directory?q=grant", {
+        label: "directory, filtered by search",
+        allow404: false,
+      }),
       checkPublicAssets(base, publicDir),
     ]);
 
@@ -517,10 +521,10 @@ async function main() {
       const { chromium } = await import("@playwright/test");
       browserHandle = await chromium.launch();
       const [all, filtered] = await Promise.all([
-        checkRouteInBrowser(browserHandle, base, apiUrl, "/", {
+        checkRouteInBrowser(browserHandle, base, apiUrl, "/directory", {
           label: "directory, rendered from a real request",
         }),
-        checkRouteInBrowser(browserHandle, base, apiUrl, "/?q=grant", {
+        checkRouteInBrowser(browserHandle, base, apiUrl, "/directory?q=grant", {
           label: "directory filtered by search, rendered from a real request",
         }),
       ]);

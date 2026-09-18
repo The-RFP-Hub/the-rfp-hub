@@ -388,7 +388,7 @@ describe("the directory's URL state", () => {
 
   it("writes nothing that is at its default, so the front page keeps a clean URL", () => {
     expect(selectionToParams(DEFAULT_SELECTION).toString()).toBe("");
-    expect(selectionToHref(DEFAULT_SELECTION)).toBe("/");
+    expect(selectionToHref(DEFAULT_SELECTION)).toBe("/directory");
   });
 
   it("distinguishes 'the reader turned the status filter off' from 'the reader chose nothing'", () => {

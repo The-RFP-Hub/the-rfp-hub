@@ -48,12 +48,13 @@ export default function DashboardPage() {
           </button>
         </p>
         <p className="muted footnote">
-          Signing in is a one-time code emailed to you by this service. There is no password to
-          choose or lose and no key to hand over. This browser stores a session so you can manage
-          your account. Permissions are checked when you submit or manage a listing.
+          Signing in is a one-time code we email you, no password to set up. This browser stores a
+          session so you can manage your account. Permissions are checked when you submit or manage
+          a listing.
         </p>
         <p className="muted footnote">
-          Nothing here is needed to read the Hub — <Link href="/">the directory</Link> is public.
+          Nothing here is needed to read the Hub — <Link href="/directory">the directory</Link> is
+          public.
         </p>
       </section>
     );

@@ -48,33 +48,33 @@ describe("the how-it-works reference page", () => {
     expect(pathway).toBeTruthy();
     expect(
       within(pathway as HTMLElement)
-        .getByRole("link", { name: "Sign in." })
+        .getByRole("link", { name: "Log in" })
         .getAttribute("href"),
     ).toBe("/dashboard");
     expect(
       within(pathway as HTMLElement)
-        .getByRole("link", { name: "Submit the opportunity." })
+        .getByRole("link", { name: "Submit a listing" })
         .getAttribute("href"),
     ).toBe("/listings/new");
     expect(
       within(pathway as HTMLElement)
-        .getByRole("link", {
-          name: "Get your organization verified — optional, and it is what removes the wait.",
-        })
+        .getByRole("link", { name: "Get verified" })
         .getAttribute("href"),
     ).toBe("/organizations");
     expect(
       within(pathway as HTMLElement)
         .getByRole("link", { name: "Open it in the directory" })
         .getAttribute("href"),
-    ).toBe("/");
+    ).toBe("/directory");
   });
 
   it("starts every explanation closed and offers no primary button", () => {
     const { container } = render(<HowItWorksPage />);
     const details = [...container.querySelectorAll("details")];
 
-    expect(details).toHaveLength(3);
+    // The reference material is folded section by section; the three "why" disclosures live
+    // inside one of them. Every fold starts closed.
+    expect(details.length).toBeGreaterThanOrEqual(3);
     for (const detail of details) {
       expect(detail.open).toBe(false);
     }

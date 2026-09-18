@@ -36,7 +36,7 @@ function Organizations({ me }: { me: Me }) {
       {me.memberships.length === 0 ? (
         <EmptyState
           title="You are not a member of any organization."
-          detail="Submissions from this account land pending, which is the normal path for a community submission. Claiming a listing for an organization you run is how that changes — a reviewer grants the membership."
+          detail="Submissions from this account land pending, which is the normal path for a community submission. Claiming a listing for an organization you run is how that changes. A reviewer grants the membership."
           action={
             <>
               <Link className="button-primary" href="/listings">
@@ -49,9 +49,8 @@ function Organizations({ me }: { me: Me }) {
       ) : (
         <>
           <p className="lede">
-            What each of these lets you do depends on whether it is verified — that is a
-            reviewer&rsquo;s decision, and it is what decides whether your listings publish
-            immediately or wait.
+            What each of these lets you do depends on whether it is verified. A reviewer decides
+            that, and it decides whether your listings publish immediately or wait.
           </p>
           <div className="table-scroll">
             <table>
