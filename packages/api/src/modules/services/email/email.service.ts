@@ -19,6 +19,7 @@ export interface OutboundEmail {
   to: string;
   subject: string;
   text: string;
+  headers?: Record<string, string>;
 }
 
 export type SendResult =
@@ -53,6 +54,10 @@ export class EmailService implements OutboundEmailPort {
   }
 
   async send(message: OutboundEmail): Promise<SendResult> {
+    const unsafe = unsafeHeader(message.headers);
+    if (unsafe !== undefined) {
+      return { status: "failed", error: "transport_failure", reason: `unsafe header ${unsafe}` };
+    }
     try {
       await this.transport.send(message);
       return { status: "sent" };
@@ -67,6 +72,15 @@ export class EmailService implements OutboundEmailPort {
       };
     }
   }
+}
+
+const HEADER_NAME = /^[!-9;-~]+$/;
+
+function unsafeHeader(headers: Record<string, string> | undefined): string | undefined {
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (!HEADER_NAME.test(name) || /[\r\n]/.test(value)) return JSON.stringify(name);
+  }
+  return undefined;
 }
 
 /** A log-safe recipient identity shared by every sender. */

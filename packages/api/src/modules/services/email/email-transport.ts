@@ -28,6 +28,7 @@ export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
+  headers?: Record<string, string>;
 }
 
 export interface EmailTransport {
@@ -178,6 +179,9 @@ function sesTransport(cfg: EmailConfig): EmailTransport {
             Simple: {
               Subject: { Data: message.subject, Charset: "UTF-8" },
               Body: { Text: { Data: message.text, Charset: "UTF-8" } },
+              ...(message.headers && {
+                Headers: Object.entries(message.headers).map(([Name, Value]) => ({ Name, Value })),
+              }),
             },
           },
         }),
@@ -216,6 +220,7 @@ function resendTransport(cfg: EmailConfig): EmailTransport {
           to: [message.to],
           subject: message.subject,
           text: message.text,
+          ...(message.headers && { headers: message.headers }),
         }),
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
@@ -286,7 +291,7 @@ function mailgunTransport(cfg: EmailConfig): EmailTransport {
   return {
     kind: "mailgun",
     async send(message) {
-      // The same four fields SES and Resend are given. There is no `html` part anywhere in this
+      // The same fields SES and Resend are given. There is no `html` part anywhere in this
       // file: a text-only body is one fewer thing a mail client can render into something the
       // recipient did not expect.
       const form = new FormData();
@@ -294,6 +299,9 @@ function mailgunTransport(cfg: EmailConfig): EmailTransport {
       form.set("to", message.to);
       form.set("subject", message.subject);
       form.set("text", message.text);
+      for (const [name, value] of Object.entries(message.headers ?? {})) {
+        form.set(`h:${name}`, value);
+      }
       const response = await fetch(endpoint, {
         method: "POST",
         // `authorization` and nothing else — see the note above on who owns `content-type`.
@@ -347,7 +355,10 @@ export function createEmailTransport(cfg: EmailConfig, production = false): Emai
         kind: "stdout",
         async send(message) {
           // The whole point of this transport, and the reason it cannot be a deployment's.
-          console.log(`[email:${message.to}] ${message.subject}\n${message.text}`);
+          const headers = Object.entries(message.headers ?? {}).map(([k, v]) => `${k}: ${v}\n`);
+          console.log(
+            `[email:${message.to}] ${message.subject}\n${headers.join("")}${message.text}`,
+          );
         },
       };
     case "null":

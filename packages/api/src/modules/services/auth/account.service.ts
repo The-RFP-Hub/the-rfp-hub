@@ -1,5 +1,6 @@
 /**
- * Accounts: provisioned on first login, keyed on the session's SUBJECT, and nothing else.
+ * Accounts: provisioned at auth signup (with a lazy fallback for legacy identities), keyed on the
+ * session's SUBJECT, and nothing else.
  *
  * WHAT THE SUBJECT IS. The opaque user id the identity tables mint — never an email address. An
  * address is a routable, transferable, re-assignable thing a person can change; the subject is the
@@ -19,6 +20,7 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
+import { createHash } from "node:crypto";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { AccountRow } from "../../../db/schema.js";
 import {
@@ -32,6 +34,14 @@ import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
+import {
+  buildPublisherVerifiedNotifications,
+  buildWelcomeNotification,
+} from "../notifications/email-notification-events.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 
 /** A handle is public and appears in `source.submittedBy`, so it is held to slug shape. */
 const HANDLE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -78,12 +88,13 @@ export class AccountService {
   constructor(
     private readonly db: DB = defaultDb,
     private readonly logger: AccountLogger = consoleLogger,
+    private readonly notificationQueue: NotificationDispatchEnqueuer = notificationDispatchQueue,
   ) {
     this.repos = repositories(db);
   }
 
   /**
-   * The account for a verified DID, creating it if this is the first login.
+   * The account for a verified DID, creating it if this is a legacy identity without a row.
    *
    * `ON CONFLICT DO NOTHING` followed by a read rather than a read-then-insert: two tabs logging in
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
@@ -102,9 +113,10 @@ export class AccountService {
         // when JavaScript catches it; keeping redemption in the provisioning transaction could
         // return an account whose insert was silently rolled back. Redemption is retryable, so its
         // own transaction may roll back while this committed account still resolves the session.
-        await withTransaction(this.db, (repos) =>
+        const notificationIds = await withTransaction(this.db, (repos) =>
           this.redeemMembershipInvites(repos, account, verifiedEmail.trim().toLowerCase()),
         );
+        this.notificationQueue.enqueue(notificationIds);
       } catch (error) {
         this.logger.error(
           {
@@ -120,13 +132,41 @@ export class AccountService {
     return account;
   }
 
+  /** Provision the app account and persist its one welcome event, best effort after auth signup. */
+  async recordSignupWelcome(subject: string): Promise<void> {
+    try {
+      const notificationIds = await withTransaction(this.db, async (repos) => {
+        // Better-Auth's post-create hook is the actual signup boundary. Provisioning here means
+        // the welcome event is not deferred until the first /v1 request; resolveBySubject remains
+        // a lazy account fallback for identities created before this hook existed.
+        await repos.accounts.insertBySubject(subject);
+        const account = await repos.accounts.findBySubject(subject);
+        if (!account) return [];
+        return repos.notifications.record([buildWelcomeNotification(account.id)]);
+      });
+      // Enqueue only after the transaction commits. Queue overflow/process loss is covered by the
+      // durable notification-dispatch job, and enqueue itself never throws into authentication.
+      this.notificationQueue.enqueue(notificationIds);
+    } catch (error) {
+      this.logger.error(
+        {
+          operation: "record_signup_welcome",
+          subjectFingerprint: createHash("sha256").update(subject).digest("hex").slice(0, 12),
+          error: error instanceof Error ? error.name : typeof error,
+        },
+        "signup welcome notification could not be recorded; authentication will continue",
+      );
+    }
+  }
+
   /** Apply every still-pending invite for an address during session principal resolution. */
   private async redeemMembershipInvites(
     repos: Repositories,
     account: AccountRow,
     email: string,
-  ): Promise<void> {
+  ): Promise<number[]> {
     const invites = await repos.membershipInvites.lockPendingForEmail(email);
+    const notificationIds: number[] = [];
 
     for (const invite of invites) {
       const existing = await repos.memberships.lockForAccountAndOrganization(
@@ -147,6 +187,14 @@ export class AccountService {
           invite.organizationId,
           invite.role,
         );
+        const organization = await repos.organizations.findById(invite.organizationId);
+        if (organization?.verified) {
+          notificationIds.push(
+            ...(await repos.notifications.record(
+              buildPublisherVerifiedNotifications([account.id], organization, new Date()),
+            )),
+          );
+        }
       }
       if (actualRole === null) throw new Error("membership vanished while accepting invite");
 
@@ -167,6 +215,7 @@ export class AccountService {
         },
       });
     }
+    return notificationIds;
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */

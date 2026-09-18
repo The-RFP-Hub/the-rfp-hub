@@ -32,6 +32,11 @@ import { badRequest, conflict, forbidden, notFound } from "../../shared/http-err
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
+import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
 
@@ -49,9 +54,14 @@ export interface OrganizationMetadata {
 
 export class ReviewService {
   private readonly repos: Repositories;
+  private readonly notificationQueue: NotificationDispatchEnqueuer;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(
+    private readonly db: DB = defaultDb,
+    options: { notificationQueue?: NotificationDispatchEnqueuer } = {},
+  ) {
     this.repos = repositories(db);
+    this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
   }
 
   // ── opportunities ──────────────────────────────────────────────────────────────
@@ -133,11 +143,12 @@ export class ReviewService {
     slug: string,
     verified: boolean,
   ): Promise<OrganizationSummaryView> {
-    return withTransaction(this.db, async (repos) => {
+    const settled = await withTransaction(this.db, async (repos) => {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
       // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
       const row = await lockOrganization(repos, slug);
-      if (row.verified === verified) return this.summarize(repos, row);
+      if (row.verified === verified)
+        return { summary: await this.summarize(repos, row), notificationIds: [] };
       const now = new Date();
       const next =
         (await repos.organizations.update(row.id, {
@@ -153,8 +164,19 @@ export class ReviewService {
         action: verified ? "verify_organization" : "unverify_organization",
         patch: { verified: { before: row.verified, after: verified } },
       });
-      return this.summarize(repos, next);
+      const notificationIds = verified
+        ? await repos.notifications.record(
+            buildPublisherVerifiedNotifications(
+              await repos.memberships.accountIdsForOrganization(next.id),
+              next,
+              now,
+            ),
+          )
+        : [];
+      return { summary: await this.summarize(repos, next), notificationIds };
     });
+    this.notificationQueue.enqueue(settled.notificationIds);
+    return settled.summary;
   }
 
   /** Directory metadata. Never the verified flag — that has its own audited verb. */
@@ -238,7 +260,7 @@ export class ReviewService {
   ): Promise<MembershipResultView> {
     const orgRole = normalizeOrgRole(role);
     try {
-      return await withTransaction(this.db, async (repos) => {
+      const settled = await withTransaction(this.db, async (repos) => {
         const org = await findOrganization(repos, slug);
         const account = await repos.accounts.findById(accountId);
         if (!account) throw notFound(`no account ${accountId}.`);
@@ -247,14 +269,23 @@ export class ReviewService {
         // Without the lock, DELETE can remove the row after this read; the UPDATE then affects
         // zero rows while the endpoint still audits and reports a membership that does not exist.
         const existing = await repos.memberships.lockForAccountAndOrganization(accountId, org.id);
+        let notificationIds: number[] = [];
 
         if (existing) {
           if (existing.role === orgRole) {
-            return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+            return {
+              result: { organizationSlug: org.slug, accountId, role: orgRole, member: true },
+              notificationIds,
+            };
           }
           await repos.memberships.updateRole(existing.id, orgRole);
         } else {
           await repos.memberships.insertRole(accountId, org.id, orgRole);
+          if (org.verified) {
+            notificationIds = await repos.notifications.record(
+              buildPublisherVerifiedNotifications([accountId], org, new Date()),
+            );
+          }
         }
 
         await repos.audit.record({
@@ -268,8 +299,13 @@ export class ReviewService {
             role: { before: existing?.role ?? null, after: orgRole },
           },
         });
-        return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+        return {
+          result: { organizationSlug: org.slug, accountId, role: orgRole, member: true },
+          notificationIds,
+        };
       });
+      this.notificationQueue.enqueue(settled.notificationIds);
+      return settled.result;
     } catch (error) {
       // TWO REVIEWERS, ONE GRANT. The read above and the insert are not one atomic step, so two
       // concurrent grants of the same previously-absent membership can both see no row and both

@@ -11,6 +11,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import {
+  notifications,
   opportunities,
   opportunityClaims,
   opportunityDuplicates,
@@ -845,6 +846,17 @@ run("M3CLAIM ownership claims", () => {
     });
     expect(decided.statusCode).toBe(200);
     expect(decided.json().message).toMatch(/auto-approve/);
+
+    const verifiedEmails = await db
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.accountId, unverifiedId),
+          eq(notifications.kind, "publisher_verified"),
+        ),
+      );
+    expect(verifiedEmails).toHaveLength(1);
 
     const write = await app.inject({
       method: "POST",

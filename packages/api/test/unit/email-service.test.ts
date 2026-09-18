@@ -57,4 +57,20 @@ describe("central email service", () => {
       reason: "test transport refused the message",
     });
   });
+
+  it("refuses a header that could inject another header", async () => {
+    const transport = createEmailTransport(config);
+    const email = new EmailService({ config, transport });
+    const unsafe: Record<string, string>[] = [
+      { "X-Test": "a\r\nBcc: x@y" },
+      { "Bad Name": "v" },
+      { "A:B": "v" },
+    ];
+    for (const headers of unsafe) {
+      await expect(email.send({ ...message, headers })).resolves.toMatchObject({
+        status: "failed",
+      });
+    }
+    expect(transport.drain?.(message.to)).toEqual([]);
+  });
 });

@@ -29,17 +29,26 @@ import type { BetterAuthConfig, EmailConfig, GoogleConfig } from "../config.js";
 import { config as defaultConfig } from "../config.js";
 import { authAccount, authSession, authUser, authVerification } from "../db/auth-schema.js";
 import { type DB, db as defaultDb } from "../db/client.js";
+import { AccountService } from "../modules/services/auth/account.service.js";
+import { deliversEmail } from "../modules/services/email/email-transport.js";
 import {
   EmailService,
   type OutboundEmailPort,
   recipientFingerprint,
 } from "../modules/services/email/email.service.js";
+import {
+  type NotificationDispatchEnqueuer,
+  NotificationDispatchQueue,
+} from "../modules/services/notifications/notification-dispatch.queue.js";
+import { NotificationDispatchService } from "../modules/services/notifications/notification-dispatch.service.js";
 
 /** Exactly the configuration this module reads — so a test can build one without the whole app's. */
 export interface AuthConfig {
   betterAuth: BetterAuthConfig;
   google: GoogleConfig;
   email: EmailConfig;
+  /** Frontend origin used by lifecycle-email links, injected from the same runtime config. */
+  appBaseUrl: string;
 }
 
 /** The deployment's own auth-side configuration, as the slice this module and the mount read. */
@@ -48,6 +57,7 @@ export function authConfigFromEnvironment(): AuthConfig {
     betterAuth: defaultConfig.betterAuth,
     google: defaultConfig.google,
     email: defaultConfig.email,
+    appBaseUrl: defaultConfig.appBaseUrl,
   };
 }
 
@@ -72,6 +82,8 @@ export interface CreateAuthOptions {
   email?: OutboundEmailPort;
   /** Where a delivery failure is reported. Defaults to stderr, which is what the deployment reads. */
   logger?: AuthLogger;
+  /** Test/composition seam for the bounded post-commit lifecycle-email accelerator. */
+  notificationQueue?: NotificationDispatchEnqueuer;
   production?: boolean;
 }
 
@@ -124,6 +136,22 @@ export function createAuth(options: CreateAuthOptions = {}) {
   const production = options.production ?? process.env.NODE_ENV === "production";
   const outboundEmail = options.email ?? new EmailService({ config: cfg.email, production });
   const logger = options.logger ?? consoleLogger;
+  // Auth may be composed over a test database, transport and config. Build the accelerator from
+  // those exact seams rather than using the process-global queue, while keeping durable rows and
+  // the nightly dispatcher as the source of truth if this bounded queue is full or the process
+  // exits before its fire-and-forget attempt completes.
+  const accountNotificationQueue =
+    options.notificationQueue ??
+    new NotificationDispatchQueue({
+      dispatcher: new NotificationDispatchService(db, {
+        email: outboundEmail,
+        appBaseUrl: cfg.appBaseUrl,
+        unsubscribe: { apiBaseUrl: cfg.betterAuth.url, secret: cfg.betterAuth.secret },
+        enabled: deliversEmail(cfg.email),
+        logger,
+      }),
+    });
+  const accountService = new AccountService(db, logger, accountNotificationQueue);
   const google = googleConfigured(cfg.google);
 
   return betterAuth({
@@ -153,6 +181,17 @@ export function createAuth(options: CreateAuthOptions = {}) {
     // what a request transiently is. The columns stay in the schema — no migration; they are
     // simply always empty — so the library's own reads keep their shape.
     databaseHooks: {
+      user: {
+        create: {
+          /** The auth user row is the actual signup event; this runs after its transaction commits. */
+          after: async (user) => {
+            // Account provisioning and the durable welcome row are best effort. In particular, a
+            // provider/database failure here must not turn a successful OTP or OAuth signup into a
+            // failed authentication response; legacy identities still provision on first /v1 use.
+            await accountService.recordSignupWelcome(user.id);
+          },
+        },
+      },
       session: {
         create: {
           before: async (session) => ({ data: { ...session, ipAddress: "", userAgent: "" } }),

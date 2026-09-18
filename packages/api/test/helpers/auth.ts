@@ -66,6 +66,7 @@ function testConfig(secret: string): AuthConfig {
     },
     google: { clientId: undefined, clientSecret: undefined },
     email,
+    appBaseUrl: "http://127.0.0.1:3005",
   };
 }
 
@@ -228,11 +229,18 @@ export async function seedAccount(input: SeedAccountInput): Promise<AccountRow> 
     .limit(1);
   const found = existing[0];
   if (!found) throw new Error(`could not seed account ${input.userId}`);
-  // A repeated seed must be able to set the role: suites reuse identities across cases.
-  if (input.role !== undefined && found.globalRole !== input.role) {
+  // A repeated seed must be able to set its fixture fields: the M5 auth signup hook eagerly creates
+  // an ordinary account before this helper applies the test handle/role.
+  const patch: Partial<typeof accounts.$inferInsert> = {};
+  if (input.handle !== undefined && found.handle !== input.handle) patch.handle = input.handle;
+  if (input.role !== undefined && found.globalRole !== input.role) patch.globalRole = input.role;
+  if (input.directCreate !== undefined && found.directCreate !== input.directCreate) {
+    patch.directCreate = input.directCreate;
+  }
+  if (Object.keys(patch).length > 0) {
     const updated = await db
       .update(accounts)
-      .set({ globalRole: input.role })
+      .set(patch)
       .where(eq(accounts.id, found.id))
       .returning();
     return updated[0] ?? found;

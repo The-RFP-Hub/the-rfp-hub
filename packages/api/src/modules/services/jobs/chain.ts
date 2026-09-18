@@ -6,7 +6,7 @@
  * enforced by nobody, in a place this repository cannot read: a caller that reorders the steps, or
  * starts them on a timer instead of on exit, breaks it silently and every run still reports green.
  * `runChain` moves the rule to where it can be checked, and `jobs.js all` is what a scheduler
- * should call instead of five tasks it has to sequence itself.
+ * should call instead of six tasks it has to sequence itself.
  *
  * TWO DECISIONS MAKE IT USEFUL RATHER THAN JUST SHORTER.
  *

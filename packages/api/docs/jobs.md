@@ -14,15 +14,16 @@ process; it calls the same dispatcher for the newly inserted row ids without inv
 
 ## 1. The catalog
 
-The five jobs, **in the order `registry.ts` lists them, which is the order the chain runs them**:
+The six jobs, **in the order `registry.ts` lists them, which is the order the chain runs them**:
 
 | Job | Shape | What it does |
 |---|---|---|
-| **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
+| **`all`** | chain | Runs the six below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no *current* vector for the configured provider — missing, from another model or provider, stale against the entry's text, or lacking the overlap scalars — records the pairs that come out, then re-judges suspected pairs the current rule did not write. It is a repair pass, not the primary detector: a normal write runs the same detection, over the same candidates, before it answers. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` per invocation, paced `VERIFY_HOST_MIN_GAP_MS` apart per host — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. A pass triggered over HTTP takes a smaller default slice (§4c). |
-| `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
+| `stale-listing-reminders` | cursor | Pages current verified publisher account/organization groups and queues one email-only event when a listing has had no publisher write or successful source-verification refresh for `STALE_LISTING_REMINDER_DAYS`. The rolling cooldown is per account + organization and measured from the later of the row's creation and successful dispatch; in-flight/retryable rows and concurrent generators are guarded in the database, while terminally exhausted rows release the guard. It never calls an email provider. |
+| `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate and lifecycle copy, re-checks publisher membership for lifecycle rows, and sends through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
@@ -33,6 +34,66 @@ sequence literally, so a new job joins the night deliberately rather than by bei
 
 `all` is not itself a job: it takes no lock of its own, appears in no catalog, and is refused by
 `POST /v1/admin/jobs/{job}/run`. It is the entry point running the catalog in order.
+
+### Lifecycle email semantics
+
+Lifecycle events are durable, email-only rows in `notifications`; they are deliberately filtered
+out of the public duplicate-notification inbox. A successful auth user-create hook provisions the
+application account and records one `welcome` row keyed by `(account, welcome, email:account,
+account)`. Account resolution remains idempotent for legacy identities, while repeated logins, OTP
+sends, and OAuth callbacks cannot create another welcome event; a database or email-provider
+failure is logged and does not reject authentication.
+
+Publisher verification records one `publisher_verified` row per current organization member when a
+real `false → true` transition commits, whether the transition came from the review endpoint or an
+approved claim. Repeating verification is a no-op; unverify → verify is a new transition and a new
+row (the subject kind carries the organization and transition time). A member who joins an
+already-verified organization — a reviewer grant or a redeemed invite — gets the same email. Delivery re-checks that the recipient is still a
+member of the still-verified organization, so a stale membership cannot receive a lifecycle email.
+
+`stale-listing-reminders` defaults to 60 days of no publisher write or successful source-verification
+refresh and a 30-day rolling cooldown. An eligible listing is open, approved, listed, unmerged, has
+no future fixed deadline, and is joined to a verified organization with a current member; imported
+source slugs alone never identify a recipient. Rows are grouped to at most 20 listings per account /
+organization. The job checks `greatest(created_at, email_dispatched_at)` under the current
+membership row lock, while a partial unique index prevents overlapping in-flight/retryable events;
+terminally exhausted rows release the guard, and exact interval expiry is allowed. The reminder job
+only queues rows; `notification-dispatch` owns provider
+calls, a five-minute retry floor, three bounded attempts, terminal recipient failures, and
+`email_dispatched_at`/`email_failed_at` evidence.
+
+Stale reminders are the one bulk message, so they carry an opt-out. Each email has a footer link and
+RFC 8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers pointing at
+`{BETTER_AUTH_URL}/v1/email/unsubscribe?token=…`. The token is an HMAC of the account id under a key
+derived from `BETTER_AUTH_SECRET`, so rotating that secret invalidates links already sent. `GET`
+only renders a confirmation form (link scanners prefetch); `POST` sets
+`accounts.stale_reminders_opted_out_at` idempotently. The generator skips opted-out accounts, and
+`notification-dispatch` terminally fails an already-queued reminder with `recipient_opted_out`.
+Welcome and publisher-verification emails are transactional and ignore the opt-out.
+
+For a production evidence check, run the following read-only query against the runtime database
+(never against a production database from a local workstation) after the scheduler has run. It
+counts successful dispatches, not tests or queued rows, and reports the two M5 acceptance measures:
+
+```sql
+SELECT
+  count(DISTINCT account_id) FILTER (
+    WHERE kind = 'stale_listing_reminder'
+      AND email_dispatched_at >= now() - interval '30 days'
+  ) AS stale_publishers_rolling_30d,
+  count(DISTINCT account_id) FILTER (
+    WHERE kind = 'welcome'
+      AND email_dispatched_at IS NOT NULL
+  ) AS onboarding_welcomes_dispatched,
+  count(*) FILTER (WHERE email_failed_at IS NOT NULL AND email_dispatched_at IS NULL)
+    AS undelivered_lifecycle_rows
+FROM notifications
+WHERE kind IN ('stale_listing_reminder', 'welcome');
+```
+
+The code and tests prove eligibility, idempotency, retry/failure handling, and hooks; they do not
+claim production delivery evidence. Record the query result, scheduler run id, and deployment
+environment when reporting `>=5` rolling publishers and `>=1` onboarding signup.
 
 ### `retention` is a deprecated alias, for one release
 
@@ -101,7 +162,7 @@ collapsed them would report a permanently unconfigured job as healthy contention
 ## 2. The schedule, and the ordering it exists to guarantee
 
 **One schedule owns the whole chain, and it is not in this repository.** An external scheduler runs
-the five jobs at **01:05 UTC**. They carry **one ordering rule** between them: the four below are
+the six jobs at **01:05 UTC**. They carry **one ordering rule** between them: the five below are
 independent and may run in any order or in parallel; `staleness` runs **after all of them**.
 
 ```
@@ -109,14 +170,15 @@ UTC
 01:05  external scheduler ──┬─ analytics-rollup ──────┐  (rolls up, then prunes)
                             ├─ embedding-backfill ────┤  independent of each other:
                             ├─ verification-backfill ─┤  any order, or in parallel
-                            └─ notification-dispatch ─┘
+                            ├─ stale-listing-reminders ─┤
+                            └─ notification-dispatch ───┘
                                        │
-                                       └──> staleness   ← after ALL four, always
+                                       └──> staleness   ← after ALL five, always
 
 03:17  nightly-export.yml     publishes the dataset — its OWN cron, not chained (see below)
 ```
 
-Running the five one at a time satisfies that rule; so does running the four together and
+Running the six one at a time satisfies that rule; so does running the five together and
 `staleness` when the last of them exits. The rule is the contract (§4d); serializing is one way to
 meet it.
 
@@ -136,7 +198,7 @@ double-write — but they do interleave, and `staleness` running while `verifica
 still going closes entries that a successful check was about to keep open, with **both runs
 reporting success** (§4d has the walk-through). Putting `staleness` after everything, under a single
 caller, is what prevents that: a successful check writes `lastSeenAt`, and staleness reads that
-state after it has settled instead of underneath it. The other four write nothing each other reads,
+state after it has settled instead of underneath it. The other five write nothing each other reads,
 which is why they carry no ordering at all.
 
 There is no notification-only cron or workflow. Normal delivery starts immediately after the
@@ -579,7 +641,7 @@ carries the time of the change, which is where that fact belongs.
 ### a. A one-off ECS task, started by hand (an operator)
 
 **This repository has no maintenance workflow.** The Actions dispatch that used to exist is gone
-along with the chain's schedule: the external scheduler runs the five nightly, and an operator who
+along with the chain's schedule: the external scheduler runs the six nightly, and an operator who
 needs a job run outside that — staging, or a recovery after a failed external run — starts the same
 one-off task directly. It is **two calls**: read the service to learn where the API runs, then start
 its task definition there with a different command.
@@ -677,9 +739,9 @@ node packages/api/dist/jobs.js <job> --json   # one job, if you have a reason to
 ```
 
 **Call `all`.** It runs `CHAIN` — `analytics-rollup`, `embedding-backfill`, `verification-backfill`,
-`notification-dispatch`, `staleness` — sequentially, in this process, so the ordering rule below is
+`stale-listing-reminders`, `notification-dispatch`, `staleness` — sequentially, in this process, so the ordering rule below is
 **enforced by the code that knows what it is for** rather than by a scheduler holding a rule written
-in prose in a repository it does not read. A caller that names the five tasks itself is still
+in prose in a repository it does not read. A caller that names the six tasks itself is still
 correct if it sequences them correctly; `all` is correct without having to.
 
 Two things `all` does NOT change. The **advisory lock is still per job**, taken by each job in turn
@@ -770,14 +832,14 @@ therefore interleave, and the interleaving loses work while every single run rep
 now holds it for you.** As deployed:
 
 > **One scheduler runs `jobs.js all`, once. `analytics-rollup`, `embedding-backfill`,
-> `verification-backfill` and `notification-dispatch` are INDEPENDENT — any order, or in parallel.
-> `staleness` runs AFTER ALL FOUR HAVE EXITED. The chain must finish before 03:17 UTC, when the
+> `verification-backfill`, `stale-listing-reminders` and `notification-dispatch` jobs are INDEPENDENT — any order, or in parallel.
+> `staleness` runs AFTER ALL FIVE HAVE EXITED. The chain must finish before 03:17 UTC, when the
 > open-data export publishes, so the snapshot is a closed dataset rather than a half-maintained
 > one.**
 
 Each clause carries weight:
 
-* **The four are independent**, in the sense that matters: none of them needs another to have run
+* **The five are independent**, in the sense that matters: none of them needs another to have run
   for its own result to be right, so a caller running them itself is free to run them in any order
   or concurrently. `all` runs them one at a time anyway — they share one database and one
   container's CPU, the chain has over two hours of margin, and it does not need the minutes.
@@ -785,10 +847,10 @@ Each clause carries weight:
   One soft preference rides along with that order, and it is latency rather than correctness:
   `embedding-backfill` runs with the immediate-email accelerator switched off (a job container
   tears its pool down as soon as the job resolves, which would strand a fire-and-forget send), so
-  the notifications it inserts wait for the dispatcher. `CHAIN` puts `notification-dispatch` after
-  it, which gets them out the SAME night. Reverse them and nothing breaks: the rows are durable and
-  the next sweep takes them.
-* **`staleness` after all four, by EXIT.** It reads what `verification-backfill` writes, and exit
+  the notifications it inserts wait for the dispatcher. `CHAIN` puts `stale-listing-reminders`
+  before `notification-dispatch`, which gets them out the SAME night. Reverse them and nothing
+  breaks: the rows are durable and the next sweep takes them.
+* **`staleness` after all five, by EXIT.** It reads what `verification-backfill` writes, and exit
   code — not elapsed time — is what says a job is done: a caller that starts `staleness` on a timer
   is racing the pass it depends on, and the race is silent (the walk-through above). Inside `all`
   this is a `for` loop over `CHAIN` and cannot be got wrong.
@@ -846,7 +908,7 @@ Before the first M3 job run on any deployment, in order:
    anything is started.
 7. Point the **external scheduler** at `node packages/api/dist/jobs.js all --json` — one task,
    with the ordering §4d requires already held in-process — and monitor it there: this repository
-   schedules nothing and will not report its absence. A scheduler still naming the five jobs
+   schedules nothing and will not report its absence. A scheduler still naming the six jobs
    individually keeps working; one still naming `retention` should drop it (§1). Nothing
    here triggers the export either — it runs on its own cron (§2) — so confirm it separately, by
    waiting for its 03:17 run or by dispatching *Nightly open-data export* directly.
@@ -861,6 +923,7 @@ Before the first M3 job run on any deployment, in order:
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES`, `DEDUPE_OVERLAP_ENABLED`, `DEDUPE_OVERLAP_THRESHOLD`, `DEDUPE_OVERLAP_MIN_TOKENS`, `DEDUPE_OVERLAP_MIN_SIMILARITY` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFY_HOST_MIN_GAP_MS` (default 1000), `VERIFICATION_RUNS_KEEP` (default 5) |
+| `stale-listing-reminders` | `STALE_LISTING_REMINDER_DAYS` (default 60), `STALE_LISTING_REMINDER_CADENCE_DAYS` (default 30) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 

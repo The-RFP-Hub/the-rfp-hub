@@ -44,6 +44,11 @@ import { effectiveCaps } from "../../shared/capabilities.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
+import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 
 const NOTE_MAX = 1_000;
 
@@ -54,9 +59,14 @@ export interface ClaimInput {
 
 export class ClaimService {
   private readonly repos: Repositories;
+  private readonly notificationQueue: NotificationDispatchEnqueuer;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(
+    private readonly db: DB = defaultDb,
+    options: { notificationQueue?: NotificationDispatchEnqueuer } = {},
+  ) {
     this.repos = repositories(db);
+    this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
   }
 
   async claim(
@@ -376,7 +386,7 @@ export class ClaimService {
     claimId: number,
     decision: { approve: boolean; verifyOrganization?: boolean },
   ): Promise<ClaimResultView> {
-    return withTransaction(this.db, async (repos) => {
+    const settled = await withTransaction(this.db, async (repos) => {
       // THE ENTRY IS LOCKED FIRST, before the claim and the organisation.
       //
       // `grant()` takes the opportunity, then the organisation, then the membership, and settles
@@ -430,13 +440,22 @@ export class ClaimService {
           opportunityId: entry.publicId,
           organizationSlug: found.organization.slug,
           message: "the claim was rejected; publisher ownership is unchanged.",
+          publisherVerifiedNotificationIds: [],
         };
       }
 
       let verified = found.organization.verified;
+      let publisherVerifiedNotificationIds: number[] = [];
       if (decision.verifyOrganization === true && !verified) {
         await repos.organizations.verifyForClaim(found.organization.id, now);
         verified = true;
+        publisherVerifiedNotificationIds = await repos.notifications.record(
+          buildPublisherVerifiedNotifications(
+            await repos.memberships.accountIdsForOrganization(found.organization.id),
+            found.organization,
+            now,
+          ),
+        );
         await repos.audit.record({
           ...reviewerActor,
           subjectKind: "organization",
@@ -496,8 +515,12 @@ export class ClaimService {
         message: verified
           ? `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`
           : `\`${found.organization.slug}\` now publishes this entry, but the organization is NOT verified — future writes into that namespace will keep landing pending until it is.`,
+        publisherVerifiedNotificationIds,
       };
     });
+    this.notificationQueue.enqueue(settled.publisherVerifiedNotificationIds);
+    const { publisherVerifiedNotificationIds: _ignored, ...result } = settled;
+    return result;
   }
 }
 

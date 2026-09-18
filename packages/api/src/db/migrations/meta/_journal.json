@@ -92,6 +92,27 @@
       "when": 1788872055950,
       "tag": "0012_description_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789000000000,
+      "tag": "0013_m5_email_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789395716874,
+      "tag": "0014_stale_listing_pending_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789745875524,
+      "tag": "0015_stale_reminder_opt_out",
+      "breakpoints": true
     }
   ]
 }
