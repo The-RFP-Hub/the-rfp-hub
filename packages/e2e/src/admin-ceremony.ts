@@ -28,10 +28,9 @@ export interface GrantAdminResult {
  * a run whose whole privileged surface is untestable, and that must fail loudly at bring-up rather
  * than as forty confusing 403s later.
  *
- * `--create` provisions the account when the address has never signed in, which is the normal case
- * here: the ceremony happens during bring-up, before anyone has authenticated. It is also why the
- * just-in-time provisioning assertion deliberately watches a NON-administrator identity — the
- * administrator's account now exists before its first request, by design.
+ * `--create` provisions the account when the address has an identity but no account row. The
+ * signup-provisioning assertion watches a NON-administrator identity so the ceremony's role grant
+ * cannot mask what signup alone created.
  */
 export async function grantAdmin(options: {
   email: string;

@@ -391,10 +391,8 @@ async function bringUp(ctx: Context): Promise<RunState> {
   //
   // ALL OF THIS IS NOW POSSIBLE OFFLINE, and the order is the interesting part.
   //
-  // Signing in creates the `auth_user` row and nothing else — the product's `accounts` row is
-  // created just-in-time on the first `/v1/me`, which is itself an M3 criterion. So bring-up
-  // deliberately signs in and then does NOT call `/v1/me`, leaving that first request for the
-  // acceptance setup to observe.
+  // Signing in creates the `auth_user` row and, through the API's signup hook, the `accounts` row.
+  // Bring-up does not call `/v1/me`; the acceptance setup asserts the first request reuses that row.
   // This process signs in too, so it needs the same two pointers the workers get.
   process.env[API_URL_ENV] = apiUrl;
   process.env[OUTBOX_ENV] = ctx.outboxDir;

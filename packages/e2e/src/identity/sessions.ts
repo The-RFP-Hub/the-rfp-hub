@@ -84,9 +84,8 @@ function deps(): SignInDeps {
  * Signs in as `email`, creating the identity if this is its first time.
  *
  * There is no separate "register" step, and that is the product's design rather than a shortcut: the
- * first successful code exchange for an address creates the `auth_user` row. The corresponding
- * `accounts` row is created just-in-time by the API on the first `/v1/me` — which is itself an M3
- * criterion, and is why nothing here calls `/v1/me` as a side effect.
+ * first successful code exchange for an address creates the `auth_user` row, and the API's signup hook
+ * creates the matching `accounts` row with it.
  */
 export async function identityFor(
   email: string,

@@ -5,12 +5,9 @@
  * runs first, its result is visible in the report, and a failure here stops the dependent projects
  * rather than letting forty specs fail one by one with the same cause.
  *
- * IT IS WHERE THE JUST-IN-TIME PROVISIONING CRITERION IS ASSERTED, and that is why bring-up signs in
- * and then deliberately does NOT call `/v1/me`. Signing in creates the identity row and nothing
- * else; the product's `accounts` row is created by the API on the first `/v1/me` a fresh identity
- * ever sends. That first request is the assertion — the account must not exist before it and must
- * exist as a `submitter` after it — and a bring-up step that had "checked the session works" would
- * have consumed the only chance to observe it.
+ * IT IS WHERE SIGNUP PROVISIONING IS ASSERTED. The first successful sign-in creates the identity, a
+ * `submitter` account and its welcome email event, before any `/v1` request; the first `/v1/me` must
+ * then resolve to that same account rather than create another.
  *
  * THE LADDER TEST THAT USED TO OPEN THIS FILE IS GONE. It recorded which rung a run had reached and
  * which criteria were therefore blocked, because identities came from a third-party tenant and how
@@ -19,7 +16,7 @@
  *
  * Order is load-bearing:
  *   1. a fresh database grants nothing (the re-scoped cross-run assertion)
- *   2. the plain submitter's first request (fresh account, `submitter`)
+ *   2. signup provisioning (account + welcome at sign-in, reused by the first request)
  *   3. the administrator the operator ceremony made, and the ceremony's idempotence
  *   4. every remaining identity's first request
  *   5. provisioning: organizations, memberships, verification — all through real routes
@@ -78,54 +75,44 @@ test("a fresh database grants nothing: no role survives a run", async ({ stack, 
   ).toBe(1);
 });
 
-test("M3-1 just-in-time provisioning: a fresh identity's first request creates a submitter account", async ({
+test("M5 signup provisioning: sign-in creates a submitter account and a welcome, the first request reuses it", async ({
   stack,
   db,
 }) => {
-  // The candidate must be an identity NOTHING has spoken to yet.
-  //
-  // The browser identity is disqualified by construction: bring-up signs it in, and the frontend
-  // issues `/v1/me` as soon as the session restores — so by the time this test runs, its account
-  // already exists and the "did not exist beforehand" assertion could only ever fail. That is not a
-  // product defect, it is this criterion being unobservable for that identity, and the honest
-  // response is to use a different one or report the criterion blocked.
-  const untouched = ([stack.actors.submitter, stack.actors.publisher] as const).find(
+  const actor = ([stack.actors.submitter, stack.actors.publisher] as const).find(
     (candidate) => candidate && candidate.userId !== stack.browserUserId,
   );
-  test.skip(
-    !untouched,
-    "BLOCKED: every available non-administrator identity has already signed in through the browser " +
-      "during bring-up, so no first-ever request is left to observe.",
-  );
-  const actor = untouched;
+  test.skip(!actor, "BLOCKED: no non-administrator identity outside the browser session.");
   if (!actor) return;
 
-  // The account must not exist BEFORE the first request. Asserted against the database rather than
-  // inferred from the response, because the response cannot distinguish "created just now" from
-  // "existed already" — and that distinction is the whole criterion.
-  const before = await db.query("SELECT id FROM accounts WHERE auth_user_id = $1", [actor.userId]);
-  expect(before.rowCount, `no account may exist for ${actor.email} before its first request`).toBe(
-    0,
+  const before = await db.query<{ id: number; global_role: string }>(
+    "SELECT id, global_role FROM accounts WHERE auth_user_id = $1",
+    [actor.userId],
   );
+  expect(before.rowCount, `sign-in provisioned exactly one account for ${actor.email}`).toBe(1);
+  expect(before.rows[0]?.global_role).toBe("submitter");
+  const accountId = Number(before.rows[0]?.id);
+
+  const welcome = await db.query(
+    "SELECT id FROM notifications WHERE account_id = $1 AND kind = 'welcome'",
+    [accountId],
+  );
+  expect(welcome.rowCount, "signup recorded exactly one welcome email event").toBe(1);
 
   const { token } = await sessionFor(actor.email);
   const client = new ApiClient({ baseUrl: stack.urls.api, token, userAgent: DESKTOP_UA });
   const view = await me(client);
 
+  expect(view.accountId).toBe(accountId);
   expect(view.role).toBe("submitter");
   expect(view.credentialKind).toBe("session");
   expect(view.canAdmin).toBe(false);
   expect(view.canReview).toBe(false);
-  // Any session can manage its own keys — a submitter included. This is the API's own answer and
-  // the frontend renders its navigation from it.
   expect(view.canManageKeys).toBe(true);
   expect(view.memberships).toEqual([]);
 
-  const after = await db.query("SELECT id, global_role FROM accounts WHERE auth_user_id = $1", [
-    actor.userId,
-  ]);
-  expect(after.rowCount).toBe(1);
-  expect(after.rows[0].global_role).toBe("submitter");
+  const after = await db.query("SELECT id FROM accounts WHERE auth_user_id = $1", [actor.userId]);
+  expect(after.rowCount, "the first request created no second account").toBe(1);
 
   updateState((state) => {
     const target = ([state.actors.submitter, state.actors.publisher] as const).find(

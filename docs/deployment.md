@@ -326,7 +326,7 @@ non-zero and says which one it wanted:
 
 | Flag | Why it is not the default |
 |---|---|
-| `--create` | Signing in makes the identity, but the `accounts` row is provisioned lazily on the first authenticated `/v1` request. Run right after sign-in — before the dashboard has ever loaded — the script finds an identity with no account, and this is what provisions one. It cannot conjure an identity that has never signed in |
+| `--create` | Signing in makes the identity and, through the signup hook, its `accounts` row. Identities created before that hook may still have no account until their first authenticated `/v1` request; this provisions one for them. It cannot conjure an identity that has never signed in |
 | `--allow-remote` | The script refuses any `DATABASE_URL` whose host is not loopback, because the ordinary case is a developer's own machine and a remote host is a production database somebody meant to point elsewhere. A deployed run **always** needs it: `refusing: <host> is not loopback. Re-run with --allow-remote if that is the database you mean.` |
 | `--yes` | It refuses to write at all without it |
 
