@@ -153,6 +153,30 @@ function fallbackLabel(value: string): string {
   return words === "" ? value : `${words[0]?.toUpperCase() ?? ""}${words.slice(1)}`;
 }
 
+/** The type as a chip: the short form where the full label would not fit a badge. */
+const FUNDING_TYPE_CHIP_LABELS: Readonly<Record<string, string>> = {
+  rfp: "RFP",
+  vc_fund: "VC fund",
+};
+
+export function fundingTypeChipLabel(value: string): string {
+  return FUNDING_TYPE_CHIP_LABELS[value] ?? fundingTypeLabel(value);
+}
+
+/** The type as a group heading: pills, tiles, filters. */
+const FUNDING_TYPE_PLURALS: Readonly<Record<string, string>> = {
+  grant: "Grants",
+  hackathon: "Hackathons",
+  bounty: "Bounties",
+  rfp: "RFPs",
+  accelerator: "Accelerators",
+  vc_fund: "Venture funds",
+};
+
+export function fundingTypePlural(value: string): string {
+  return FUNDING_TYPE_PLURALS[value] ?? `${fundingTypeLabel(value)}s`;
+}
+
 export function fundingTypeLabel(value: string): string {
   return FUNDING_TYPE_LABELS[value] ?? fallbackLabel(value);
 }

@@ -98,9 +98,7 @@ export function ErrorState({
         <p className="empty-title">
           <IconLabel icon={ExclamationTriangleIcon}>Your sign-in has ended.</IconLabel>
         </p>
-        <p className="muted">
-          Sign in again to continue to {what}. Nothing was lost, and you can pick up where you were.
-        </p>
+        <p className="muted">Sign in again to continue to {what}.</p>
         {onLogin ? (
           <p className="row">
             <button type="button" className="button-primary" onClick={onLogin}>

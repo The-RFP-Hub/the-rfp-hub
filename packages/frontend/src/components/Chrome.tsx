@@ -27,6 +27,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { BUILT_BY, FUNDED_BY } from "@/lib/credits";
 import {
+  DIRECTORY,
   HOW_IT_WORKS,
   HOW_IT_WORKS_ROLES,
   PUBLISHERS,
@@ -90,7 +91,7 @@ function badgeText(count: number): string {
 
 /** Readable to everybody, session or not. */
 const PUBLIC_NAV: NavItem[] = [
-  { href: "/", label: "Directory", icon: ListBulletIcon },
+  { href: DIRECTORY, label: "Directory", icon: ListBulletIcon },
   { href: PUBLISHERS, label: "Publishers", icon: CheckBadgeIcon },
   { href: HOW_IT_WORKS, label: "How it works", icon: BookOpenIcon },
 ];
@@ -343,7 +344,7 @@ export function Chrome({ children }: { children: ReactNode }) {
           <BrandMark className="brand-mark" />
           <span className="brand-text">
             RFP Hub
-            <span className="brand-tagline">an open index of funding opportunities</span>
+            <span className="brand-tagline">an open index of Ethereum funding</span>
           </span>
         </GuardedLink>
 
@@ -553,7 +554,7 @@ export function RequireSession({
   if (!session.authenticated) {
     return (
       <div className="state empty">
-        <p className="empty-title">{gate?.title ?? "You are not signed in."}</p>
+        <h1 className="empty-title">{gate?.title ?? "You are not signed in."}</h1>
         <p className="muted">
           {gate?.detail ??
             "This page shows one account’s own listings and traffic, so it needs a session."}
@@ -585,7 +586,7 @@ export function RequireSession({
   if (capability && !capability.needs(me)) {
     return (
       <div className="state empty">
-        <p className="empty-title">{capability.title}</p>
+        <h1 className="empty-title">{capability.title}</h1>
         <p className="muted">{capability.detail}</p>
         <p className="row">
           <GuardedLink href="/account">Check your account</GuardedLink>

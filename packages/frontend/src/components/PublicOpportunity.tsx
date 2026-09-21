@@ -20,7 +20,9 @@ import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresenta
 import { PublicClaimControl } from "@/components/ClaimForm";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { IconLabel } from "@/components/IconLabel";
-import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
+import { OrgMark } from "@/components/OrgMark";
+import { UntrustedMarkdown } from "@/components/UntrustedMarkdown";
+import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError, linkOutUrl } from "@/lib/api";
@@ -29,13 +31,16 @@ import {
   describeDeadline,
   describeDeadlineEntry,
   formatAmount,
+  formatDate,
   formatInstant,
+  hasRollingDeadline,
 } from "@/lib/format";
 import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
 import { ArrowTopRightOnSquareIcon, GlobeAltIcon, LinkIcon } from "@heroicons/react/20/solid";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
@@ -123,152 +128,194 @@ export function OpportunityView({
   const operator = entry.operatingOrganizations[0];
   const namespace = entry.id.split(":")[0];
 
+  const typeLabel = fundingTypeLabel(entry.fundingType);
+  const claimed = Boolean(source.publisher);
+
   return (
-    <>
-      <h1>
-        <UntrustedText value={entry.title} />
-      </h1>
-      <p className="muted">
-        {fundingTypeLabel(entry.fundingType)} · <StatusBadge status={entry.status} />
-        {operator ? (
-          <>
-            {" "}
-            · run by <UntrustedText value={operator.name} />
-          </>
-        ) : null}
-      </p>
-
-      {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
-
-      <ApplyAction entry={entry} baseUrl={baseUrl} />
-
-      {claimControl}
-
-      <dl className="grid-2 card">
-        <div>
-          <dt>Next deadline</dt>
-          <dd>{describeDeadline(entry.deadlines)}</dd>
-        </div>
-        <div>
-          <dt>Award</dt>
-          <dd>{award ? <UntrustedText value={award} /> : <span className="muted">—</span>}</dd>
-        </div>
-        <div>
-          <dt>Applications open</dt>
-          <dd>{formatInstant(entry.opensAt)}</dd>
-        </div>
-        <div>
-          <dt>Announced</dt>
-          <dd>{formatInstant(entry.postedAt)}</dd>
-        </div>
-        <div>
-          <dt>Committed to date</dt>
-          <dd>
-            <UntrustedText value={formatAmount(funding?.allocated, funding?.currency)} />
-          </dd>
-        </div>
-        <div>
-          <dt>Last updated here</dt>
-          <dd>{formatInstant(entry.updatedAt)}</dd>
-        </div>
-      </dl>
-
-      <h2>About this opportunity</h2>
-      <UntrustedBlock value={entry.description} />
-
-      <Prose title="Who may apply" value={entry.eligibility} />
-      <Prose title="What a proposal must contain" value={entry.prerequisites} />
-      <Prose title="Service agreement" value={entry.serviceAgreement} />
-      <Prose title="Further references" value={entry.additionalReferences} />
-
-      <Deadlines entry={entry} />
-      <Milestones entry={entry} />
-      <Organizations entry={entry} />
-      <Tags entry={entry} />
-      <Links entry={entry} />
-
-      {/*
-       * NAMED FOR WHO IT IS FOR. This block is raw JSON in a page otherwise written for applicants,
-       * and "Type-specific details (grant)" read like a section of the listing they were skipping
-       * by mistake. Saying "for developers" out loud costs nothing and stops a reader opening a
-       * pretty-printed object looking for the deadline.
-       */}
-      <details className="card">
-        <summary>Machine-readable details (for developers)</summary>
-        <p className="muted footnote">
-          Listing id: <code>{entry.id}</code>
-        </p>
-        <p className="muted footnote">
-          The Standard&rsquo;s <code>fundingDetails</code> block for a{" "}
-          <strong>{entry.fundingType}</strong>, verbatim. It is a different shape for each of the
-          six funding types, so it is shown as the listing itself carries it rather than through a
-          per-type layout that could drop a field a publisher entered.
-        </p>
-        <pre className="untrusted-block">{JSON.stringify(entry.fundingDetails, null, 2)}</pre>
-        <p className="muted footnote">
-          Source record, including the wire value for how this listing arrived.
-        </p>
-        <pre className="untrusted-block">{JSON.stringify(source, null, 2)}</pre>
-      </details>
-
-      <section aria-labelledby="provenance-heading" className="card">
-        <h2 id="provenance-heading">Where this listing came from</h2>
-        <p className="muted footnote">
-          The Hub republishes what a publisher or a submitter stated. The check below is a{" "}
-          <strong>low-bar anti-spam signal</strong> — the linked page exists and its title is about
-          the same program — and never a fact-check of the amounts or the dates.
-        </p>
-        <p>
-          <MatchBadge matched={source.verifiedAgainstSource ?? null} />{" "}
-          {source.verifiedAt ? (
-            <span className="muted">last checked {formatInstant(source.verifiedAt)}</span>
+    <div className="opportunity-layout">
+      <div className="opportunity-main">
+        <nav className="crumb muted" aria-label="Breadcrumb">
+          <Link href="/directory">Directory</Link>
+          <span aria-hidden="true"> / </span>
+          <Link href={`/directory?type=${encodeURIComponent(entry.fundingType)}`}>{typeLabel}</Link>
+          {operator ? (
+            <>
+              <span aria-hidden="true"> / </span>
+              <Link href={`/directory?organization=${encodeURIComponent(operator.slug)}`}>
+                <UntrustedText value={operator.name} />
+              </Link>
+            </>
           ) : null}
-        </p>
-        <dl className="grid-2">
+        </nav>
+
+        <div className="opportunity-head">
+          {operator ? (
+            <OrgMark slug={operator.slug} name={operator.name} verified={claimed} />
+          ) : null}
           <div>
-            <dt>Publisher</dt>
+            <h1>
+              <UntrustedText value={entry.title} />
+            </h1>
+            {/* One line, one voice: type, who runs it, where, and the status as the one badge. */}
+            <p className="opportunity-meta muted">
+              <span>
+                {typeLabel}
+                {operator ? (
+                  <>
+                    {" "}
+                    by <UntrustedText value={operator.name} />
+                  </>
+                ) : null}
+                {(entry.ecosystems ?? []).length > 0 ? (
+                  <>
+                    {" "}
+                    · <UntrustedText value={(entry.ecosystems ?? []).join(", ")} />
+                  </>
+                ) : null}
+              </span>
+              <StatusBadge status={entry.status} />
+            </p>
+          </div>
+        </div>
+
+        {/* The three facts an applicant decides on, before any prose: award, next date, and how
+          the program takes applications. */}
+        <dl className="facts-strip">
+          <div>
+            <dt>Award</dt>
             <dd>
-              <UntrustedText value={source.publisher} fallback="Not claimed by a publisher" />
+              {award ? <UntrustedText value={award} /> : <span className="muted">not stated</span>}
+              {funding?.allocated ? (
+                <small className="facts-note">
+                  <UntrustedText value={formatAmount(funding.allocated, funding.currency)} />{" "}
+                  committed so far
+                </small>
+              ) : null}
             </dd>
           </div>
           <div>
-            <dt>Namespace</dt>
-            <dd>
-              <code>{namespace}</code>
-            </dd>
+            <dt>Next deadline</dt>
+            <dd>{describeDeadline(entry.deadlines)}</dd>
           </div>
           <div>
-            <dt>Submitted by</dt>
-            <dd>
-              <UntrustedText value={source.submittedBy} fallback="not stated" />
-            </dd>
-          </div>
-          <div>
-            <dt>Submitted</dt>
-            <dd>{formatInstant(source.submittedAt)}</dd>
-          </div>
-          <div>
-            <dt>How it arrived</dt>
-            <dd>{ingestionMethodLabel(source.ingestedVia)}</dd>
-          </div>
-          <div>
-            <dt>Id at the source</dt>
-            <dd>
-              <UntrustedText value={source.originalId} fallback="not stated" />
-            </dd>
-          </div>
-          <div>
-            <dt>Archived snapshot</dt>
-            <dd>
-              <UntrustedLink href={source.snapshotUrl} />
-            </dd>
+            <dt>Applications</dt>
+            <dd>{hasRollingDeadline(entry.deadlines) ? "Rolling" : "Fixed dates"}</dd>
           </div>
         </dl>
-        <p className="muted footnote">
-          Conforms to RFP Hub Standard <code>{entry.specVersion}</code>.
+
+        {entry.summary ? <UntrustedMarkdown value={entry.summary} /> : null}
+
+        <h2>About this opportunity</h2>
+        <UntrustedMarkdown value={entry.description} />
+
+        <Prose title="Who may apply" value={entry.eligibility} />
+        <Prose title="What a proposal must contain" value={entry.prerequisites} />
+        <Prose title="Service agreement" value={entry.serviceAgreement} />
+        <Prose title="Further references" value={entry.additionalReferences} />
+
+        <Deadlines entry={entry} />
+        <Milestones entry={entry} />
+        <Organizations entry={entry} />
+        <Tags entry={entry} />
+        <Links entry={entry} />
+
+        {/*
+         * NAMED FOR WHO IT IS FOR. This block is raw JSON in a page otherwise written for applicants,
+         * and "Type-specific details (grant)" read like a section of the listing they were skipping
+         * by mistake. Saying "for developers" out loud costs nothing and stops a reader opening a
+         * pretty-printed object looking for the deadline.
+         */}
+        <details className="card">
+          <summary>Machine-readable details (for developers)</summary>
+          <p className="muted footnote">
+            Listing id: <code>{entry.id}</code>
+          </p>
+          <p className="muted footnote">
+            The Standard&rsquo;s <code>fundingDetails</code> block for a{" "}
+            <strong>{entry.fundingType}</strong>, verbatim. It is a different shape for each of the
+            six funding types, so it is shown as the listing itself carries it rather than through a
+            per-type layout that could drop a field a publisher entered.
+          </p>
+          <pre className="untrusted-block">{JSON.stringify(entry.fundingDetails, null, 2)}</pre>
+          <p className="muted footnote">
+            Source record, including the wire value for how this listing arrived.
+          </p>
+          <pre className="untrusted-block">{JSON.stringify(source, null, 2)}</pre>
+        </details>
+
+        <section aria-labelledby="provenance-heading" className="card">
+          <h2 id="provenance-heading">Where this listing came from</h2>
+          <p className="muted footnote">
+            The Hub republishes what a publisher or a submitter stated. The check below is a{" "}
+            <strong>low-bar anti-spam signal</strong>: it only confirms the linked page exists and
+            its title matches the program. It never fact-checks the amounts or the dates.
+          </p>
+          <p>
+            <MatchBadge matched={source.verifiedAgainstSource ?? null} />{" "}
+            {source.verifiedAt ? (
+              <span className="muted">last checked {formatInstant(source.verifiedAt)}</span>
+            ) : null}
+          </p>
+          <dl className="grid-2">
+            <div>
+              <dt>Publisher</dt>
+              <dd>
+                <UntrustedText value={source.publisher} fallback="Not claimed by a publisher" />
+              </dd>
+            </div>
+            <div>
+              <dt>Namespace</dt>
+              <dd>
+                <code>{namespace}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Submitted by</dt>
+              <dd>
+                <UntrustedText value={source.submittedBy} fallback="not stated" />
+              </dd>
+            </div>
+            <div>
+              <dt>Submitted</dt>
+              <dd>{formatInstant(source.submittedAt)}</dd>
+            </div>
+            <div>
+              <dt>How it arrived</dt>
+              <dd>{ingestionMethodLabel(source.ingestedVia)}</dd>
+            </div>
+            <div>
+              <dt>Id at the source</dt>
+              <dd>
+                <UntrustedText value={source.originalId} fallback="not stated" />
+              </dd>
+            </div>
+            <div>
+              <dt>Archived snapshot</dt>
+              <dd>
+                <UntrustedLink href={source.snapshotUrl} />
+              </dd>
+            </div>
+          </dl>
+          <p className="muted footnote">
+            Conforms to RFP Hub Standard <code>{entry.specVersion}</code>.
+          </p>
+        </section>
+      </div>
+
+      <aside className="opportunity-aside">
+        <ApplyAction entry={entry} baseUrl={baseUrl} />
+        <p className="muted footnote opportunity-aside-meta">
+          {claimed
+            ? "Published by its organization"
+            : "Listed from public sources, not yet claimed"}
+          . Indexed {formatDate(entry.postedAt)}, updated {formatDate(entry.updatedAt)} ·{" "}
+          <a href={`${baseUrl}/v1/opportunities/${encodeURIComponent(entry.id)}`}>JSON</a>
         </p>
-      </section>
-    </>
+        {/* Claiming is a publisher's action on a page written for applicants: last in the action
+            column, folded, never between the title and the apply button. */}
+        {claimControl}
+      </aside>
+    </div>
   );
 }
 
@@ -296,18 +343,21 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
 
   if (entry.applicationUrl) {
     return (
-      <div className="card">
-        <p className="row">
-          <a
-            className="button-primary"
-            href={linkOutUrl(baseUrl, entry.id, "apply")}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-              Apply on the program&rsquo;s own site
-            </IconLabel>
-          </a>
+      <div className="card action-card">
+        <a
+          className="button-primary action-primary"
+          href={linkOutUrl(baseUrl, entry.id, "apply")}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+            {operator && operator.name.length <= 24
+              ? `Apply on ${operator.name}’s site`
+              : "Apply on the program’s site"}
+          </IconLabel>
+        </a>
+        <p className="muted footnote">Applying takes you to the program&rsquo;s own site.</p>
+        <p className="row action-row">
           {entry.website ? (
             <a
               className="row-action-link"
@@ -320,24 +370,17 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           ) : null}
           <ShareLink />
         </p>
-        <p className="muted footnote">
-          The Hub does not take applications and never sees yours — you land on the program&rsquo;s
-          own page. The hop goes through the Hub so the publisher can see their listing was acted
-          on.
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="card">
+    <div className="card action-card">
       <p>
         <strong>This listing states no application link.</strong>
       </p>
       <p className="muted footnote">
-        That is what the publisher filed, not something missing from this page. Applications for
-        this program are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
-        says — start from the program&rsquo;s own site.
+        The publisher filed it this way. Start from the program&rsquo;s own site.
       </p>
       <p className="row">
         {entry.website ? (
@@ -380,7 +423,7 @@ function ShareLink() {
       await navigator.clipboard.writeText(window.location.href);
       setNote("Link copied");
     } catch {
-      setNote("Could not copy — use the address bar");
+      setNote("Could not copy. Use the address bar.");
     }
   };
 
@@ -404,7 +447,7 @@ function Prose({ title, value }: { title: string; value: string | null | undefin
   return (
     <>
       <h2>{title}</h2>
-      <UntrustedBlock value={value} />
+      <UntrustedMarkdown value={value} />
     </>
   );
 }

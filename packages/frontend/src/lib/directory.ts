@@ -128,6 +128,8 @@ export interface DirectorySelection {
   deadlineBefore: string;
   ordering: Ordering;
   page: number;
+  /** How the results render — table or a grid of cards. Never sent to the API: `directoryQuery`
+   *  does not read it, and it is not a filter, so it never resets the page or counts as "custom". */
 }
 
 /**
@@ -387,7 +389,7 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
 }
 
 /** The path plus querystring for a selection — what `router.replace` and a shared link both want. */
-export function selectionToHref(selection: DirectorySelection, path = "/"): string {
+export function selectionToHref(selection: DirectorySelection, path = "/directory"): string {
   const query = selectionToParams(selection).toString();
   return query ? `${path}?${query}` : path;
 }

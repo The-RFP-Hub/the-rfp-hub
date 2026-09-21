@@ -125,29 +125,31 @@ export function SeriesView({
 
       <details>
         <summary>Day by day</summary>
-        <table>
-          <caption>{METRIC_LABELS[metric]} per day, UTC</caption>
-          <thead>
-            <tr>
-              <th scope="col" className="numeric">
-                Day
-              </th>
-              <th scope="col" className="numeric">
-                {METRIC_LABELS[metric]}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {points.map((point) => (
-              <tr key={point.day}>
-                <th scope="row" className="numeric">
-                  {formatDay(point.day)}
+        <div className="table-scroll">
+          <table>
+            <caption>{METRIC_LABELS[metric]} per day, UTC</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="numeric">
+                  Day
                 </th>
-                <td className="numeric">{formatCount(point.value)}</td>
+                <th scope="col" className="numeric">
+                  {METRIC_LABELS[metric]}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {points.map((point) => (
+                <tr key={point.day}>
+                  <th scope="row" className="numeric">
+                    {formatDay(point.day)}
+                  </th>
+                  <td className="numeric">{formatCount(point.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </details>
 
       <p className="muted footnote">

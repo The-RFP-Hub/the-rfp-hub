@@ -7,7 +7,7 @@
 /** In-app. */
 export const HOW_IT_WORKS = "/how-it-works";
 export const HOW_IT_WORKS_ROLES = `${HOW_IT_WORKS}#roles`;
-export const DIRECTORY = "/";
+export const DIRECTORY = "/directory";
 export const PUBLISHERS = "/publishers";
 
 /** A literal: the address `package.json` names. A fork that wants its own edits one line. */

@@ -146,7 +146,7 @@ export default function AuthCompletePage() {
           <button type="button" onClick={openSignIn}>
             Sign in again
           </button>
-          <Link href="/">Back to the directory</Link>
+          <Link href="/directory">Back to the directory</Link>
         </p>
       </section>
     );

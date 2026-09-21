@@ -2,7 +2,7 @@
  * Asserted against `<main>` rather than the document: the global footer carries a Governance link on
  * every route, so finding the URL somewhere on the home page proves nothing about the home page.
  */
-import DirectoryPage from "@/app/page";
+import DirectoryPage from "@/app/directory/page";
 import { Chrome } from "@/components/Chrome";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
