@@ -893,6 +893,37 @@ run("M3DUP duplicate detection", () => {
       .update(opportunities)
       .set({ applicationUrl: "javascript:alert(document.cookie)" })
       .where(eq(opportunities.publicId, `${NS}:beta-copy`));
+
+    /**
+     * EVERY row the merge touches, before and after.
+     *
+     * "The survivor did not take the URL" is not the same claim as "nothing happened": a merge
+     * retires the loser, stamps both rows and closes the pair, and a rollback that missed any one
+     * of those would leave a half-merged pair behind while still passing a check on the URL alone.
+     * The comparison is whole-row, so a field this test does not know to name is covered too.
+     */
+    const mergeState = async () => ({
+      survivor: (
+        await db
+          .select()
+          .from(opportunities)
+          .where(eq(opportunities.publicId, `${NS}:beta`))
+          .limit(1)
+      )[0],
+      loser: (
+        await db
+          .select()
+          .from(opportunities)
+          .where(eq(opportunities.publicId, `${NS}:beta-copy`))
+          .limit(1)
+      )[0],
+      pair: await pairBetween(`${NS}:beta`, `${NS}:beta-copy`),
+    });
+
+    const before = await mergeState();
+    expect(before.survivor?.reviewStatus, "the survivor starts public").toBe("approved");
+    expect(before.survivor?.isListed).toBe(true);
+
     const unsafe = await app.inject({
       method: "POST",
       url: `/v1/review/duplicates/${pair?.id}/merge`,
@@ -901,14 +932,11 @@ run("M3DUP duplicate detection", () => {
     });
     expect(unsafe.statusCode, unsafe.body).toBe(409);
     expect(unsafe.json().error).toBe("merge_would_invalidate_survivor");
-    // Rolled back whole: the survivor did not take the value, and the pair is still open.
-    const [guarded] = await db
-      .select({ applicationUrl: opportunities.applicationUrl })
-      .from(opportunities)
-      .where(eq(opportunities.publicId, `${NS}:beta`))
-      .limit(1);
-    expect(guarded?.applicationUrl).not.toBe("javascript:alert(document.cookie)");
-    expect((await pairBetween(`${NS}:beta`, `${NS}:beta-copy`))?.status).not.toBe("merged");
+
+    // Not "the URL was not copied" — NOTHING moved. Both rows and the pair are byte-for-byte what
+    // they were, `updatedAt` and `mergedIntoId` included.
+    expect(await mergeState()).toEqual(before);
+
     await db
       .update(opportunities)
       .set({ applicationUrl: null })

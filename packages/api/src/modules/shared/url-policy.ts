@@ -19,13 +19,21 @@
  * rewrite, and the published corpus is already 100% `https:` across every one of these fields, so
  * requiring it costs no existing record and needs no backfill.
  *
- * THE LOOPBACK EXEMPTION is the same one `config.ts` states for `PUBLIC_BASE_URL`, in the same
- * words and through the same predicate: `https:` anywhere, `http:` on loopback, nothing else.
- * Plaintext to a host that is not reachable off the machine crosses no network segment on which it
- * could be observed or tampered with, and refusing it would make a local development stack and the
- * e2e run — which stands up a real fixture web server on 127.0.0.1 and points records at it —
- * impossible to express. A loopback URL published to a reader is inert rather than dangerous: it
- * addresses the reader's own machine.
+ * THE LOOPBACK EXEMPTION exists for LOCAL DEVELOPMENT AND FIXTURES, and for nothing else. It is
+ * the same rule `config.ts` states for `PUBLIC_BASE_URL`, through the same predicate: `https:`
+ * anywhere, `http:` on loopback, nothing else. Plaintext to a host that is not reachable off the
+ * machine crosses no network segment on which it could be observed or tampered with, and refusing
+ * it would make a local stack and the e2e run — which stands up a real fixture web server on
+ * 127.0.0.1 and points records at it — impossible to express.
+ *
+ * A LOOPBACK URL IS NOT INERT, and it is worth being exact about that rather than comfortable. It
+ * resolves on the machine of whoever OPENS it, so a published one addresses that reader's own local
+ * services — a dev server, a notebook, an admin panel on a home router. Two separate things keep
+ * that from mattering here, and neither is this predicate being clever: a loopback host is refused
+ * by the SSRF guard the verification fetcher applies to the ADDRESS it resolves to, independently
+ * of scheme and independently of this policy; and no production record carries one, because nothing
+ * outside a local stack has a reason to submit one. The exemption is scoped by what can realistically
+ * reach it, not by the destination being harmless.
  */
 import { isLoopbackHost } from "../../shared/loopback.js";
 
