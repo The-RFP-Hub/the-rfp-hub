@@ -18,7 +18,16 @@
  * is plainer: `http:` under a counted redirect on our own domain is a downgrade a network can
  * rewrite, and the published corpus is already 100% `https:` across every one of these fields, so
  * requiring it costs no existing record and needs no backfill.
+ *
+ * THE LOOPBACK EXEMPTION is the same one `config.ts` states for `PUBLIC_BASE_URL`, in the same
+ * words and through the same predicate: `https:` anywhere, `http:` on loopback, nothing else.
+ * Plaintext to a host that is not reachable off the machine crosses no network segment on which it
+ * could be observed or tampered with, and refusing it would make a local development stack and the
+ * e2e run — which stands up a real fixture web server on 127.0.0.1 and points records at it —
+ * impossible to express. A loopback URL published to a reader is inert rather than dangerous: it
+ * addresses the reader's own machine.
  */
+import { isLoopbackHost } from "../../shared/loopback.js";
 
 /** Every `format: uri` location in a Standard opportunity, as a JSON Pointer producer. */
 type UrlSite = { path: string; value: unknown };
@@ -85,13 +94,51 @@ export interface UrlPolicyProblem {
   message: string;
 }
 
+/**
+ * The authority form — `scheme://host/…` — and nothing looser.
+ *
+ * `new URL("https:example.org/apply")` yields protocol `https:` and host `example.org`, so a
+ * protocol test alone accepts it. It is a RELATIVE reference, and the RAW STRING is what ships in
+ * the feeds and the export: a consumer resolving it against their own base lands on
+ * `https://reader.example/folder/example.org/apply` instead. Requiring the `//` closes that
+ * discrepancy, and it costs nothing — it is what everybody writing a URL means anyway.
+ */
+const AUTHORITY_FORM = /^https?:\/\//i;
+
 /** True when `value` is a URL this hub will store and republish. */
 export function isPublishableUrl(value: string): boolean {
+  if (!AUTHORITY_FORM.test(value)) return false;
+  let url: URL;
   try {
-    return new URL(value).protocol === "https:";
+    url = new URL(value);
   } catch {
     return false;
   }
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && isLoopbackHost(url.hostname);
+}
+
+/**
+ * Why one value was refused, in terms of the mistake the publisher actually made.
+ *
+ * The three are worth telling apart: a wrong SCHEME is a different fix from a plaintext host, and
+ * both are a different fix from `https:example.org` — which names the right scheme and is still
+ * refused, so a message about schemes would send its author looking in the wrong place.
+ */
+function refusalFor(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "must be an absolute `https://` URL.";
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return `must be an \`https://\` URL — the ${url.protocol} scheme is not published.`;
+  }
+  if (!AUTHORITY_FORM.test(value)) {
+    return "must be written in full, as `https://host/path` — this form is a relative reference.";
+  }
+  return "must use `https:`, not `http:` (which is accepted only on loopback).";
 }
 
 /**
@@ -107,20 +154,7 @@ export function urlPolicyProblems(record: Record<string, unknown>): UrlPolicyPro
     if (typeof value !== "string" || value.trim() === "") continue;
     if (isPublishableUrl(value)) continue;
 
-    let scheme: string;
-    try {
-      scheme = new URL(value).protocol;
-    } catch {
-      problems.push({ path, message: "must be an absolute `https:` URL." });
-      continue;
-    }
-    problems.push({
-      path,
-      message:
-        scheme === "http:"
-          ? "must use `https:`, not `http:`."
-          : `must be an \`https:\` URL — the ${scheme} scheme is not published.`,
-    });
+    problems.push({ path, message: refusalFor(value) });
   }
   return problems;
 }

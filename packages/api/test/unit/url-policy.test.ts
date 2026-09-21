@@ -29,12 +29,30 @@ const REFUSED = [
   "file:///etc/passwd",
   "ftp://example.org/apply",
   "http://example.org/apply",
+  // The right scheme, but a RELATIVE reference: `new URL` resolves it to the same href, and the raw
+  // string is what ships in the feeds and the export, where a consumer resolves it against a
+  // different base entirely.
+  "https:example.org/apply",
+  "https:/example.org/apply",
 ];
 
 const ACCEPTED = [
   "https://example.org/apply",
   "https://example.org/apply?a=1&b=2#frag",
   "https://sub.example.org:8443/a/b",
+  "HTTPS://example.org",
+  // Plaintext that crosses no network segment. The same exemption `config.ts` states for
+  // PUBLIC_BASE_URL, through the same predicate — and the e2e stands up a real fixture web server
+  // on 127.0.0.1 and points records at it.
+  "http://localhost:3001/apply",
+  "http://127.0.0.1:8080/apply",
+  "http://127.0.0.2/apply",
+  "http://api.localhost:3001/apply",
+  "http://[::1]:3001/apply",
+  // The ROOT-ANCHORED form of the same names: a resolver treats these identically, and the
+  // compliance runner accepts `--api http://localhost.:3001`.
+  "http://localhost.:3001/apply",
+  "http://api.localhost.:3001/apply",
 ];
 
 /** A minimal object shell — the walk reads by shape and never needs a valid document. */
@@ -80,7 +98,7 @@ describe("urlPolicyProblems", () => {
       expect(problems).toEqual([
         {
           path: `/${field}`,
-          message: "must be an `https:` URL — the javascript: scheme is not published.",
+          message: "must be an `https://` URL — the javascript: scheme is not published.",
         },
       ]);
     },
@@ -88,8 +106,41 @@ describe("urlPolicyProblems", () => {
 
   it("names `http:` as its own mistake rather than an unpublishable scheme", () => {
     expect(urlPolicyProblems(doc({ applicationUrl: "http://example.org/apply" }))).toEqual([
-      { path: "/applicationUrl", message: "must use `https:`, not `http:`." },
+      {
+        path: "/applicationUrl",
+        message: "must use `https:`, not `http:` (which is accepted only on loopback).",
+      },
     ]);
+  });
+
+  /**
+   * `https:example.org` names the RIGHT scheme and is still refused, so a message about schemes
+   * would send its author looking in the wrong place.
+   */
+  it("tells a relative reference apart from a wrong scheme", () => {
+    expect(urlPolicyProblems(doc({ applicationUrl: "https:example.org/apply" }))).toEqual([
+      {
+        path: "/applicationUrl",
+        message:
+          "must be written in full, as `https://host/path` — this form is a relative reference.",
+      },
+    ]);
+  });
+
+  it("treats a root-anchored loopback name as loopback", () => {
+    expect(urlPolicyProblems(doc({ applicationUrl: "http://localhost.:3001/apply" }))).toEqual([]);
+    // Not a name any resolver accepts, so it is not quietly collapsed into one that is.
+    expect(
+      urlPolicyProblems(doc({ applicationUrl: "http://localhost..:3001/apply" })),
+    ).toHaveLength(1);
+    expect(urlPolicyProblems(doc({ applicationUrl: "http://example.com./apply" }))).toHaveLength(1);
+  });
+
+  it("allows plaintext on loopback, and only there", () => {
+    expect(urlPolicyProblems(doc({ applicationUrl: "http://127.0.0.1:8080/apply" }))).toEqual([]);
+    // A private LAN address is not loopback: that traffic crosses a real network.
+    expect(urlPolicyProblems(doc({ applicationUrl: "http://192.168.1.10/apply" }))).toHaveLength(1);
+    expect(urlPolicyProblems(doc({ applicationUrl: "http://10.0.0.1/apply" }))).toHaveLength(1);
   });
 
   it("reaches organization URLs on both sides of the funding relationship", () => {

@@ -437,6 +437,27 @@ describe("toDocument", () => {
     ).toBeUndefined();
   });
 
+  /**
+   * The form mirrors the hub's ingest policy, which is stricter than the schema on purpose: the
+   * schema's `format: uri` is RFC 3986 and calls every one of these conformant. Refusing them here
+   * is what puts the answer next to the input instead of in a 400.
+   */
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+    "http://example.org",
+    // The right scheme, but a relative reference: the raw string is what gets published.
+    "https:example.org/apply",
+  ])("refuses %s, which the schema alone accepts", (value) => {
+    expect(toDocument(usable({ website: value })).fieldProblems.website).toBeDefined();
+  });
+
+  it("accepts plaintext on loopback, so a local stack can be described as it runs", () => {
+    for (const value of ["http://localhost:3001/apply", "http://127.0.0.1:8080/apply"]) {
+      expect(toDocument(usable({ website: value })).fieldProblems.website).toBeUndefined();
+    }
+  });
+
   it("produces a document the Standard's own validator accepts", () => {
     const result = validateDocument(toDocument(usable()).document);
     expect(result.available).toBe(true);

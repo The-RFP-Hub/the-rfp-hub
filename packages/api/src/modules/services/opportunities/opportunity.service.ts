@@ -122,6 +122,13 @@ export class OpportunityService {
    * `deadlines[]` on the way in, and APPENDS AN AUDIT ROW when the write actually changed
    * something. Callers validate upstream (the seed's `gateForSeed`).
    *
+   * THAT INCLUDES THE URL POLICY, and deliberately so. This is the storage primitive, not an
+   * ingest gate: `modules/shared/url-policy.ts` is asserted by the two things that actually accept
+   * a document from outside — the authenticated write path and `gateForSeed` — while this stays
+   * able to express a row the policy would refuse. It has to be. Rows stored before the policy
+   * exist, the redirect and the feed mapper are written to cope with them, and the suites proving
+   * that have to be able to create one. A new importer calling this is a new caller of the policy.
+   *
    * ATOMIC, like the seed's batch form. The pre-image lock, the organization upserts, the
    * opportunity upsert and the history row are one decision or none: on the pool-bound bundle they
    * would commit independently, so a failure between the upsert and the audit insert would leave

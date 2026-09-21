@@ -879,6 +879,41 @@ run("M3DUP duplicate detection", () => {
     const pair = await pairBetween(`${NS}:beta`, `${NS}:beta-copy`);
     expect(pair, "beta and its copy should be suspected duplicates").toBeTruthy();
 
+    /**
+     * A merge copies fields from the loser onto an APPROVED, LISTED survivor — a door no submission
+     * can open, since the write path refuses these URLs. A row stored before that policy still
+     * carries one, so the policy is asserted on the MERGED RESULT too, inside the transaction that
+     * already rolls back a merge leaving the survivor non-conformant.
+     *
+     * Planted directly, because the write path is exactly what can no longer produce it. Asserted
+     * on THIS pair rather than a pair of its own: duplicate scoring reads a corpus-wide IDF table,
+     * so two more near-identical fixtures would move every other suspicion in this file.
+     */
+    await db
+      .update(opportunities)
+      .set({ applicationUrl: "javascript:alert(document.cookie)" })
+      .where(eq(opportunities.publicId, `${NS}:beta-copy`));
+    const unsafe = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair?.id}/merge`,
+      headers: bearer(reviewerToken),
+      payload: { survivorId: `${NS}:beta`, fields: ["applicationUrl"] },
+    });
+    expect(unsafe.statusCode, unsafe.body).toBe(409);
+    expect(unsafe.json().error).toBe("merge_would_invalidate_survivor");
+    // Rolled back whole: the survivor did not take the value, and the pair is still open.
+    const [guarded] = await db
+      .select({ applicationUrl: opportunities.applicationUrl })
+      .from(opportunities)
+      .where(eq(opportunities.publicId, `${NS}:beta`))
+      .limit(1);
+    expect(guarded?.applicationUrl).not.toBe("javascript:alert(document.cookie)");
+    expect((await pairBetween(`${NS}:beta`, `${NS}:beta-copy`))?.status).not.toBe("merged");
+    await db
+      .update(opportunities)
+      .set({ applicationUrl: null })
+      .where(eq(opportunities.publicId, `${NS}:beta-copy`));
+
     const merged = await app.inject({
       method: "POST",
       url: `/v1/review/duplicates/${pair?.id}/merge`,

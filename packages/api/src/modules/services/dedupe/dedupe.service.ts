@@ -83,6 +83,7 @@ import { DeadlineExceeded, withDeadline } from "../../shared/deadline.js";
 import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, descriptionHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
+import { urlPolicyProblems } from "../../shared/url-policy.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
@@ -1015,11 +1016,23 @@ export class DedupeService {
         });
         // Inside the transaction, so a merge that would leave the survivor non-conformant does not
         // happen at all rather than happening and being noticed later.
-        const { valid, errors } = validateOpportunity(toStandard(updated ?? survivor));
+        const merged = toStandard(updated ?? survivor);
+        const { valid, errors } = validateOpportunity(merged);
         if (!valid) {
           throw conflict(
             "merge_would_invalidate_survivor",
             `copying ${copied.fields.join(", ")} would leave ${JSON.stringify(survivor.publicId)} invalid against the Standard (${errors.length} violation(s)); the merge was rolled back.`,
+          );
+        }
+        // Conformance is not the whole of "acceptable": the loser may be a legacy row carrying a URL
+        // the write path would refuse today, and copying its `applicationUrl` onto an approved,
+        // listed survivor would publish that value through a door no submission can open. The same
+        // rollback, for the same reason.
+        const refused = urlPolicyProblems(merged as unknown as Record<string, unknown>);
+        if (refused.length > 0) {
+          throw conflict(
+            "merge_would_invalidate_survivor",
+            `copying ${copied.fields.join(", ")} would give ${JSON.stringify(survivor.publicId)} a URL this hub does not publish (${refused.map(({ path, message }) => `\`${path}\` ${message}`).join(" ")}); the merge was rolled back.`,
           );
         }
       }

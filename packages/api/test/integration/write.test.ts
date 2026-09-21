@@ -167,7 +167,7 @@ run("M3WRITE submissions", () => {
     expect(res.json().error).toBe("validation_failed");
     expect(res.json().issues).toContainEqual({
       path: "/applicationUrl",
-      message: expect.stringContaining("must be an `https:` URL"),
+      message: expect.stringContaining("must be an `https://` URL"),
     });
     expect(
       await db
@@ -190,7 +190,7 @@ run("M3WRITE submissions", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().issues).toContainEqual({
       path: "/website",
-      message: "must use `https:`, not `http:`.",
+      message: "must use `https:`, not `http:` (which is accepted only on loopback).",
     });
   });
 

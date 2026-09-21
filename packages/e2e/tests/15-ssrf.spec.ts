@@ -35,13 +35,19 @@ import * as processes from "../src/processes.js";
  *
  * The two IPv6 forms matter most: a check written against dotted-quad strings alone passes for
  * `169.254.169.254` and waves through `[::ffff:169.254.169.254]`, which reaches the same host.
+ *
+ * `https:` THROUGHOUT, because these have to be STORABLE before they can be verified: the ingest
+ * URL policy accepts plaintext only on loopback, so `http://10.0.0.1/` is refused at submission and
+ * the run below would never reach the fetcher. The scheme is immaterial to what this asserts — the
+ * classifier reads the resolved ADDRESS, not the transport — and a private address behind `https:`
+ * is the same SSRF target wearing the scheme that gets through the front door.
  */
 const PRIVATE_TARGETS: Array<[string, string]> = [
-  ["loopback", "http://127.0.0.1:1/"],
-  ["private range", "http://10.0.0.1/"],
-  ["link-local metadata", "http://169.254.169.254/latest/meta-data/"],
-  ["IPv6 loopback", "http://[::1]:1/"],
-  ["IPv6-mapped metadata", "http://[::ffff:169.254.169.254]/latest/meta-data/"],
+  ["loopback", "https://127.0.0.1:1/"],
+  ["private range", "https://10.0.0.1/"],
+  ["link-local metadata", "https://169.254.169.254/latest/meta-data/"],
+  ["IPv6 loopback", "https://[::1]:1/"],
+  ["IPv6-mapped metadata", "https://[::ffff:169.254.169.254]/latest/meta-data/"],
 ];
 
 test.describe("SSRF: direct private targets are refused", () => {
