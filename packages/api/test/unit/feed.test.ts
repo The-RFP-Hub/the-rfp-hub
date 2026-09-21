@@ -148,6 +148,28 @@ describe("entry mapping", () => {
     expect(mapped.id).toBe(`${BASE}/v1/opportunities/feedtest:1`);
   });
 
+  /**
+   * A feed entry's link is rendered as an `<a href>` by somebody else's reader, which has none of
+   * this hub's guards. The write path refuses these values outright; this is the read-side floor
+   * for rows that predate that policy, and it is why the feeds cannot redistribute one.
+   */
+  it.each([
+    ["javascript:", "javascript:alert(document.cookie)"],
+    ["data:", "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="],
+    ["vbscript:", "vbscript:msgbox(1)"],
+    ["file:", "file:///etc/passwd"],
+    ["plaintext http:", "http://evil.example/apply"],
+  ])(
+    "falls back to the record URL rather than publishing a %s applicationUrl",
+    (_label, stored) => {
+      const mapped = toFeedEntry(summary({ applicationUrl: stored }), {
+        publicBaseUrl: BASE,
+        now: NOW,
+      });
+      expect(mapped.link).toBe(`${BASE}/v1/opportunities/feedtest:1`);
+    },
+  );
+
   it("omits `published` when the record has no postedAt, and falls back for `updated`", () => {
     const mapped = toFeedEntry(summary({ postedAt: undefined, updatedAt: undefined }), {
       publicBaseUrl: BASE,

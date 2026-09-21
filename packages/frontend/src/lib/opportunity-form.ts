@@ -1282,12 +1282,19 @@ export function fieldAdvisories(form: OpportunityFormState): Record<string, stri
 
 // ── per-field validation, mirroring the schema's rules ──────────────────────────
 
+/**
+ * The hub's ingest URL policy, mirrored so the answer arrives next to the input.
+ *
+ * `https:` only, matching the API (`modules/shared/url-policy.ts`), which is stricter than the
+ * schema's `format: uri` on purpose: `uri` admits `javascript:` and `data:`, and these values are
+ * republished in the feeds and the open-data export. This copy is convenience — the API refuses
+ * the same values whatever this function says.
+ */
 function isUri(value: string): boolean {
   try {
     // The `uri` format is an ABSOLUTE reference: `new URL` with no base rejects `/apply` and
     // `example.org` on its own, which is exactly the pair a publisher gets wrong.
-    new URL(value);
-    return true;
+    return new URL(value).protocol === "https:";
   } catch {
     return false;
   }
@@ -1342,10 +1349,7 @@ export function fieldProblems(
   };
   const uri = (path: string, value: string, label: string) => {
     if (value.trim() !== "" && !isUri(value.trim())) {
-      fail(
-        path,
-        `${label} must be a full URL including the scheme, for example https://example.org.`,
-      );
+      fail(path, `${label} must be a full https:// URL, for example https://example.org.`);
     }
   };
   const moment = (path: string, value: string, label: string) => {

@@ -4,6 +4,7 @@
  *
  * Isolation tag: `M3WRITE` / `m3write:`.
  */
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -140,6 +141,56 @@ run("M3WRITE submissions", () => {
     expect(res.json().issues).toContainEqual({
       path: "/title",
       message: "must be at most 256 characters (got 300).",
+    });
+  });
+
+  /**
+   * The schema types these fields as `format: uri`, which is RFC 3986 — `javascript:` and `data:`
+   * are well-formed URIs and pass validation. They are refused as INGEST POLICY instead, because
+   * these values are republished raw in the feeds, in `/v1/opportunities/:id` and in the open-data
+   * export, where a consumer that renders a link-out as `<a href>` has none of this hub's guards.
+   */
+  it.each([
+    ["javascript:", "javascript:alert(document.cookie)"],
+    ["data:", "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="],
+    ["file:", "file:///etc/passwd"],
+  ])("refuses a %s applicationUrl the schema calls conformant", async (_label, stored) => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(submitterToken),
+      payload: submission(`${OTHER_NS}:bad-scheme`, OTHER_NS, {
+        applicationUrl: stored,
+      } as Partial<Opportunity>),
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("validation_failed");
+    expect(res.json().issues).toContainEqual({
+      path: "/applicationUrl",
+      message: expect.stringContaining("must be an `https:` URL"),
+    });
+    expect(
+      await db
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.publicId, `${OTHER_NS}:bad-scheme`))
+        .limit(1),
+    ).toEqual([]);
+  });
+
+  it("refuses a plaintext `http:` link-out and names it as its own mistake", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(submitterToken),
+      payload: submission(`${OTHER_NS}:plaintext`, OTHER_NS, {
+        website: "http://example.org",
+      } as Partial<Opportunity>),
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues).toContainEqual({
+      path: "/website",
+      message: "must use `https:`, not `http:`.",
     });
   });
 

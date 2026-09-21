@@ -30,6 +30,7 @@
  * `/v1/opportunities/{id}` URLs under whatever `PUBLIC_BASE_URL` names, and the apex is the
  * SPECIFICATION's origin, which is not where records live.
  */
+import { isPublishableUrl } from "../shared/url-policy.js";
 import { type XmlElement, el, renderXmlDocument, text } from "../shared/xml.js";
 import type { OpportunitySummary } from "./opportunity.mapper.js";
 
@@ -117,6 +118,11 @@ function parseDate(value: string | null | undefined): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** A stored link-out, or undefined when it is not something a feed reader may safely follow. */
+function publishableLink(value: string | null | undefined): string | undefined {
+  return value && isPublishableUrl(value) ? value : undefined;
+}
+
 /** Collapse every run of whitespace to a single space — feeds carry a one-line abstract. */
 function plainText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -129,6 +135,12 @@ function plainText(value: string): string {
  * record's own API URL is still carried as its identifier. Records without one link back to
  * themselves. `summary` is the description as PLAIN TEXT — served with Atom's `type="text"`, so a
  * description containing markup is displayed literally rather than interpreted.
+ *
+ * `link` IS FILTERED, and this is the one place in the read path where that matters. A feed entry's
+ * link is rendered as an `<a href>` by somebody else's reader, which has none of our guards — so a
+ * stored value that is not `https:` falls back to the record's own URL rather than travelling. The
+ * write path refuses such values outright (modules/shared/url-policy.ts); this covers rows that
+ * predate it, and it is why the feeds cannot be the surface that redistributes one.
  */
 export function toFeedEntry(opp: OpportunitySummary, opts: FeedIdentityOptions): FeedEntry {
   const updated = parseDate(opp.updatedAt) ?? parseDate(opp.createdAt) ?? opts.now;
@@ -139,7 +151,7 @@ export function toFeedEntry(opp: OpportunitySummary, opts: FeedIdentityOptions):
   return {
     id: entryIdentifier(opts.publicBaseUrl, opp.id),
     title: plainText(opp.title),
-    link: opp.applicationUrl ?? recordUrl(opts.publicBaseUrl, opp.id),
+    link: publishableLink(opp.applicationUrl) ?? recordUrl(opts.publicBaseUrl, opp.id),
     summary: plainText(opp.description),
     updated,
     published: parseDate(opp.postedAt),

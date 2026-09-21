@@ -29,9 +29,11 @@ async function resolveDestination(publicId: string, kind: LinkKind): Promise<str
     throw notFound(`no ${kind} link for ${JSON.stringify(publicId)}.`);
   }
   // A stored value is not automatically a safe one: this endpoint emits a `Location`, and a
-  // `javascript:` or `data:` URL behind our own domain is a phishing primitive. Only the two web
-  // schemes are ever handed back.
-  if (destination.protocol !== "http:" && destination.protocol !== "https:") {
+  // `javascript:` or `data:` URL behind our own domain is a phishing primitive. `https:` is now the
+  // only scheme handed back — ingest refuses everything else (modules/shared/url-policy.ts), and
+  // this stays as the second gate for rows that predate that policy. `http:` is refused here too:
+  // a plaintext destination under our own counted redirect is a hop a network can rewrite.
+  if (destination.protocol !== "https:") {
     throw notFound(`no ${kind} link for ${JSON.stringify(publicId)}.`);
   }
   return destination.href;

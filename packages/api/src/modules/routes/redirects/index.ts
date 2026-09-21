@@ -7,7 +7,7 @@
  *
  * THE OPEN-REDIRECT RULE, which is the whole security surface of this module: the destination is
  * never taken from the request. It is read from the STORED row, it must be one of the two URL
- * columns of an entry that is `approved AND is_listed`, and its scheme must be http or https.
+ * columns of an entry that is `approved AND is_listed`, and its scheme must be `https:`.
  * Anything else is a 404, not a redirect to an error page — an endpoint that will emit a `Location`
  * a caller supplied is a phishing primitive wearing this project's domain.
  *
@@ -56,7 +56,7 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
         tags: ["opportunities"],
         summary: "Redirect to an entry's applicationUrl, counting the click",
         description:
-          "302 to the record's stored `applicationUrl`. 404 when the entry is not publicly visible, carries no `applicationUrl`, or the stored value is not an http(s) URL.",
+          "302 to the record's stored `applicationUrl`. 404 when the entry is not publicly visible, carries no `applicationUrl`, or the stored value is not an `https:` URL.",
         params,
         response: responses,
       },

@@ -72,6 +72,7 @@ import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shar
 import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
 import { comparableOpportunity as comparable } from "../../shared/opportunity-content.js";
 import { diffFields } from "../../shared/patch.js";
+import { urlPolicyProblems } from "../../shared/url-policy.js";
 import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 import {
@@ -194,6 +195,7 @@ export class OpportunityWriteService {
         },
       );
     }
+    assertPublishableUrls(record);
     const document = record as unknown as Opportunity;
 
     // The id may not change, whatever else does. Checked before anything is looked up, because a
@@ -885,6 +887,27 @@ function asDocument(body: unknown): Record<string, unknown> {
     );
   }
   return body as Record<string, unknown>;
+}
+
+/**
+ * Ingest URL policy, checked once the document is known to be schema-valid.
+ *
+ * AFTER the validator, not before: it reads fields by shape, and a document that failed validation
+ * has no shape worth reading. Reported in the validator's own envelope so a publisher sees one
+ * field-by-field report rather than two kinds of 400 with different bodies.
+ */
+export function assertPublishableUrls(record: Record<string, unknown>): void {
+  const problems = urlPolicyProblems(record);
+  if (problems.length === 0) return;
+  throw new HttpError(
+    400,
+    "validation_failed",
+    "the submission carries a URL we will not publish.",
+    {
+      errors: problems.map(({ path, message }) => `\`${path}\` ${message}`),
+      issues: problems,
+    },
+  );
 }
 
 /** Field caps, checked before validation so an oversized body is cheap to refuse. */
