@@ -124,6 +124,8 @@ async function expectAdvancedFilterComposition(page: Page, viewport: Viewport): 
 
   const controls = new Map<string, Awaited<ReturnType<typeof readBox>>>();
   for (const id of [
+    "directory-type",
+    "directory-status",
     "directory-ecosystem",
     "directory-category",
     "directory-organization",
@@ -160,10 +162,15 @@ async function expectAdvancedFilterComposition(page: Page, viewport: Viewport): 
     expect(award.y, `${viewport.name}: range row must follow the top groups`).toBeGreaterThan(
       details.y,
     );
+    // 360 WAS THE BUDGET WHEN LISTING DETAILS WAS ONE ROW. It is two now — `Funding type` and
+    // `Status` moved into a three-column group — so the panel is taller by exactly one row pitch,
+    // and that pitch is measured off the page rather than folded into a bigger constant. The
+    // headroom over the old budget is therefore unchanged: anything ELSE that grows still trips it.
+    const addedRow = control("directory-category").y - control("directory-ecosystem").y;
     expect(
       Math.max(award.y + award.height, deadline.y + deadline.height) - details.y,
       `${viewport.name}: advanced filters must stay intentionally dense`,
-    ).toBeLessThanOrEqual(360);
+    ).toBeLessThanOrEqual(360 + addedRow);
   } else {
     // Tablet and phone read the four concepts as one unambiguous vertical sequence.
     expectAligned(details.x, sort.x, `${viewport.name}: group left edges`);
@@ -178,16 +185,29 @@ async function expectAdvancedFilterComposition(page: Page, viewport: Viewport): 
   }
 
   if (viewport.width > 640) {
+    // FIVE CONTROLS IN A THREE-COLUMN GRID: type, status and ecosystem take the first row, category
+    // and organization the second. `Funding type` and `Status` joined this group when the type pills
+    // took the top of the filter bar, so the second row is deliberate rather than a wrap, and the
+    // break between the rows is asserted alongside the rows themselves.
     expectAligned(
+      control("directory-type").y,
+      control("directory-status").y,
+      `${viewport.name}: listing detail controls, first row`,
+    );
+    expectAligned(
+      control("directory-status").y,
       control("directory-ecosystem").y,
-      control("directory-category").y,
-      `${viewport.name}: listing detail controls`,
+      `${viewport.name}: listing detail controls, first row`,
     );
     expectAligned(
       control("directory-category").y,
       control("directory-organization").y,
-      `${viewport.name}: listing detail controls`,
+      `${viewport.name}: listing detail controls, second row`,
     );
+    expect(
+      control("directory-category").y,
+      `${viewport.name}: the second row of listing details must follow the first`,
+    ).toBeGreaterThan(control("directory-ecosystem").y);
     expectAligned(
       control("directory-min-award").y,
       control("directory-max-award").y,
@@ -200,6 +220,8 @@ async function expectAdvancedFilterComposition(page: Page, viewport: Viewport): 
     );
   } else {
     // A phone stacks fields within each group instead of preserving cramped desktop columns.
+    expect(control("directory-status").y).toBeGreaterThan(control("directory-type").y);
+    expect(control("directory-ecosystem").y).toBeGreaterThan(control("directory-status").y);
     expect(control("directory-category").y).toBeGreaterThan(control("directory-ecosystem").y);
     expect(control("directory-organization").y).toBeGreaterThan(control("directory-category").y);
     expect(control("directory-max-award").y).toBeGreaterThan(control("directory-min-award").y);
@@ -243,19 +265,26 @@ async function expectUsableNav(page: Page, viewport: Viewport): Promise<void> {
   }
 }
 
-/** The directory's main filter controls — the ones a thumb actually has to hit on a phone. */
+/**
+ * The directory's main filter controls — the ones a thumb actually has to hit on a phone.
+ *
+ * ONLY THE SEARCH ROW IS MEASURED BEFORE THE DISCLOSURE IS OPENED. The type pills took the top of
+ * the filter bar and the `Funding type` and `Status` selects moved behind `More filters` with the
+ * rest, so measuring them on a closed page would be measuring a control nobody can reach — and a
+ * `<details>` that is shut reports no box at all, which is a failure that says nothing about size.
+ */
 async function expectDirectoryControlsAreTouchable(page: Page): Promise<void> {
   await expectTouchTarget(page.getByLabel("Search", { exact: true }), "the Search box");
-  await expectTouchTarget(
-    page.getByLabel("Funding type", { exact: true }),
-    "the Funding type select",
-  );
-  await expectTouchTarget(page.getByLabel("Status", { exact: true }), "the Status select");
   await expectTouchTarget(page.getByRole("button", { name: "Search" }), "the Search button");
 
   const more = page.locator(".filters-more > summary");
   await expectTouchTarget(more, "the More filters disclosure");
   await more.click();
+  await expectTouchTarget(
+    page.getByLabel("Funding type", { exact: true }),
+    "the Funding type select",
+  );
+  await expectTouchTarget(page.getByLabel("Status", { exact: true }), "the Status select");
   await expectTouchTarget(page.getByLabel("Organization", { exact: true }), "the Organization box");
 }
 
@@ -290,7 +319,7 @@ test.describe("M4 responsive layout", () => {
     });
 
     try {
-      await page.goto(stack.urls.frontend);
+      await page.goto(`${stack.urls.frontend}/directory`);
       const disclosure = page.locator(".filters-more");
       const summary = page.locator(".filters-more > summary");
       await expect(summary).toBeVisible();
@@ -300,7 +329,9 @@ test.describe("M4 responsive layout", () => {
       await page.keyboard.press("Enter");
       await expect(disclosure).toHaveAttribute("open", "");
       await page.keyboard.press("Tab");
-      await expect(page.locator("#directory-ecosystem")).toBeFocused();
+      // `Funding type` is the first control inside the disclosure now that it, and `Status`, moved
+      // in behind the type pills; `Ecosystem` used to open the group and no longer does.
+      await expect(page.locator("#directory-type")).toBeFocused();
     } finally {
       await context.close();
     }
@@ -417,10 +448,10 @@ test.describe("M4 responsive layout", () => {
       });
 
       try {
-        await page.goto(stack.urls.frontend);
-        await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+        await page.goto(`${stack.urls.frontend}/directory`);
+        await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible();
         await expectDirectoryControlsAreTouchable(page);
-        await expectNoHorizontalOverflow(page, `/ at ${width}px with a fine pointer`);
+        await expectNoHorizontalOverflow(page, `/directory at ${width}px with a fine pointer`);
       } finally {
         await context.close();
       }
@@ -435,13 +466,13 @@ test.describe("M4 responsive layout", () => {
       const { context, page } = await newViewportPage(browser, viewport);
 
       try {
-        await page.goto(`${stack.urls.frontend}/?${ADVANCED_FILTER_QUERY}`);
-        await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+        await page.goto(`${stack.urls.frontend}/directory?${ADVANCED_FILTER_QUERY}`);
+        await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible();
         await expect(page.locator(".filters-more")).toHaveAttribute("open", "");
         await expect(page.locator(".filters-more-summary")).toHaveText("8 set");
         await expect(page.getByRole("link", { name: "Clear filters" })).toHaveAttribute(
           "href",
-          "/",
+          "/directory",
         );
         await expectAdvancedFilterComposition(page, viewport);
         await expectNoHorizontalOverflow(page, `${viewport.name}: expanded directory filters`);
@@ -474,14 +505,14 @@ test.describe("M4 responsive layout", () => {
       try {
         // The heading is static markup beside `<DirectoryList/>`, so it is visible long before the
         // list's own fetch resolves; `waitForLoaded` is what proves real content rendered.
-        await page.goto(stack.urls.frontend);
-        await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+        await page.goto(`${stack.urls.frontend}/directory`);
+        await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible();
         const listedEntry = page.getByRole("link", {
           name: new RegExp(`Responsive layout probe ${stamp}`),
         });
         await waitForLoaded(page, listedEntry);
         await expect(listedEntry).toBeVisible();
-        await expectNoHorizontalOverflow(page, "/");
+        await expectNoHorizontalOverflow(page, "/directory");
         await expectUsableNav(page, viewport);
 
         // Both touch viewports: 768×1024 also runs `isMobile`, so the same rule has to hold there.
@@ -491,7 +522,9 @@ test.describe("M4 responsive layout", () => {
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
         // The apply action renders only once the entry's data has loaded, so it doubles as the
         // content signal `waitForLoaded` races against empty/error.
-        const apply = page.getByRole("link", { name: /Apply on the program’s own site/ });
+        // The label names the operating organization when its name is short enough and falls back
+        // to "the program" when it is not, so the pattern has to admit both.
+        const apply = page.getByRole("link", { name: /Apply on .+’s site/ });
         await waitForLoaded(page, apply);
         await expect(apply).toBeVisible();
         await expectNoHorizontalOverflow(page, `/opportunities/${id}`);
@@ -521,8 +554,12 @@ test.describe("M4 responsive layout", () => {
         await expectUsableNav(page, viewport);
 
         await page.goto(`${stack.urls.frontend}/how-it-works`);
-        await expect(page.getByRole("heading", { name: "How the Hub works" })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Who can do what" })).toBeVisible();
+        await expect(
+          page.getByRole("heading", { name: /Who’s funding what on Ethereum/ }),
+        ).toBeVisible();
+        // The role map moved behind a fold; `The five roles` is the substance that is still open on
+        // arrival, and is what a reader at this width actually meets.
+        await expect(page.getByRole("heading", { name: "The five roles" })).toBeVisible();
         await expectNoHorizontalOverflow(page, "/how-it-works");
         await expectUsableNav(page, viewport);
       } finally {

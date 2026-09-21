@@ -71,9 +71,9 @@ test.describe("M3-7 the public directory", () => {
 
     const { context, page } = await anonymous(browser);
     try {
-      await page.goto(stack.urls.frontend);
+      await page.goto(`${stack.urls.frontend}/directory`);
       await expect(page).toHaveTitle("Directory | RFP Hub");
-      await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible();
 
       // The filter is a parameter the endpoint declares — the list route validates its querystring
       // with `additionalProperties: false`, so an invented one would be a 400 rather than a control
@@ -111,6 +111,47 @@ test.describe("M3-7 the public directory", () => {
   });
 
   /**
+   * THE FRONT DOOR IS NO LONGER THE INDEX, so the hop between them is a criterion of its own.
+   *
+   * `/` became a landing page and `/directory` became the table, and every assertion in this file
+   * moved with it. That move is exactly how a broken front door goes unnoticed: each half works on
+   * its own address, and nothing states that one reaches the other. This states it, and carries a
+   * search across the boundary so the hop has to preserve intent rather than merely arrive.
+   */
+  test("the landing page carries a stranger into the directory, with their search intact", async ({
+    browser,
+    stack,
+    api,
+    opportunityFixture,
+  }) => {
+    const publisher = await api("publisher");
+    const stamp = Date.now();
+    const token = `frontdoor${stamp}`;
+
+    const entry = opportunityFixture(stack.namespaces.publisher, `front-door-${stamp}`, {
+      title: `Front door probe ${token}`,
+    });
+    expect((await publisher.post("/v1/opportunities", entry)).status).toBe(201);
+
+    const { context, page } = await anonymous(browser);
+    try {
+      await page.goto(stack.urls.frontend);
+      await page.getByLabel("Search the directory", { exact: true }).fill(token);
+      await page.getByRole("button", { name: "Search" }).click();
+
+      await expect(page).toHaveURL(
+        (url) => url.pathname === "/directory" && url.searchParams.get("q") === token,
+      );
+      await expect(
+        page.getByRole("link", { name: `Front door probe ${token}` }),
+        "the search typed on the landing page is the one the directory answers",
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
+  /**
    * THE DEFAULT NARROWING IS VISIBLE AND UNDOABLE.
    *
    * The directory opens showing open opportunities only, which is right for almost every reader and
@@ -141,7 +182,7 @@ test.describe("M3-7 the public directory", () => {
 
     const { context, page } = await anonymous(browser);
     try {
-      await page.goto(`${stack.urls.frontend}?q=${encodeURIComponent(token)}`);
+      await page.goto(`${stack.urls.frontend}/directory?q=${encodeURIComponent(token)}`);
 
       // The default is a REAL filter: the closed entry is published and listed, and is absent only
       // because of it.
@@ -154,7 +195,7 @@ test.describe("M3-7 the public directory", () => {
       // …and the control is holding the value rather than sitting blank over a narrowed list.
       await expect(page.getByLabel("Status", { exact: true })).toHaveValue("open");
 
-      await page.getByRole("link", { name: "Include closed and upcoming" }).click();
+      await page.getByRole("link", { name: "Show closed and upcoming too" }).click();
       await expect(
         page.getByRole("link", { name: `Closed probe ${token}` }),
         "and one click puts the closed round back",
@@ -169,7 +210,7 @@ test.describe("M3-7 the public directory", () => {
 /**
  * The page that explains who does what, and the only route to it from a cold landing.
  *
- * A stranger arrives on the directory with no idea what this site is or whether they may put
+ * A stranger arrives on the landing page with no idea what this site is or whether they may put
  * something on it. `/how-it-works` is the answer, and it is reachable from the footer of every
  * page — so "the footer links to it" and "it renders" are one criterion rather than two: a link to
  * a blank page is not a route to an explanation.
@@ -189,12 +230,19 @@ test.describe("M3-7 what the Hub explains about itself", () => {
       // origin, and clicking those would make an offline suite depend on github.com resolving.
       await footer.getByRole("link", { name: "About", exact: true }).click();
       await expect(page).toHaveURL((url) => url.pathname === "/how-it-works");
+
+      // THE ROLE MAP IS BEHIND A FOLD, and opening it is part of this criterion rather than a step
+      // on the way to it: "the map renders" is only true if a reader who arrived cold can get it
+      // open. The summary is the control a reader clicks, so that is what is clicked here.
+      const matrix = page.locator("details#rule-matrix");
+      await matrix.locator("> summary").click();
+      await expect(matrix).toHaveAttribute("open", "");
       await expect(page.getByRole("heading", { name: "Who can do what" })).toBeVisible();
 
       // The matrix is the substance of the page. Every column is asserted because the columns ARE
       // the roles: one missing "Verified org member" has lost the distinction the page exists to
       // draw. Names are matched loosely — a header may carry an inline note.
-      const roles = page.getByRole("table").first();
+      const roles = matrix.getByRole("table").first();
       await expect(roles).toBeVisible();
       for (const role of [
         "Visitor",
@@ -341,7 +389,7 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       // said neither whose page nor that the click leaves this site — and this page exists to send
       // a reader somewhere else, because the Hub takes no applications. Matched by pattern rather
       // than exactly: the label carries a trailing ↗ that says the same thing to the eye.
-      const apply = page.getByRole("link", { name: /Apply on the program’s own site/ });
+      const apply = page.getByRole("link", { name: /Apply on .+’s site/ });
       await expect(apply).toBeVisible();
 
       const afterRead = await pollUntil(
