@@ -87,7 +87,8 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
           </a>
         </p>
         <h1 id="landing-heading">
-          Find what&rsquo;s open on Ethereum: grants, hackathons, bounties, RFPs.
+          Find all funding opportunities in the Ethereum ecosystem: RFPs, Grants, Hackathons,
+          Bounties and more
         </h1>
         <p className="lede">
           Every listing links out to the program&rsquo;s own site. You apply there.

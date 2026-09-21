@@ -2490,7 +2490,13 @@ pre.untrusted-block {
 
 .landing-tally-row {
   display: grid;
-  grid-template-columns: minmax(6.5ch, auto) 1fr;
+  /*
+   * A FIXED FIRST COLUMN, SIZED FROM THE NUMBER'S OWN TYPE. `ch` resolved against the row's body
+   * font, not the display face the figure is set in, so a wide value like $144M outgrew the track
+   * and pushed its own caption right while 92 and 6 stayed put. Four captions that start at four
+   * different x positions read as four unrelated facts.
+   */
+  grid-template-columns: calc(var(--text-tally) * 3.5) 1fr;
   gap: 0 var(--space-4);
   align-items: baseline;
   padding: var(--space-3) 0;
@@ -3003,10 +3009,6 @@ pre.untrusted-block {
   .landing-paths,
   .landing-tiles {
     grid-template-columns: 1fr;
-  }
-
-  .landing-tally-value {
-    min-width: 4ch;
   }
 
   .directory-cards {
