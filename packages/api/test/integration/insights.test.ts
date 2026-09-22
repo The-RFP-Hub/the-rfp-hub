@@ -40,6 +40,7 @@ const EMAILS = {
 const PUBLIC_ID = `${NS}:live`;
 const PENDING_ID = `${NS}:pending`;
 const BAD_LINK_ID = `${NS}:badlink`;
+const PLAINTEXT_LINK_ID = `${NS}:plaintext`;
 const APPLY_URL = "https://apply.example.org/m3ana";
 const SITE_URL = "https://programme.example.org/m3ana";
 
@@ -119,6 +120,9 @@ run("M3ANA insights", () => {
     await seed(PENDING_ID, { reviewStatus: "pending", applicationUrl: APPLY_URL });
     // A stored value is not automatically a safe one — this is the open-redirect case.
     await seed(BAD_LINK_ID, { applicationUrl: "javascript:alert(1)" });
+    // A row that predates the ingest URL policy: the write path refuses `http:` now, but rows
+    // already stored are what the redirect's own scheme check exists for.
+    await seed(PLAINTEXT_LINK_ID, { applicationUrl: "http://apply.example.org/m3ana" });
   });
 
   afterAll(async () => {
@@ -181,6 +185,8 @@ run("M3ANA insights", () => {
     expect((await app.inject({ url: `/v1/r/${BAD_LINK_ID}/apply` })).statusCode).toBe(404);
     // No `website` stored at all.
     expect((await app.inject({ url: `/v1/r/${BAD_LINK_ID}/source` })).statusCode).toBe(404);
+    // `http:` under our own counted redirect is a hop a network can rewrite, so it is not emitted.
+    expect((await app.inject({ url: `/v1/r/${PLAINTEXT_LINK_ID}/apply` })).statusCode).toBe(404);
     expect((await app.inject({ url: `/v1/r/${NS}:nothere/apply` })).statusCode).toBe(404);
   });
 

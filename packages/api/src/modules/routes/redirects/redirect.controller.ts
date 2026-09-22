@@ -3,6 +3,7 @@ import { OpportunityService } from "../../services/opportunities/opportunity.ser
 import { captureViews } from "../../shared/analytics-capture.js";
 import { notFound } from "../../shared/http-error.js";
 import { handled, paramsOf } from "../../shared/route-helpers.js";
+import { isPublishableUrl } from "../../shared/url-policy.js";
 
 /** The two link-outs, and which stored column each one means. */
 type LinkKind = "apply" | "source";
@@ -29,9 +30,12 @@ async function resolveDestination(publicId: string, kind: LinkKind): Promise<str
     throw notFound(`no ${kind} link for ${JSON.stringify(publicId)}.`);
   }
   // A stored value is not automatically a safe one: this endpoint emits a `Location`, and a
-  // `javascript:` or `data:` URL behind our own domain is a phishing primitive. Only the two web
-  // schemes are ever handed back.
-  if (destination.protocol !== "http:" && destination.protocol !== "https:") {
+  // `javascript:` or `data:` URL behind our own domain is a phishing primitive. The destination now
+  // has to satisfy the SAME rule ingest applies (modules/shared/url-policy.ts) rather than a looser
+  // one of its own, so the two cannot drift: `https:` anywhere, `http:` on loopback. Keeping the
+  // check here at all is what covers rows that predate that policy — plaintext to a remote host
+  // under our own counted redirect is a hop a network can rewrite.
+  if (!isPublishableUrl(stored)) {
     throw notFound(`no ${kind} link for ${JSON.stringify(publicId)}.`);
   }
   return destination.href;

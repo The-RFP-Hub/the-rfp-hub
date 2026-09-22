@@ -1282,12 +1282,37 @@ export function fieldAdvisories(form: OpportunityFormState): Record<string, stri
 
 // ── per-field validation, mirroring the schema's rules ──────────────────────────
 
+/**
+ * The hub's ingest URL policy, mirrored so the answer arrives next to the input.
+ *
+ * `https://`, or `http://` on loopback — the same rule the API applies in
+ * `modules/shared/url-policy.ts`, and stricter than the schema's `format: uri` on purpose: `uri` is
+ * RFC 3986, so it admits `javascript:` and `data:`, and these values are republished in the feeds
+ * and the open-data export. Mirrored rather than shared because the two packages ship separately;
+ * the API refuses the same values whatever this function says, so the cost of drift is a confusing
+ * message rather than an unsafe record. The loopback arm exists so a local stack can be described
+ * in the form it actually runs under.
+ */
+const LOOPBACK = /^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[?::1\]?)$/i;
+
 function isUri(value: string): boolean {
+  // The AUTHORITY FORM, not merely something `new URL` parses: it rejects `/apply` and
+  // `example.org` on their own, which is the pair a publisher gets wrong, and also
+  // `https:example.org`, which names the right scheme but is a relative reference.
+  if (!/^https?:\/\//i.test(value)) return false;
   try {
-    // The `uri` format is an ABSOLUTE reference: `new URL` with no base rejects `/apply` and
-    // `example.org` on its own, which is exactly the pair a publisher gets wrong.
-    new URL(value);
-    return true;
+    const url = new URL(value);
+    if (url.protocol === "https:") return true;
+    // Mirrors `api/src/shared/loopback.ts`, including the ROOT-ANCHORED form: `localhost.` is the
+    // same name written as an FQDN, and a resolver treats the two identically.
+    const host = url.hostname
+      .toLowerCase()
+      .replace(/^\[|\]$/g, "")
+      .replace(/\.$/, "");
+    return (
+      url.protocol === "http:" &&
+      (host === "localhost" || host.endsWith(".localhost") || LOOPBACK.test(host))
+    );
   } catch {
     return false;
   }
@@ -1344,7 +1369,7 @@ export function fieldProblems(
     if (value.trim() !== "" && !isUri(value.trim())) {
       fail(
         path,
-        `${label} must be a full URL including the scheme, for example https://example.org.`,
+        `${label} must be a full URL starting with https://, for example https://example.org.`,
       );
     }
   };

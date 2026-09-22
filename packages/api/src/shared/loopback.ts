@@ -14,7 +14,10 @@
  * is deliberately narrow, and deliberately says nothing about any particular domain:
  *
  * - `localhost` and any `*.localhost` name: RFC 6761 §6.3 reserves the whole subtree to resolve to
- *   loopback, so `http://api.localhost:3001` is a legitimate development origin;
+ *   loopback, so `http://api.localhost:3001` is a legitimate development origin. The
+ *   ROOT-ANCHORED form counts too — `localhost.` and `api.localhost.` are the same names written
+ *   as fully qualified domain names, and a resolver treats them identically, so a single trailing
+ *   dot is stripped before comparing rather than turning a loopback name into a stranger;
  * - the entire IPv4 loopback block `127.0.0.0/8` (RFC 1122 §3.2.1.3), not merely `127.0.0.1` —
  *   every address in it is loopback, and per-service aliases like `127.0.0.2` are a common habit;
  * - `::1`, the IPv6 loopback (RFC 4291 §2.5.3). `new URL()` reports IPv6 hosts bracketed, so the
@@ -25,7 +28,12 @@
  * a wildcard bind address rather than a host any client can reach, so it is excluded too.
  */
 export function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  // One trailing dot, not a run of them: `localhost..` is not a name any resolver accepts, and
+  // collapsing a run would invent a host the caller did not write.
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
   if (host === "localhost" || host.endsWith(".localhost")) return true;
   if (host === "::1") return true;
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);

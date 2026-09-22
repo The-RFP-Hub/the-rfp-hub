@@ -41,6 +41,7 @@ import { humanizeErrors, validateOpportunity } from "rfphub-validate";
 import { db, pool } from "../src/db/client.js";
 import { withTransaction } from "../src/modules/repositories/index.js";
 import { upsertOpportunityFromStandard } from "../src/modules/services/opportunities/opportunity.service.js";
+import { urlPolicyProblems } from "../src/modules/shared/url-policy.js";
 
 const MIN_VALID = 100;
 
@@ -135,8 +136,22 @@ export function gateForSeed(documents: readonly Opportunity[]): SeedGateResult {
   const rejected: RejectedRecord[] = [];
   for (const record of documents) {
     const { valid, errors } = validateOpportunity(record, { checks: false });
-    if (valid) accepted.push(record);
-    else rejected.push({ id: record.id ?? "(no id)", errors: humanizeErrors(errors, record) });
+    if (!valid) {
+      rejected.push({ id: record.id ?? "(no id)", errors: humanizeErrors(errors, record) });
+      continue;
+    }
+    // The same URL policy the authenticated write path applies, for the same reason: `format: uri`
+    // admits `javascript:` and `data:`, and a curated file is edited by hand. The gate refuses here
+    // what the API would refuse, so the corpus cannot reintroduce it.
+    const urlProblems = urlPolicyProblems(record as unknown as Record<string, unknown>);
+    if (urlProblems.length > 0) {
+      rejected.push({
+        id: record.id ?? "(no id)",
+        errors: urlProblems.map(({ path, message }) => `\`${path}\` ${message}`),
+      });
+      continue;
+    }
+    accepted.push(record);
   }
   return { accepted, rejected };
 }
