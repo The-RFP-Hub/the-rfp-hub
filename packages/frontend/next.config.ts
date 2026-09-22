@@ -8,7 +8,7 @@ const packageDir = dirname(fileURLToPath(import.meta.url));
 /**
  * The frontend is a BROWSER CLIENT of the API and nothing else.
  *
- * There are no Next route handlers, no server actions that talk to the API and no server-side
+ * There are no route handlers or server actions that call the API for a user, and no server-side
  * session: every authenticated request is made from the browser with the caller's own session
  * token, so the API stays the single authorization authority. A server session here would be a
  * second one, and the two would disagree the first time a role changed.

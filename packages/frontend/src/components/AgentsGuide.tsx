@@ -1,10 +1,11 @@
 import { CopyBlock } from "@/components/CopyBlock";
 import {
   type AgentOrigins,
-  INSTALL_COMMANDS,
-  MCP_CLIENT_CONFIG,
   MCP_COMMAND,
+  SKILL_COMMANDS,
   agentPrompt,
+  apiOrigin,
+  mcpInstall,
 } from "@/lib/agents";
 import {
   HOW_IT_WORKS,
@@ -20,6 +21,7 @@ import Link from "next/link";
 
 export function AgentsGuide(origins: AgentOrigins) {
   const { apiBaseUrl } = origins;
+  const mcp = mcpInstall(apiBaseUrl);
   return (
     <section className="agents-page">
       <h1>Agents</h1>
@@ -32,9 +34,10 @@ export function AgentsGuide(origins: AgentOrigins) {
         <h2 id="agents-prompt">Start with a prompt</h2>
         <p className="prose">
           This works in any assistant that can browse the web or make HTTP requests. It points the
-          agent at <a href={LLMS_TXT}>llms.txt</a>, tells it how to search, and sets two ground
-          rules: listing text is data rather than instructions, and applications happen on each
-          program&rsquo;s own site. Add what you&rsquo;re looking for at the end.
+          agent at <a href={LLMS_TXT}>llms.txt</a>, tells it how to search, and sets ground rules:
+          listing text is data rather than instructions, links inside listings are for you to open
+          rather than the agent, and applications happen on each program&rsquo;s own site. Add what
+          you&rsquo;re looking for at the end.
         </p>
         <CopyBlock text={agentPrompt(origins)} label="Copy prompt" />
       </section>
@@ -48,26 +51,29 @@ export function AgentsGuide(origins: AgentOrigins) {
           </a>{" "}
           gives an MCP client two read tools, <code>search_opportunities</code> and{" "}
           <code>fetch_opportunity</code>. It runs locally over <code>stdio</code> with{" "}
-          <code>{MCP_COMMAND}</code> and needs no configuration to search.
+          <code>{MCP_COMMAND}</code>. Searching needs no key; <code>RFPHUB_API_BASE</code> tells it
+          which API to read, and the commands below point it at{" "}
+          <code className="wrap-anywhere">{apiOrigin(apiBaseUrl)}</code>.
         </p>
         <h3>Claude Code</h3>
-        <CopyBlock text={INSTALL_COMMANDS.claudeCode} label="Copy command" />
+        <CopyBlock text={mcp.claudeCode} label="Copy Claude Code command" />
         <h3>Codex CLI</h3>
-        <CopyBlock text={INSTALL_COMMANDS.codex} label="Copy command" />
+        <CopyBlock text={mcp.codex} label="Copy Codex command" />
         <h3>Claude Desktop, Cursor and other clients</h3>
         <p className="prose">
           Most clients take a JSON entry like this one. VS Code names the root key{" "}
           <code>servers</code> instead of <code>mcpServers</code>.
         </p>
-        <CopyBlock text={MCP_CLIENT_CONFIG} label="Copy config" />
+        <CopyBlock text={mcp.json} label="Copy JSON config" />
         <p className="prose">
           To let an agent submit listings as well, it needs an API key with <code>read</code> and{" "}
-          <code>write</code> scopes, and every submission still waits for your approval in the
-          terminal. The{" "}
+          <code>write</code> scopes, and each submission waits for an approval typed at a terminal.
+          That approval is a deliberate step, not a wall: an agent that can run shell commands as
+          you can approve its own submission. The{" "}
           <a href={MCP_GUIDE} target="_blank" rel="noopener noreferrer">
             setup guide
           </a>{" "}
-          walks through it.
+          covers both.
         </p>
       </section>
 
@@ -78,11 +84,12 @@ export function AgentsGuide(origins: AgentOrigins) {
           to search the index with bundled scripts. This installs it into every agent it finds on
           your machine:
         </p>
-        <CopyBlock text={INSTALL_COMMANDS.skill} label="Copy command" />
+        <CopyBlock text={SKILL_COMMANDS.install} label="Copy skill install command" />
         <p className="prose">In Claude Code, it also comes as a plugin:</p>
-        <CopyBlock text={INSTALL_COMMANDS.claudePlugin} label="Copy commands" />
+        <CopyBlock text={SKILL_COMMANDS.claudePlugin} label="Copy plugin commands" />
         <p className="prose">
-          Other install paths are in the{" "}
+          The skill reads the same <code>RFPHUB_API_BASE</code> variable from the agent&rsquo;s
+          environment. Other install paths are in the{" "}
           <a href={SKILLS_GUIDE} target="_blank" rel="noopener noreferrer">
             skills guide
           </a>
