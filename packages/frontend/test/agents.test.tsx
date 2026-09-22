@@ -12,6 +12,8 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
+afterEach(() => vi.unstubAllEnvs());
+
 const origins = { siteOrigin: "https://rfphub.example", apiBaseUrl: "https://api.rfphub.example" };
 
 function links(markdown: string): string[] {
@@ -93,8 +95,6 @@ describe("the agents page", () => {
     writeText.mockReset().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   });
-
-  afterEach(() => vi.unstubAllEnvs());
 
   it("shows the whole prompt and copies exactly what it shows", async () => {
     const { container } = render(<AgentsGuide {...origins} />);
