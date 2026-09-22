@@ -1906,13 +1906,25 @@ tbody:first-of-type .matrix-band th {
   margin-bottom: var(--space-1);
 }
 
-pre.untrusted-block {
+pre.untrusted-block,
+pre.code-block {
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
   font-size: var(--text-xs);
   background: var(--panel);
   border-radius: var(--radius);
   padding: var(--space-3);
   overflow-x: auto;
+}
+
+/* A prompt is prose: it wraps rather than scrolling sideways, so it can be read before it is copied. */
+pre.code-block {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0 0 var(--space-2);
+}
+
+.copy-block {
+  margin-bottom: var(--space-4);
 }
 
 /* The real modal sits in the browser's top layer; its backdrop makes the page behind it inert. */
@@ -2082,7 +2094,9 @@ pre.untrusted-block {
   }
 
   .shell-header[data-authenticated="false"] .shell-nav-primary {
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0 var(--space-3);
   }
 
   .shell-header[data-authenticated="false"] .shell-login {

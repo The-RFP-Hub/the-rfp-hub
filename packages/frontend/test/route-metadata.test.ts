@@ -32,10 +32,11 @@ function pageRoutes(directory = appRoot): string[] {
 }
 
 /**
- * What `src/app/sitemap.ts` publishes: five static pages plus `/opportunities/[id]` per entry.
+ * What `src/app/sitemap.ts` publishes: the static pages plus `/opportunities/[id]` per entry.
  */
 const PUBLIC_ROUTES = [
   "/",
+  "/agents",
   "/directory",
   "/how-it-works",
   "/opportunities/[id]",
@@ -91,6 +92,7 @@ describe("route metadata", () => {
       "/",
       "/account",
       "/admin",
+      "/agents",
       "/auth/complete",
       "/dashboard",
       "/directory",
