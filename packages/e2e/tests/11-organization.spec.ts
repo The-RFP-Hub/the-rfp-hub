@@ -156,7 +156,7 @@ test.describe("M3-8 the organization's own page", () => {
     // member's click is only real if it changed what the world sees.
     const { context, page: visitor } = await anonymous(browser);
     try {
-      await visitor.goto(`${stack.urls.frontend}?q=${encodeURIComponent(token)}`);
+      await visitor.goto(`${stack.urls.frontend}/directory?q=${encodeURIComponent(token)}`);
       await expect(
         visitor.getByRole("link", { name: `Filed by an outsider ${token}` }),
         "an approved entry is in the public directory, for everyone",
@@ -217,7 +217,9 @@ test.describe("M3-8 the organization's own page", () => {
     // is where the absence is checked rather than in an API status code.
     const { context, page: visitor } = await anonymous(browser);
     try {
-      await visitor.goto(`${stack.urls.frontend}?q=${encodeURIComponent(token)}&status=any`);
+      await visitor.goto(
+        `${stack.urls.frontend}/directory?q=${encodeURIComponent(token)}&status=any`,
+      );
       await expect(
         visitor.getByRole("link", { name: `Filed in error ${token}` }),
         "a refused entry stays out of the public directory, whatever the status filter says",
