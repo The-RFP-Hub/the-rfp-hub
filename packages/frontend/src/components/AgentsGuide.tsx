@@ -88,8 +88,10 @@ export function AgentsGuide(origins: AgentOrigins) {
         <p className="prose">In Claude Code, it also comes as a plugin:</p>
         <CopyBlock text={SKILL_COMMANDS.claudePlugin} label="Copy plugin commands" />
         <p className="prose">
-          The skill reads the same <code>RFPHUB_API_BASE</code> variable from the agent&rsquo;s
-          environment. Other install paths are in the{" "}
+          The skill searches the production API unless the agent&rsquo;s environment sets{" "}
+          <code>RFPHUB_API_BASE</code>. To search this deployment, set it to{" "}
+          <code className="wrap-anywhere">{apiOrigin(apiBaseUrl)}</code>. Other install paths are in
+          the{" "}
           <a href={SKILLS_GUIDE} target="_blank" rel="noopener noreferrer">
             skills guide
           </a>

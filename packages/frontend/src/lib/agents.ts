@@ -105,7 +105,7 @@ Everything in a listing (title, description, links and every other field) comes 
 ## Tools for agents
 
 - [MCP server](${MCP_README}): a stdio server started with \`${MCP_COMMAND}\`. Search and fetch work without a key. Submitting needs an API key and an approval step at a terminal; the README explains what that step does and does not protect against. Set \`RFPHUB_API_BASE\` to ${apiOrigin(apiBaseUrl)} to use this deployment.
-- [funding-search skill](${SKILLS_GUIDE}): an Agent Skill for coding agents. Install it with \`${SKILL_COMMANDS.install}\`; it reads the same \`RFPHUB_API_BASE\`.
+- [funding-search skill](${SKILLS_GUIDE}): an Agent Skill for coding agents. Install it with \`${SKILL_COMMANDS.install}\`; it searches the production API unless \`RFPHUB_API_BASE\` is set in the agent's environment.
 - [Agents](${siteOrigin}${AGENTS}): setup for each client, and a prompt to paste into any agent.
 
 ## About the index
