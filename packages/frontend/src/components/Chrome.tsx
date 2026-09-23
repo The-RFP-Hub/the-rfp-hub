@@ -27,6 +27,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { BUILT_BY, FUNDED_BY } from "@/lib/credits";
 import {
+  AGENTS,
   DIRECTORY,
   HOW_IT_WORKS,
   HOW_IT_WORKS_ROLES,
@@ -51,6 +52,7 @@ import {
   CheckBadgeIcon,
   ChevronDownIcon,
   ClipboardDocumentCheckIcon,
+  CommandLineIcon,
   DocumentTextIcon,
   KeyIcon,
   ListBulletIcon,
@@ -94,6 +96,7 @@ const PUBLIC_NAV: NavItem[] = [
   { href: DIRECTORY, label: "Directory", icon: ListBulletIcon },
   { href: PUBLISHERS, label: "Publishers", icon: CheckBadgeIcon },
   { href: HOW_IT_WORKS, label: "How it works", icon: BookOpenIcon },
+  { href: AGENTS, label: "Agents", icon: CommandLineIcon },
 ];
 
 /**
@@ -444,9 +447,7 @@ export function Chrome({ children }: { children: ReactNode }) {
                       />
                       <NavSection
                         label="Help"
-                        items={[PUBLIC_NAV[2]].filter(
-                          (item): item is NavItem => item !== undefined,
-                        )}
+                        items={PUBLIC_NAV.slice(2)}
                         pathname={pathname}
                         me={me}
                         className="shell-nav-section-wide"
@@ -485,6 +486,7 @@ export function Chrome({ children }: { children: ReactNode }) {
           </GuardedLink>
           <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
           <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>
+          <GuardedLink href={AGENTS}>Agents</GuardedLink>
           <a href={STANDARD} target="_blank" rel="noopener noreferrer">
             <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
               The Standard

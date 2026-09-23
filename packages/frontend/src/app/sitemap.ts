@@ -4,13 +4,21 @@ import { canonicalSiteOrigin, isCanonicalRequest } from "@/lib/site-origin";
 import type { MetadataRoute } from "next";
 
 /**
- * The public sitemap, emitted only on the declared canonical origin: the five static pages, then
+ * The public sitemap, emitted only on the declared canonical origin: the static pages, then
  * every listed opportunity, read an hour at a time and capped far below the 50,000-URL limit. A
  * crawl must not depend on that read — an unreachable or malformed API leaves the statics standing.
  * `lastModified` is omitted on the statics, where "now" would be fabricated, and carried only when
  * the API reports one.
  */
-const ROUTES = ["/", "/directory", "/how-it-works", "/publishers", "/privacy", "/terms"] as const;
+const ROUTES = [
+  "/",
+  "/directory",
+  "/how-it-works",
+  "/publishers",
+  "/agents",
+  "/privacy",
+  "/terms",
+] as const;
 
 const MAX_OPPORTUNITY_URLS = 5_000;
 const REVALIDATE_SECONDS = 3_600;

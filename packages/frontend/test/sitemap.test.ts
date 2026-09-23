@@ -14,6 +14,7 @@ const STATIC_URLS = [
   "https://ethrfps.app/directory",
   "https://ethrfps.app/how-it-works",
   "https://ethrfps.app/publishers",
+  "https://ethrfps.app/agents",
   "https://ethrfps.app/privacy",
   "https://ethrfps.app/terms",
 ];

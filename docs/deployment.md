@@ -647,8 +647,9 @@ Four steps, once the npm package of §7.5–7.6 is on the registry under the new
 
 **1. The release commit carries the version everywhere.** `changeset version` bumps `package.json`
 only; the same commit must move `packages/mcp/server.json` (`version` and `packages[0].version`)
-and every pinned snippet in `packages/mcp/README.md` to the new number. `pnpm --filter
-@the-rfp-hub/mcp test` fails until it does. The server reports `package.json`'s version, so
+and every pinned snippet in `packages/mcp/README.md` to the new number, plus `MCP_VERSION` in
+`packages/frontend/src/lib/agents.ts`, which the `/agents` page and `/llms.txt` pin. `pnpm --filter
+@the-rfp-hub/mcp test` and `pnpm --filter @the-rfp-hub/frontend test` fail until it does. The server reports `package.json`'s version, so
 nothing in `src/` needs touching.
 
 **2. Tag that commit and push the tag.** The workflow accepts only a tag — a branch or a bare SHA

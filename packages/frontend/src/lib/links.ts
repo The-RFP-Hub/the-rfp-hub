@@ -9,6 +9,8 @@ export const HOW_IT_WORKS = "/how-it-works";
 export const HOW_IT_WORKS_ROLES = `${HOW_IT_WORKS}#roles`;
 export const DIRECTORY = "/directory";
 export const PUBLISHERS = "/publishers";
+export const AGENTS = "/agents";
+export const LLMS_TXT = "/llms.txt";
 
 /** A literal: the address `package.json` names. A fork that wants its own edits one line. */
 export const REPOSITORY = "https://github.com/The-RFP-Hub/the-rfp-hub";
@@ -24,12 +26,20 @@ export const REVIEW_CRITERIA = `${REPOSITORY}/blob/main/REVIEW-CRITERIA.md`;
 
 export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md#rfc-process`;
 
+export const MCP_README = `${REPOSITORY}/blob/main/packages/mcp/README.md`;
+
 /** Client-specific install and private-environment setup for the RFP Hub MCP server. */
-export const MCP_GUIDE = `${REPOSITORY}/blob/main/packages/mcp/README.md#submit-from-an-agent`;
+export const MCP_GUIDE = `${MCP_README}#submit-from-an-agent`;
+
+export const SKILLS_GUIDE = `${REPOSITORY}/blob/main/skills/README.md`;
 
 /** The API's interactive documentation, on whichever API this build talks to. */
 export function apiDocsUrl(apiBaseUrl: string): string {
   return `${apiBaseUrl.replace(/\/+$/, "")}/v1/docs`;
+}
+
+export function openApiUrl(apiBaseUrl: string): string {
+  return `${apiDocsUrl(apiBaseUrl)}/json`;
 }
 
 /** The bulk data exports, on whichever API this build talks to. */

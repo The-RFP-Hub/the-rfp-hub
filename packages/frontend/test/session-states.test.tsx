@@ -337,7 +337,7 @@ describe("organization navigation", () => {
     const uniqueDestinations = new Set(
       [...(panel?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")),
     );
-    expect([...uniqueDestinations]).toHaveLength(11);
+    expect([...uniqueDestinations]).toHaveLength(12);
     expect(within(panel as HTMLElement).getByRole("link", { name: longName })).toBeTruthy();
   });
 
