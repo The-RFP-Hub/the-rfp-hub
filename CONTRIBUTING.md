@@ -38,7 +38,7 @@ pnpm lint         # biome
 - Validate your changes against real data:
   ```bash
   pnpm --filter rfphub-validate build
-  node packages/validate/dist/cli.js packages/standard/schemas/v1.0.1/examples
+  node packages/validate/dist/cli.js packages/standard/schemas/v1.0.0/examples
   ```
 
 ### Proposing changes to the Standard

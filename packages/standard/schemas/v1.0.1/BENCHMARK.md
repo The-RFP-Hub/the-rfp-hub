@@ -19,8 +19,8 @@ The 311-entry pull above is a single aggregator's public API, and it contains **
 security bug bounty**: that whole category sits on dedicated platforms the aggregator does not
 index. Two fixtures were therefore transcribed from their publishers' own pages rather than
 mapped from the corpus —
-[`29-bounty-security-ethereum-foundation.json`](./examples/29-bounty-security-ethereum-foundation.json)
-and [`30-bounty-security-starknet.json`](./examples/30-bounty-security-starknet.json).
+[`29-bounty-security-ethereum-foundation.json`](../v1.0.0/examples/29-bounty-security-ethereum-foundation.json)
+and [`30-bounty-security-starknet.json`](../v1.0.0/examples/30-bounty-security-starknet.json).
 
 They were chosen to cover the two shapes the type has to hold: a program grading on **severity
 alone**, every tier a ceiling rather than a fixed figure, with awards at a panel's stated
@@ -41,7 +41,7 @@ the ecosystem's own flagship program.
 |---|---|---|
 | Unique entries pulled | **311** | pre-re-cut shape |
 | Mapped to source-neutral examples + validated | **289 / 289 valid (0 failures)** | pre-re-cut shape |
-| Curated benchmark fixtures | **30** (in [`examples/`](./examples)) | **current shape (2026-08-11 fourth revision) — 30/30 valid** |
+| Curated benchmark fixtures | **30** (in [`examples/`](../v1.0.0/examples)) | **current shape (2026-08-11 fourth revision) — 30/30 valid** |
 | Funding types covered by fixtures | grant, hackathon, bounty, accelerator, rfp | — |
 
 289 of the 311 pulled entries mapped to public-source, source-neutral examples and all validated
@@ -58,7 +58,7 @@ values the source did carry were dropped (see below). The third conversion, by c
 a pure script rewrite and lossless (see below).
 
 ```bash
-npx rfphub-validate packages/standard/schemas/v1.0.1/examples
+npx rfphub-validate packages/standard/schemas/v1.0.0/examples
 # 30 passed, 0 failed
 ```
 
@@ -156,7 +156,7 @@ standard, and neither is normative.
 
 ## Benchmark fixture set
 
-28 of the fixtures in [`examples/`](./examples) are the top entries by fill, with type diversity
+28 of the fixtures in [`examples/`](../v1.0.0/examples) are the top entries by fill, with type diversity
 injected (≥1 of each available type): **19 hackathon, 6 grant, 1 bounty, 1 accelerator, 1 rfp**.
 They serve as (a) the real-data validation corpus, (b) golden inputs for the `rfphub-validate`
 CLI, and (c) realistic seed candidates for the public dataset. They are **examples, not
@@ -167,7 +167,7 @@ application deadline, 2026-06-30, has since passed: fixtures are a snapshot of t
 pull, not live state, so a stale `status`/deadline pair here is expected rather than an error.)
 
 **Both program-level totals were removed rather than refreshed.**
-[`10-grant-fundingmap_600.json`](./examples/10-grant-fundingmap_600.json) (Prezenti Mint Round,
+[`10-grant-fundingmap_600.json`](../v1.0.0/examples/10-grant-fundingmap_600.json) (Prezenti Mint Round,
 `fundingmap:600`) carried `fundingInfo.budget: 160000` and `fundingInfo.allocated: 1129670`.
 Neither survives its sources, re-read on 2026-08-12. The document also contradicted itself on its
 face: `allocated` sat at **7×** the `budget` beside it, and this schema derives "remaining" as

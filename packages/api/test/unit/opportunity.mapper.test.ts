@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Opportunity } from "@the-rfp-hub/standard";
+import { type Opportunity, SPEC_VERSION } from "@the-rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { describe, expect, it } from "vitest";
 import type { OpportunityRow } from "../../src/db/schema.js";
@@ -13,7 +13,7 @@ import {
 } from "../../src/modules/mappers/opportunity.mapper.js";
 
 const EXAMPLES_DIR = fileURLToPath(
-  new URL("../../../standard/schemas/v1.0.1/examples", import.meta.url),
+  new URL("../../../standard/schemas/v1.0.0/examples", import.meta.url),
 );
 
 function loadExamples(): { file: string; opp: Opportunity }[] {
@@ -73,7 +73,8 @@ describe("opportunity.mapper round-trip (Standard → row → Standard)", () => 
       const { opp: insert } = fromStandard(opp);
       const rebuilt = toStandard(rowFromInsert(insert));
       expect(validateOpportunity(rebuilt).valid).toBe(true);
-      expect(normalize(rebuilt)).toEqual(normalize(opp));
+      // The examples declare 1.0.0; every row is stored and served at the current version.
+      expect(normalize(rebuilt)).toEqual(normalize({ ...opp, specVersion: SPEC_VERSION }));
     });
   }
 });
