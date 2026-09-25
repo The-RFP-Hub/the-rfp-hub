@@ -491,7 +491,7 @@ describe("the derived id follows the primary organization", () => {
 describe("replacing a claimed listing", () => {
   /** An imported id, published under and operated by the organization that claimed it. */
   const claimed = {
-    specVersion: "1.0.0",
+    specVersion: "1.0.1",
     id: "host:123",
     fundingType: "grant",
     title: "Round One",
@@ -1165,7 +1165,7 @@ describe("after a submission", () => {
   it("offers the edit back, rather than a blank form, after a replace", async () => {
     const api = stub(outcome({ created: false }));
     const stored = {
-      specVersion: "1.0.0",
+      specVersion: "1.0.1",
       id: "acme:round-one",
       fundingType: "grant",
       title: "Round One",

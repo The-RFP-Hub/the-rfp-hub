@@ -55,6 +55,7 @@ interface SpecConfig {
   schemaDir: string;
   baseUrl: string;
   vocabIri: string;
+  identityMigrations?: { from: { baseUrl: string; vocabIri: string; versions: string[] } }[];
 }
 
 /** The Standard's single hand-written source of identity. Every URL below derives from it. */

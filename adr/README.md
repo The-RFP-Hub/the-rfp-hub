@@ -19,12 +19,13 @@ total, not one per commit.
 | [0004](./0004-second-draft-revision-org-swap-and-closure.md) | Revise draft v1.0.0 in place a second time — swap the organisation roles, close the top level, retire the eligibility registry | accepted — supersedes parts of 0002 | 2026-08-05 |
 | [0005](./0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) | Revise draft v1.0.0 in place a third time — mandate UTC `Z` timestamps and collapse the type blocks into a tagged `fundingDetails` union | accepted — supersedes 0002 #3 | 2026-08-05 |
 | [0006](./0006-document-wide-single-currency.md) | Denominate every monetary amount in the single document-wide `fundingInfo.currency` | accepted — supersedes 0002 #17 | 2026-08-05 |
-| [0007](./0007-canonical-domain-and-spec-identity.md) | Adopt `ethrfps.app` as the canonical domain, and mint spec v1.0.0's identity on it | accepted | 2026-08-10 |
+| [0007](./0007-canonical-domain-and-spec-identity.md) | Adopt `ethrfps.app` as the canonical domain, and mint spec v1.0.0's identity on it | accepted — domain superseded by 0013 | 2026-08-10 |
 | [0008](./0008-security-bounty-payout-tiers.md) | Split `bounty` into task and security kinds, and give the security kind a payout table | accepted | 2026-08-10 |
 | [0009](./0009-land-duplicate-notifications-in-app-first.md) | Land duplicate notifications in-app first | accepted | 2026-08-26 |
 | [0010](./0010-centralize-and-dispatch-notification-email.md) | Centralize outbound email and dispatch duplicate notifications | accepted | 2026-08-26 |
 | [0011](./0011-repositories-own-all-database-access.md) | Make repositories own all database access | accepted | 2026-08-26 |
 | [0012](./0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md) | Ship the MCP server as stdio, on the user's own credential, with the write approval out of band | accepted | 2026-08-27 |
+| [0013](./0013-move-spec-identity-to-rfpsear-ch.md) | Move the project and the spec's identity to `rfpsear.ch`, as spec v1.0.1 | accepted — supersedes the domain choice of 0007 | 2026-09-25 |
 
 ## When to write one
 

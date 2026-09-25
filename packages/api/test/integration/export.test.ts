@@ -109,7 +109,7 @@ run("open-data export", () => {
     const jsonText = await readFile(path(archive(names, "json")), "utf8");
     const json = JSON.parse(jsonText);
     expect(json.license).toBe("CC0-1.0");
-    expect(json.specVersion).toBe("1.0.0");
+    expect(json.specVersion).toBe("1.0.1");
     expect(json.count).toBe(count);
     // `generatedAt` comes from the CLOCK, not from the data. That is why a re-run over unchanged
     // data is byte-identical in CSV but not in JSON — the envelope, its digest and its archive name
@@ -322,7 +322,7 @@ run("open-data export", () => {
     expect(published.runId).toMatch(/^[0-9a-f]{32}$/);
     expect(published.count).toBe(count);
     expect(published.license).toBe("CC0-1.0");
-    expect(published.specVersion).toBe("1.0.0");
+    expect(published.specVersion).toBe("1.0.1");
     expect(Date.parse(published.generatedAt)).toBeGreaterThan(0);
 
     // It names the IMMUTABLE archives, never the aliases — an alias href would reintroduce exactly

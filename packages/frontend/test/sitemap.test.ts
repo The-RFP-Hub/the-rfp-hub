@@ -10,13 +10,13 @@ vi.mock("next/headers", () => ({
 }));
 
 const STATIC_URLS = [
-  "https://ethrfps.app/",
-  "https://ethrfps.app/directory",
-  "https://ethrfps.app/how-it-works",
-  "https://ethrfps.app/publishers",
-  "https://ethrfps.app/agents",
-  "https://ethrfps.app/privacy",
-  "https://ethrfps.app/terms",
+  "https://rfpsear.ch/",
+  "https://rfpsear.ch/directory",
+  "https://rfpsear.ch/how-it-works",
+  "https://rfpsear.ch/publishers",
+  "https://rfpsear.ch/agents",
+  "https://rfpsear.ch/privacy",
+  "https://rfpsear.ch/terms",
 ];
 
 async function mockHost(host: string | null, forwardedHost: string | null = null) {
@@ -74,22 +74,22 @@ afterEach(() => {
 
 describe("the public sitemap", () => {
   it("lists the six static public routes, then every listed opportunity", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     stubDirectory([{ id: "curated:0x-bug-bounty" }, { id: "fundingmap:1496" }]);
 
     const entries = await sitemap();
 
     expect(entries.map((entry) => entry.url)).toEqual([
       ...STATIC_URLS,
-      "https://ethrfps.app/opportunities/curated%3A0x-bug-bounty",
-      "https://ethrfps.app/opportunities/fundingmap%3A1496",
+      "https://rfpsear.ch/opportunities/curated%3A0x-bug-bounty",
+      "https://rfpsear.ch/opportunities/fundingmap%3A1496",
     ]);
   });
 
   it("pages the list route 100 at a time and revalidates it hourly", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     const rows = Array.from({ length: 160 }, (_, index) => ({ id: `entry-${index}` }));
     const fetchImpl = stubDirectory(rows);
 
@@ -105,8 +105,8 @@ describe("the public sitemap", () => {
   });
 
   it("stops well below the sitemap limit rather than enumerating an unbounded directory", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     stubDirectory(Array.from({ length: 6_000 }, (_, index) => ({ id: `entry-${index}` })));
 
     const entries = await sitemap();
@@ -115,8 +115,8 @@ describe("the public sitemap", () => {
   });
 
   it("falls back to the static routes when the API cannot be reached", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -128,8 +128,8 @@ describe("the public sitemap", () => {
   });
 
   it("falls back to the static routes when the API answers with something that is not a list", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -145,69 +145,69 @@ describe("the public sitemap", () => {
   });
 
   it("falls back to the static routes when this deployment was built with no API to read", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     await expect(sitemap()).resolves.toEqual(STATIC_URLS.map((url) => ({ url })));
   });
 
   it("never stamps a fabricated lastModified", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     stubDirectory([{ id: "dated", updatedAt: "2026-08-01T00:00:00Z" }, { id: "undated" }]);
 
     const entries = await sitemap();
     const byUrl = new Map(entries.map((entry) => [entry.url, entry.lastModified]));
 
     for (const url of STATIC_URLS) expect(byUrl.get(url)).toBeUndefined();
-    expect(byUrl.get("https://ethrfps.app/opportunities/dated")).toBe("2026-08-01T00:00:00Z");
-    expect(byUrl.get("https://ethrfps.app/opportunities/undated")).toBeUndefined();
+    expect(byUrl.get("https://rfpsear.ch/opportunities/dated")).toBe("2026-08-01T00:00:00Z");
+    expect(byUrl.get("https://rfpsear.ch/opportunities/undated")).toBeUndefined();
   });
 
   it("is empty when NEXT_PUBLIC_SITE_ORIGIN is unset — the normal state off production", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     await expect(sitemap()).resolves.toEqual([]);
   });
 
   it("is empty on a staging alias, even though the variable is set for production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("staging.ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("staging.rfpsear.ch");
 
     await expect(sitemap()).resolves.toEqual([]);
   });
 
   it("is empty when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     await expect(sitemap()).resolves.toEqual([]);
   });
 
   it("publishes for the forwarded host when a proxy rewrote Host", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("frontend.internal:8080", "ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("frontend.internal:8080", "rfpsear.ch");
 
     const entries = await sitemap();
-    expect(entries.map((entry) => entry.url)).toContain("https://ethrfps.app/publishers");
+    expect(entries.map((entry) => entry.url)).toContain("https://rfpsear.ch/publishers");
   });
 
   it("publishes on Vercel production with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const entries = await sitemap();
-    expect(entries.map((entry) => entry.url)).toContain("https://ethrfps.app/");
+    expect(entries.map((entry) => entry.url)).toContain("https://rfpsear.ch/");
   });
 
   it("is empty on a Vercel preview with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
 
     await expect(sitemap()).resolves.toEqual([]);
@@ -223,7 +223,7 @@ describe("the public sitemap", () => {
   it("publishes for the explicit variable, not Vercel's production domain, when both are present", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("mirror.example.org");
 
     const entries = await sitemap();
@@ -231,8 +231,8 @@ describe("the public sitemap", () => {
   });
 
   it("carries no organization, listing or workbench route", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
     stubDirectory([{ id: "curated:0x-bug-bounty" }]);
 
     const entries = await sitemap();

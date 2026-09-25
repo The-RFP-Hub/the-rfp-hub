@@ -19,7 +19,7 @@ Shell blocks are marked `no-run`, `safe-read` or `staging-write` — see
 
 * This page.
 * The repository URL.
-* The API origin: `https://api.ethrfps.app`.
+* The API origin: `https://api.rfpsear.ch`.
 * Nothing else. **Do not answer questions during the two hours.** Every question the tester wants
   to ask is a finding; answering it destroys the finding and inflates the result. Collect the
   questions at the end.
@@ -65,7 +65,7 @@ note about where it stopped is a result; a block that ran over and ate the next 
 | Block | Time | What you do | What you record |
 |---|---|---|---|
 | **0** | 5 min | Read **only** [`api-integration.md` §1](./api-integration.md#1-five-minute-quickstart) and run one `safe-read` command against the API | Did it work first try? If not, what did you have to guess? |
-| **1** | 20 min | **Path A** — the Vercel Deploy Button from [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy), with `NEXT_PUBLIC_API_URL=https://api.ethrfps.app` | The deployment URL. Where it stalled, if it did |
+| **1** | 20 min | **Path A** — the Vercel Deploy Button from [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy), with `NEXT_PUBLIC_API_URL=https://api.rfpsear.ch` | The deployment URL. Where it stalled, if it did |
 | **2** | 40 min | **Path B** — copy only `packages/frontend`, swap the two workspace dependencies for the versions `npm view` reports, `npm install`, build **with the API URL set**, run the standalone server locally | The two versions used. Did the build pass? Did the server answer with data? What did you have to guess? |
 | **3** | 20 min | Exercise whichever deployment you got: search, two filters, paging, a detail page, both deep-links, and `/publishers` | A screenshot of each |
 | **4** | 15 min | Try to **sign in**. Confirm it fails, and confirm the documentation warned you it would | Where did you look for that warning, and was it there? |
@@ -74,7 +74,7 @@ note about where it stopped is a result; a block that ran over and ate the next 
 ### Block 0 — five minutes
 
 ```sh no-run
-API=https://api.ethrfps.app        # the target for this whole protocol
+API=https://api.rfpsear.ch        # the target for this whole protocol
 ```
 
 ```sh safe-read
@@ -88,7 +88,7 @@ Record: did the quickstart get you to a real response without reading anything e
 
 Follow the button link in [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy).
 It clones the repository into your own Vercel account with the root directory already set to
-`packages/frontend`. Set `NEXT_PUBLIC_API_URL` to `https://api.ethrfps.app` when prompted.
+`packages/frontend`. Set `NEXT_PUBLIC_API_URL` to `https://api.rfpsear.ch` when prompted.
 
 Record the deployment URL. If the build fails, capture the **first** error in the log — not the
 last — and move on when the time is up.
@@ -125,7 +125,7 @@ npm install
 
 # NEXT_PUBLIC_API_URL is inlined at BUILD time. It belongs here and nowhere else — setting it in
 # front of `node server.js` later does nothing, and the page renders "no API configured".
-NEXT_PUBLIC_API_URL=https://api.ethrfps.app npm run build
+NEXT_PUBLIC_API_URL=https://api.rfpsear.ch npm run build
 
 # server.js is NOT at .next/standalone/server.js in a stand-alone copy — find it. Exclude
 # node_modules: the traced dependencies ship server.js files of their own, and a bare find

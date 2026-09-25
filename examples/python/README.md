@@ -18,8 +18,8 @@ python3 rfphub_client.py
 Point at a different API (always `https` for a hosted instance):
 
 ```bash
-RFPHUB_API_BASE=https://api.ethrfps.app python3 rfphub_client.py           # production
-RFPHUB_API_BASE=https://api-staging.ethrfps.app python3 rfphub_client.py   # staging
+RFPHUB_API_BASE=https://api.rfpsear.ch python3 rfphub_client.py           # production
+RFPHUB_API_BASE=https://api-staging.rfpsear.ch python3 rfphub_client.py   # staging
 ```
 
 ## What it exercises

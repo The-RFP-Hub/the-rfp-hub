@@ -54,8 +54,8 @@ export function defaultReportPath(prefix, now = new Date()) {
 
 export function parseArgs(argv) {
   const opts = {
-    api: "https://api.ethrfps.app",
-    site: "https://ethrfps.app",
+    api: "https://api.rfpsear.ch",
+    site: "https://rfpsear.ch",
     exportUrl: undefined,
     repoRoot: process.cwd(),
     milestone: undefined,

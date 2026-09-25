@@ -12,7 +12,7 @@ export const SKILL_VERSION = "0.1.0";
 
 export const SKILL_NAME = "funding-search";
 
-export const DEFAULT_API_BASE = "https://api.ethrfps.app";
+export const DEFAULT_API_BASE = "https://api.rfpsear.ch";
 
 /** `RFPHUB_API_BASE` env var, or the public production API. Never a CLI flag — see SKILL.md. */
 export function apiBase() {

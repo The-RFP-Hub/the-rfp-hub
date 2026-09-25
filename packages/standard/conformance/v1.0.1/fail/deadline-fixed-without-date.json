@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.1",
+  "id": "conformance:fixed-no-date",
+  "fundingType": "grant",
+  "title": "Fixed deadline with no date",
+  "description": "A deadline whose deadlineType is 'fixed' with the date omitted. date is required when deadlineType is 'fixed' — schema-enforced via if/then, not a SHOULD.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "deadlines": [
+    {
+      "deadlineType": "fixed",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

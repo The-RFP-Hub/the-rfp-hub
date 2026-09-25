@@ -31,24 +31,24 @@ The raw schema file is also published and importable directly (the import attrib
 required under `module: nodenext`, and harmless elsewhere):
 
 ```ts
-import schema from "@the-rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json" with { type: "json" };
+import schema from "@the-rfp-hub/standard/schemas/v1.0.1/opportunity.schema.json" with { type: "json" };
 ```
 
 ## What this package ships
 
 | Artifact | What it is |
 |---|---|
-| `schemas/v1.0.0/opportunity.schema.json` | The **normative** schema. Everything else is derived from it or governed by it. |
-| `schemas/v1.0.0/context.jsonld` | JSON-LD context. Term IRIs are versionless; the context *document* is what gets versioned. |
-| `schemas/v1.0.0/examples/` | 30 curated real-world entries. |
-| `conformance/v1.0.0/{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
+| `schemas/v1.0.1/opportunity.schema.json` | The **normative** schema. Everything else is derived from it or governed by it. |
+| `schemas/v1.0.1/context.jsonld` | JSON-LD context. Term IRIs are versionless; the context *document* is what gets versioned. |
+| `schemas/v1.0.0/examples/` | 30 curated real-world entries, valid under v1.0.0 and v1.0.1. |
+| `conformance/v1.0.1/{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
 | `registries/` | Four open vocabularies: deadline labels, program models, and bounty reward-tier severities and asset types. The schema keeps these fields free-text; the registry fixes what each value means. `ecosystems` is open too and deliberately has no registry — see [`ARTIFACTS.md`](./ARTIFACTS.md). (`eligibility-keys` was retired on 2026-08-05 when `eligibility` became free text.) |
 | `meta/rfphub-schema.meta.json` | Metaschema constraining our schema file's shape and legalising `x-stability` / `x-since` / `x-deprecated`. |
 | `spec.config.json` | The spec's identity. Every generated version string and URL is stamped from here. |
 
 ## Source of truth
 
-`schemas/v1.0.0/opportunity.schema.json` is hand-authored and authoritative; `spec.config.json`
+`schemas/v1.0.1/opportunity.schema.json` is hand-authored and authoritative; `spec.config.json`
 is the only place a version string or namespace IRI is hand-written. `pnpm codegen` stamps that
 identity into the schema, the context and `SPEC_VERSION`, then generates
 `src/generated/opportunity.ts`, `registries/index.json`, `schemas/index.json` and the field
@@ -56,9 +56,9 @@ tables in `FIELDS.md`. `pnpm codegen:check` fails CI when any of them is stale; 
 the publication rules (context↔schema drift, version-string agreement, source neutrality). Never
 edit a generated file by hand.
 
-See [`schemas/v1.0.0/FIELDS.md`](./schemas/v1.0.0/FIELDS.md) for the full field reference (its
+See [`schemas/v1.0.1/FIELDS.md`](./schemas/v1.0.1/FIELDS.md) for the full field reference (its
 tables are generated from the schema), [`CHANGELOG.md`](./CHANGELOG.md) for the release record,
-and [`schemas/v1.0.0/BENCHMARK.md`](./schemas/v1.0.0/BENCHMARK.md) for real-data validation
+and [`schemas/v1.0.1/BENCHMARK.md`](./schemas/v1.0.1/BENCHMARK.md) for real-data validation
 results.
 
 ## How this standard is governed
@@ -68,7 +68,7 @@ results.
 | [`NORMATIVE.md`](./NORMATIVE.md) | Which artifacts carry authority, and which can be corrected any day without a release. |
 | [`PROCESS.md`](./PROCESS.md) | Feature stages, what "breaking" means operationally, deprecation, how to register a vocabulary value, the release checklist. |
 | [`ARTIFACTS.md`](./ARTIFACTS.md) | Every artifact this standard ships, plans to ship, or has declined — with the reason. |
-| [`schemas/v1.0.0/STATUS.md`](./schemas/v1.0.0/STATUS.md) | Where this version stands: maturity, known issues, revision history. |
+| [`schemas/v1.0.1/STATUS.md`](./schemas/v1.0.1/STATUS.md) | Where this version stands: maturity, known issues, revision history. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | What changed and when — including the [field mapping tables](./CHANGELOG.md#field-mapping-old--new). No row is ever removed from it. |
 
 Who decides, and the review windows, are in `GOVERNANCE.md` at the repository root.

@@ -15,7 +15,7 @@ running them against production is a decision, not a demonstration. Read them, t
 knowingly.
 
 ```sh no-run
-API=https://api.ethrfps.app
+API=https://api.rfpsear.ch
 REVIEWER=<your session token>       # from `set-auth-token` on sign-in; NOT an rfph_ key
 ```
 

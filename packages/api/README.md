@@ -1,7 +1,7 @@
 # @the-rfp-hub/api
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
-serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a curated 142-entry dataset
+serves [RFP Hub Standard v1.0.1](../standard) objects, backed by a curated 142-entry dataset
 committed to this repository, and repeatable open-data exports (CC0). This is milestone **M2**.
 
 ## Endpoints (`/v1`)
@@ -21,7 +21,7 @@ committed to this repository, and repeatable open-data exports (CC0). This is mi
 
 ### The spec's own documents (unversioned, at the root)
 
-Every identifier the Standard publishes is an absolute URL on `ethrfps.app`, and each one is
+Every identifier the Standard publishes is an absolute URL on `rfpsear.ch`, and each one is
 served here at exactly the path it names — deliberately **not** under `/v1/`: these are the
 spec's identifiers, not API resources, and an identifier must not carry an API version. Bytes
 are the package's own, served verbatim (a consumer that hashes the response gets the same digest
@@ -29,8 +29,8 @@ as one that hashes the file). See [`adr/0007`](../../adr/0007-canonical-domain-a
 
 | Method | Path | Media type |
 |---|---|---|
-| `GET` | `/schemas/v1.0.0/opportunity.schema.json` | `application/schema+json` |
-| `GET` | `/schemas/v1.0.0/context.jsonld` | `application/ld+json` |
+| `GET` | `/schemas/v1.0.1/opportunity.schema.json` | `application/schema+json` |
+| `GET` | `/schemas/v1.0.1/context.jsonld` | `application/ld+json` |
 | `GET` | `/schemas/index.json` | `application/json` |
 | `GET` | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
 | `GET` | `/registries/entry.schema.json` | `application/schema+json` |
@@ -55,7 +55,7 @@ without any identifier changing.
 
 The five URLs above are the ones the Standard *mints an identifier for*. The API also mirrors the
 **whole of the three directories they live in**, read-only, at the paths the package's own layout
-gives them — because `schemas/v1.0.0/STATUS.md` says the identifiers mirror "this package's own
+gives them — because `schemas/v1.0.1/STATUS.md` says the identifiers mirror "this package's own
 directory layout", and a tree that reproduces the layout for five files and `404`s the rest is a
 shortlist, not a mirror. The served documents cross-link (`FIELDS.md` → `./context.jsonld`,
 `CROSSWALK.md` → `./opportunity.schema.json`, both → `../../registries/…`), and those links resolve
@@ -64,11 +64,11 @@ against the URL the document was fetched from.
 | Path | Media type |
 |---|---|
 | `/schemas/index.json` | `application/json` |
-| `/schemas/v1.0.0/opportunity.schema.json` | `application/schema+json` |
-| `/schemas/v1.0.0/context.jsonld` | `application/ld+json` |
-| `/schemas/v1.0.0/{FIELDS,CROSSWALK,BENCHMARK,STATUS}.md` | `text/markdown; charset=utf-8` |
-| `/schemas/v1.0.0/FROZEN` | `text/plain; charset=utf-8` |
-| `/schemas/v1.0.0/examples/*.json` (30 documents) | `application/json` |
+| `/schemas/v1.0.1/opportunity.schema.json` | `application/schema+json` |
+| `/schemas/v1.0.1/context.jsonld` | `application/ld+json` |
+| `/schemas/v1.0.1/{FIELDS,CROSSWALK,BENCHMARK,STATUS}.md` | `text/markdown; charset=utf-8` |
+| `/schemas/v1.0.1/FROZEN` | `text/plain; charset=utf-8` |
+| `/schemas/v1.0.0/examples/*.json` (30 documents, valid under v1.0.1 too) | `application/json` |
 | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
 | `/registries/entry.schema.json` | `application/schema+json` |
 | `/registries/{index,deadline-labels,program-models,bounty-severities,bounty-asset-types}.json` | `application/json` |
@@ -79,12 +79,12 @@ the identifiers. The directories the load balancer forwards to the apex are exac
 so `conformance/` is deliberately **not** served: it ships in the npm package for implementers to
 run offline, and no identifier names it.
 
-**Identifiers versus locators.** `https://ethrfps.app/…` stays the canonical identifier of every
+**Identifiers versus locators.** `https://rfpsear.ch/…` stays the canonical identifier of every
 one of these documents — that is what an `$id` or a `@context` names, and it does not change when
-the serving arrangement does; `https://api.ethrfps.app/…` is merely a locator that happens to hold
+the serving arrangement does; `https://api.rfpsear.ch/…` is merely a locator that happens to hold
 the same bytes, and the apex serves these same paths by proxying to it.
 
-There are **no directory listings**: `GET /schemas/v1.0.0/` is a `404`. The package ships no index
+There are **no directory listings**: `GET /schemas/v1.0.1/` is a `404`. The package ships no index
 for that directory, and synthesising one would put an API-shaped document — whose format could
 change — inside a directory whose entire promise is that its bytes cannot. `/schemas/index.json` is
 the shipped, machine-readable entry point.
@@ -103,12 +103,12 @@ documented here. Implementation: `src/modules/shared/spec-artifacts.ts` (the dir
 — *"no service is ever mounted here"* — and that reservation is the entire reason `/schemas/`,
 `/meta/`, `/registries/` and `/ns/` are safe as permanent identifier paths. Routing the apex to
 this service **wholesale** would not reserve it; it would publish the whole `/v1` API at
-`ethrfps.app`, and every future apex path would become API collision surface.
+`rfpsear.ch`, and every future apex path would become API collision surface.
 
 | Host | What this service answers |
 |---|---|
-| `ethrfps.app` (and `www.`) | The publication tree above — the five canonical documents and the rest of `/schemas/`, `/meta/`, `/registries/`. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
-| `api.ethrfps.app`, `api-staging.ethrfps.app`, anything else | Everything, including the publication tree. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
+| `rfpsear.ch` (and `www.`) | The publication tree above — the five canonical documents and the rest of `/schemas/`, `/meta/`, `/registries/`. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
+| `api.rfpsear.ch`, `api-staging.rfpsear.ch`, anything else | Everything, including the publication tree. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
 
 This is enforced in the application (`src/plugins/apex-host.ts`, an `onRequest` allowlist derived
 from the Standard's own `baseUrl`) and asserted with both `Host` headers in
@@ -116,7 +116,7 @@ from the Standard's own `baseUrl`) and asserted with both `Host` headers in
 independently**: in production the apex resolves to the reference frontend, which proxies exactly
 `/schemas/`, `/meta/`, `/registries/` and `/ns/` to this service and claims none of them as app
 routes — so apex traffic for `/v1` never reaches a task at all. The table above still describes
-this service's behavior under a `Host: ethrfps.app` header, and that is the point: it is what
+this service's behavior under a `Host: rfpsear.ch` header, and that is the point: it is what
 holds if the apex is ever routed here directly. Two layers, because the application rule survives
 an infrastructure edit and the infrastructure rule survives a routing change here.
 
@@ -132,7 +132,7 @@ loop written in prose.
 `application/json` opportunity responses (list and detail, `200` only) carry
 
 ```
-Link: <https://ethrfps.app/schemas/v1.0.0/context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"
+Link: <https://rfpsear.ch/schemas/v1.0.1/context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"
 ```
 
 so a conformant JSON-LD 1.1 processor reads them as linked data with no `@context` in the
@@ -489,7 +489,7 @@ gap for a reader to fall into.
 
 ```json
 {
-  "specVersion": "1.0.0",
+  "specVersion": "1.0.1",
   "license": "CC0-1.0",
   "runId": "9f2c…",
   "generatedAt": "2026-08-11T09:41:07.512Z",

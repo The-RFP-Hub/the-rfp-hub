@@ -32,7 +32,7 @@ Options:
   --format <json|table>  default json
   --help                 show this message
 
-Env: RFPHUB_API_BASE (default https://api.ethrfps.app). Requests time out after 10000ms.
+Env: RFPHUB_API_BASE (default https://api.rfpsear.ch). Requests time out after 10000ms.
 `;
 
 const GET_ALLOWED_FLAGS = new Set(["id", "format", "help"]);

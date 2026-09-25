@@ -8,6 +8,44 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
+## v1.0.1 — the identity moves to `rfpsear.ch` (2026-09-25)
+
+The project moved from `ethrfps.app` to `rfpsear.ch`. v1.0.0's identifiers are frozen bytes, so
+the move is a new version: **v1.0.1 is v1.0.0's contract under new identifiers.** Decision record:
+[`adr/0013`](../../adr/0013-move-spec-identity-to-rfpsear-ch.md).
+
+| Identifier | v1.0.0 (unchanged) | v1.0.1 |
+|---|---|---|
+| Schema `$id` | `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json` | `https://rfpsear.ch/schemas/v1.0.1/opportunity.schema.json` |
+| Context URL | `https://ethrfps.app/schemas/v1.0.0/context.jsonld` | `https://rfpsear.ch/schemas/v1.0.1/context.jsonld` |
+| Metaschema `$id` | — | `https://rfpsear.ch/meta/rfphub-schema.meta.json` |
+| Registry entry `$id` | — | `https://rfpsear.ch/registries/entry.schema.json` |
+| `@vocab` | `https://ethrfps.app/ns/rfp#` | `https://rfpsear.ch/ns/rfp#` |
+
+### Schema
+
+- **`specVersion` accepts `"1.0.0"` and `"1.0.1"`** (was `const: "1.0.0"`). **Breaking** under the
+  bidirectional definition — a document declaring `1.0.1` was invalid under v1.0.0 — and the only
+  such change: every other constraint is v1.0.0's, byte for byte apart from the identifiers.
+  Documents that declare `1.0.0` keep validating, so no publisher has to change anything.
+
+### Context
+
+- `@vocab` moves to `https://rfpsear.ch/ns/rfp#`. `ns/rfp.jsonld` now lists the terms under the new
+  namespace and records that the v1.0.0 namespace names the same terms.
+
+### Tooling
+
+- The freeze gate permits a recorded **identity migration**: a new version directory on the new
+  identity, the versionless `$id`s re-stamped byte-exactly, and one entry appended to
+  `spec.config.json`'s `identityMigrations` naming an accepted ADR. Frozen directories stay
+  immutable. `check-spec` accepts the previous authority's URLs only for the versions published
+  under it.
+- `schemas/index.json` lists every published version, not only the current one.
+- Conformance: `pass/spec-version-1-0-0-still-accepted.json`, `fail/specversion-unknown-patch.json`.
+
+---
+
 ## Canonical identity adopted; v1.0.0 declared stable (2026-08-10)
 
 **Every identifier this standard publishes changed.** The project adopted its canonical domain,

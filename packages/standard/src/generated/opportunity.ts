@@ -1,9 +1,9 @@
-// GENERATED from schemas/v1.0.0/opportunity.schema.json — do not edit by hand.
+// GENERATED from schemas/v1.0.1/opportunity.schema.json — do not edit by hand.
 // Regenerate with `pnpm codegen`.
 /* biome-ignore-all lint: generated */
 
 /**
- * RFP Hub Standard v1.0.0 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @the-rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.
+ * RFP Hub Standard v1.0.1 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @the-rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.
  */
 export type RFPHubOpportunity = {
   [k: string]: unknown;
@@ -21,9 +21,9 @@ export type RFPHubOpportunity = {
    */
   "@type"?: string | unknown[];
   /**
-   * The RFP Hub Standard version this entry conforms to. Fixed at 1.0.0 for this schema. Consumers use it to select the correct validator.
+   * The RFP Hub Standard version this entry conforms to. 1.0.1 changes only the standard's identifiers (its $id, context and vocabulary moved to rfpsear.ch); the data contract is 1.0.0's, so a document declaring 1.0.0 also conforms to this schema. New documents should declare 1.0.1. Consumers use it to select the correct validator.
    */
-  specVersion: "1.0.0";
+  specVersion: "1.0.0" | "1.0.1";
   /**
    * Stable, unique identifier for the opportunity within the Hub. Immutable once assigned. A namespaced form is recommended but not required.
    */

@@ -5,7 +5,12 @@
       "version": "1.0.0",
       "path": "v1.0.0",
       "status": "stable"
+    },
+    {
+      "version": "1.0.1",
+      "path": "v1.0.1",
+      "status": "stable"
     }
   ],
-  "latest": "1.0.0"
+  "latest": "1.0.1"
 }

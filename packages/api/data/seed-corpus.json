@@ -2,7 +2,7 @@
   "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` means the date the SOURCE ITSELF announced the opportunity, and it is never the date this file was edited. On the 94 `curated:` records it is a date the funder published — a program page's \"Live Since\" line, a governance topic's creation date, a launch post or a press release — written into the description of the record it dates; seven of those are archival bounds instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all, and each says so in its own description.\n\nOn the `fundingmap:` records the field used to carry the timestamp the upstream snapshot held for its own row — when that registry recorded the program, not when the funder announced it. Those values were not announcement dates and no longer ship: 65 of the 66 were re-researched here. 26 now carry a date the funder or organiser itself published (11 exact — a forum topic's creation time, a listing's own publication timestamp, a press release dateline; 13 dated launch announcements; 2 archival bounds), each written into the description of the record it dates. For the other 39 no publishable date could be established, so `postedAt` is absent — the Standard's \"unknown\" — and each of those records says in its own description what was searched. `fundingmap:1382` keeps the date researched for it earlier. 121 of the 160 documents therefore carry a `postedAt`, and every one of them is a source date.\n\n`createdAt`/`updatedAt` are Hub timestamps — on `curated:` records the curation date, on `fundingmap:` records the snapshot's own row timestamp — which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading and go stale: re-check against the funder before relying on one. The curation pass read them on 2026-08-11 (eighteen security-bounty records researched from their Sherlock, HackenProof and Immunefi programme pages were added and read on 2026-08-14); a pre-review pass on 2026-08-13 re-read a subset against the funder and corrected what had moved, and each record it touched carries its own dated reading. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
   "documents": [
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1042",
       "fundingType": "grant",
       "title": "Optimism Season 9 — Audit Grants",
@@ -89,7 +89,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1045",
       "fundingType": "grant",
       "title": "Optimism Season 9 — Growth Grants",
@@ -177,7 +177,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:961",
       "fundingType": "grant",
       "title": "Optimism Audit Service Providers (ASP)",
@@ -256,7 +256,7 @@
       }
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1059",
       "fundingType": "hackathon",
       "title": "Build Agents for the Real World Hackathon V2",
@@ -399,7 +399,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:991",
       "fundingType": "grant",
       "title": "Polygon Prediction Markets Program",
@@ -491,7 +491,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:996",
       "fundingType": "grant",
       "title": "Polygon Audit Support Program",
@@ -597,7 +597,7 @@
       "website": "https://areta.market/polygon"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:981",
       "fundingType": "grant",
       "title": "Polygon Growth Partnership Program",
@@ -694,7 +694,7 @@
       "serviceAgreement": "Polygon /grow was framed as an ongoing business-development and partnership engagement with Polygon Labs' BD and founder-support teams — deeper business relationships, technical partnerships and ecosystem integration — rather than a one-off award."
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1046",
       "fundingType": "grant",
       "title": "GEN Ukraine MicroGrant Program",
@@ -738,7 +738,7 @@
       "opensAt": "2026-01-31T22:00:00.000Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1021",
       "fundingType": "grant",
       "title": "Localism Mini Grant Round 01 | Colombia",
@@ -819,7 +819,7 @@
       "website": "https://linktr.ee/reficolombia"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:958",
       "fundingType": "grant",
       "title": "Optimism Season 8 — Audit Grants",
@@ -907,7 +907,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:959",
       "fundingType": "grant",
       "title": "Optimism Season 8 — Growth Grants",
@@ -994,7 +994,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:969",
       "fundingType": "grant",
       "title": "Scroll Community Grants",
@@ -1086,7 +1086,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:990",
       "fundingType": "grant",
       "title": "Local Meetups LATAM | Round 02",
@@ -1175,7 +1175,7 @@
       "website": "https://www.localism.fund/round-02"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1496",
       "fundingType": "hackathon",
       "title": "FlutterFlow Champions League Hackathon",
@@ -1231,7 +1231,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/7267d88b12f948539641fea683cb6c66/assets/cover/70.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1493",
       "fundingType": "hackathon",
       "title": "MicroCraft - Vibeathon",
@@ -1302,7 +1302,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/58c978f82f7a46c1b152b6bcac7e4ef4/assets/cover/994.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1494",
       "fundingType": "hackathon",
       "title": "FutureForge Hackathon 2026",
@@ -1377,7 +1377,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/bb54d442577e484b9166313a22c6e24d/assets/cover/439.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1491",
       "fundingType": "hackathon",
       "title": "MicroCraft - ArcNight",
@@ -1449,7 +1449,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/497c85945eca460b8825c2e29bb45375/assets/cover/505.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1423",
       "fundingType": "hackathon",
       "title": "The Turing Test Hackathon 2026 — Phase 2: AI Awakening",
@@ -1546,7 +1546,7 @@
       "additionalReferences": "Mantle's press release announcing the hackathon: https://www.prnewswire.com/news-releases/mantle-unites-global-ai-tech-and-youth-communities-for-its-largest-ai-hackathon-backed-by-tencent-cloud-bybit-byreal-and-blockchain-for-good-alliance-302750420.html"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1094",
       "fundingType": "hackathon",
       "title": "ETHGlobal New York 2026",
@@ -2025,7 +2025,7 @@
       "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Event page, which carries the \"$175,000 Available in prizes\" headline: https://ethglobal.com/events/newyork2026 · Prizes page, which carries the sponsor breakdown summed into the recorded budget: https://ethglobal.com/events/newyork2026/prizes"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1482",
       "fundingType": "hackathon",
       "title": "Devlynix Buildathon 2.0",
@@ -2086,7 +2086,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/ca11d7f700174ed6ae546ffd4cdf0eda/assets/cover/548.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1412",
       "fundingType": "hackathon",
       "title": "Arbitrum Open House London: Online Buildathon",
@@ -2175,7 +2175,7 @@
       "website": "https://blog.arbitrum.foundation/builders-block-016-open-house-london-dates-locked-first-cohort-of-mentorship-program/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1468",
       "fundingType": "hackathon",
       "title": "HexaFalls 2",
@@ -2343,7 +2343,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/cea35e57f7a84781b380c84ec37498ee/assets/cover/684.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1490",
       "fundingType": "hackathon",
       "title": "Hack On Hills 8.0",
@@ -2437,7 +2437,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/bafa728dabdc4269bb2bebeca040d418/assets/cover/529.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1489",
       "fundingType": "hackathon",
       "title": "Hack4Brahma 2.0",
@@ -2498,7 +2498,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/382bf64d45a44f70ad2a782b3b078d1b/assets/cover/821.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1488",
       "fundingType": "hackathon",
       "title": "DSU DEVHACK 3.0",
@@ -2603,7 +2603,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/7ee5299489e44835bf3872bd262e34b3/assets/cover/999.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1483",
       "fundingType": "hackathon",
       "title": "HackNex Season 2",
@@ -2704,7 +2704,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/4f8ce8d49ffe4afd93f1c3bf8b47d6bd/assets/cover/835.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1487",
       "fundingType": "hackathon",
       "title": "SheBuilds Chennai Hack",
@@ -2782,7 +2782,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/7f2375c62653474ab7941b2d81c0de6b/assets/cover/175.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1478",
       "fundingType": "hackathon",
       "title": "ccuhacks",
@@ -2887,7 +2887,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/71e67277b968419dbea7c6b4eeaf553a/assets/cover/403.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1480",
       "fundingType": "hackathon",
       "title": "HACKER HOUSE GOA 2026",
@@ -2974,7 +2974,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/6b8701ece63444619285ea50db89a8bc/assets/cover/64.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1431",
       "fundingType": "hackathon",
       "title": "DeerHack 2026",
@@ -3086,7 +3086,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/fbe504b105644394a18f4e96fc7b21e5/assets/cover/382.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1230",
       "fundingType": "hackathon",
       "title": "HackPrix Season 3",
@@ -3247,7 +3247,7 @@
       "additionalReferences": "First archived capture of the event page: https://web.archive.org/web/20260211213610/https://hackprix-2026.devfolio.co/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1467",
       "fundingType": "hackathon",
       "title": "AI x Web3 School",
@@ -3333,7 +3333,7 @@
       "additionalReferences": "Launch announcement: https://x.com/aiweb3school/status/2045061837259980858"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1458",
       "fundingType": "grant",
       "title": "Prezenti Anchor Pool",
@@ -3461,7 +3461,7 @@
       "website": "https://www.prezenti.xyz/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1459",
       "fundingType": "grant",
       "title": "Prezenti Boost Pool S2",
@@ -3601,7 +3601,7 @@
       "website": "https://www.prezenti.xyz/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:600",
       "fundingType": "grant",
       "title": "Prezenti Mint Round",
@@ -3718,7 +3718,7 @@
       "website": "https://www.prezenti.xyz/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1382",
       "fundingType": "bounty",
       "title": "Confidential Onchain Finance Bounty",
@@ -3810,7 +3810,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1463",
       "fundingType": "hackathon",
       "title": "Devlynix Buildathon 1.0",
@@ -3871,7 +3871,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/5117ff78ba25463d99d282450e29a968/assets/cover/901.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1462",
       "fundingType": "grant",
       "title": "Uniswap Foundation Security Fund (UFSF)",
@@ -3977,7 +3977,7 @@
       "website": "https://www.uniswapfoundation.org/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1277",
       "fundingType": "hackathon",
       "title": "ETHGlobal Open Agents",
@@ -4150,7 +4150,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1414",
       "fundingType": "accelerator",
       "title": "Yellow Acceleration #2",
@@ -4203,7 +4203,7 @@
       "website": "https://www.yellow.org/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1429",
       "fundingType": "hackathon",
       "title": "HACKWAVE 2.0",
@@ -4296,7 +4296,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/fde8dab47d7a418d938ebf5dcd8d2c9f/assets/cover/119.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1375",
       "fundingType": "hackathon",
       "title": "Altaria",
@@ -4386,7 +4386,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/e9e64e4a256e4533af7746038ec3001d/assets/cover/369.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1229",
       "fundingType": "hackathon",
       "title": "InnoFusion 3.0",
@@ -4596,7 +4596,7 @@
       "additionalReferences": "First archived capture of the event's prize page: https://web.archive.org/web/20260115210124/https://www.innofusion.tech/prizepool"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1398",
       "fundingType": "hackathon",
       "title": "Arbitrum Open House — London",
@@ -4696,7 +4696,7 @@
       "website": "https://arbitrum-london.hackquest.io/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1395",
       "fundingType": "hackathon",
       "title": "10X Founders Demo Day: Inspira Labs <> Yellow Capital",
@@ -4782,7 +4782,7 @@
       "additionalReferences": "Launch announcement: https://x.com/InspiraLabsHQ/status/2041125205712470426"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1275",
       "fundingType": "hackathon",
       "title": "INNOVATEX 1.O",
@@ -4844,7 +4844,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/838f51e615a74d598cebffc6f3e32319/assets/cover/406.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1299",
       "fundingType": "hackathon",
       "title": "Athernex",
@@ -4916,7 +4916,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/f65cd8d2352a4030a35d4bdedf952cfe/assets/cover/419.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1417",
       "fundingType": "grant",
       "title": "Q402 Grant Program",
@@ -5025,7 +5025,7 @@
       "website": "https://q402.quackai.ai/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1390",
       "fundingType": "hackathon",
       "title": "Citadel Hackathon - Season 1",
@@ -5118,7 +5118,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/301b87a3a31a4c64970739267cd4083a/assets/cover/509.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1283",
       "fundingType": "hackathon",
       "title": "Hack&Chill3.0",
@@ -5191,7 +5191,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/58daad50f5ab45848fa7fbc66eb71186/assets/cover/252.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1298",
       "fundingType": "hackathon",
       "title": "Build with Framework 1.0",
@@ -5296,7 +5296,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/8fe109f965fb49dabca0ba679d6e16e2/assets/cover/226.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1266",
       "fundingType": "hackathon",
       "title": "Cepheus 2.0",
@@ -5380,7 +5380,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/a5a7830547d647498c1262d87b7e470f/assets/cover/280.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1362",
       "fundingType": "hackathon",
       "title": "DAYZERO 2.0",
@@ -5452,7 +5452,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/142e3f3160df4db48ed644899a430405/assets/cover/443.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1246",
       "fundingType": "hackathon",
       "title": "HashKey Chain On-Chain Horizon Hackathon",
@@ -5560,7 +5560,7 @@
       "website": "https://dorahacks.io/hackathon/2045/detail"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1291",
       "fundingType": "accelerator",
       "title": "Web3 X Incubation Program — Batch 07",
@@ -5613,7 +5613,7 @@
       "website": "https://www.w3x.network/incubation"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1361",
       "fundingType": "hackathon",
       "title": "BITBOX 6.0",
@@ -5718,7 +5718,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/0710a77c54e94c67903cc296437697fa/assets/cover/12.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1343",
       "fundingType": "hackathon",
       "title": "Build Space",
@@ -5797,7 +5797,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/6c7c1fd6efb54e31b336ff257fe19f16/assets/cover/798.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1355",
       "fundingType": "hackathon",
       "title": "InOut2k26",
@@ -5876,7 +5876,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/fd2430dfced14fd083236bfb15d9960f/assets/cover/456.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1329",
       "fundingType": "hackathon",
       "title": "Push to Prod Hackathon with Genspark & Claude",
@@ -5976,7 +5976,7 @@
       "additionalReferences": "Launch announcement: https://x.com/devfolio/status/2038513204800680310"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1360",
       "fundingType": "hackathon",
       "title": "Innovate-Iterate-Interrupt (III) 5.0",
@@ -6047,7 +6047,7 @@
       "bannerUrl": "https://assets.devfolio.co/hackathons/fcfadb2a7e4c473398eb88fa6b7cb874/assets/cover/987.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1225",
       "fundingType": "hackathon",
       "title": "NMIT HACKS 2026",
@@ -6206,7 +6206,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1366",
       "fundingType": "grant",
       "title": "Regenesis Season 1 Grants",
@@ -6297,7 +6297,7 @@
       "website": "https://grants.dclregenesislabs.xyz/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-dda-developer-tooling-on-arbitrum-one-and-nova",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Dev Tooling on One and Stylus",
@@ -6369,7 +6369,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-dda-education-community-growth-and-events",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Education, Community Growth and Events",
@@ -6455,7 +6455,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:road-to-devcon-8-india-ecosystem-program",
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — Ecosystem Program",
@@ -6560,7 +6560,7 @@
       "website": "https://esp.ethereum.foundation/applicants/rfp/rtd8_india"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:road-to-devcon-8-india-university-program",
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — University Program",
@@ -6673,7 +6673,7 @@
       "website": "https://esp.ethereum.foundation/applicants/rfp/rtd8_india_academic"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rfp-reboot-the-gitcoin-community-for-the-3-3-era",
       "fundingType": "rfp",
       "title": "RFP: Reboot the Gitcoin Community for the 3.3 Era",
@@ -6771,7 +6771,7 @@
       "serviceAgreement": "Phased engagement running June 2026 – Q1 2027, structured as milestone-gated contracts rather than a single large retainer. Multiple contracts are expected to be awarded across the three workstreams; Workstream C is procured as a plan first, with an option to execute pending mutual agreement closer to launch."
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethereum-foundation-esp",
       "fundingType": "grant",
       "title": "Ecosystem Support Program (ESP)",
@@ -6848,7 +6848,7 @@
       "website": "https://esp.ethereum.foundation/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-grants",
       "fundingType": "grant",
       "title": "Aave Grants",
@@ -6897,7 +6897,7 @@
       "website": "https://aavegrants.org/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:lido-ecosystem-grants-organisation-lego",
       "fundingType": "grant",
       "title": "Lido Ecosystem Grants Organisation (LEGO)",
@@ -6985,7 +6985,7 @@
       "website": "https://lido.fi/lego"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ssv-grants-program",
       "fundingType": "grant",
       "title": "SSV Grants Program",
@@ -7056,7 +7056,7 @@
       "website": "https://ssv.network/get-funded"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:nouns-dao-small-grants",
       "fundingType": "grant",
       "title": "Nouns DAO Small Grants",
@@ -7119,7 +7119,7 @@
       "website": "https://nouns.center/funding/smallgrants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:metamask-grants-program",
       "fundingType": "grant",
       "title": "MetaMask Grants Program",
@@ -7173,7 +7173,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:unichain-grants",
       "fundingType": "grant",
       "title": "Unichain Grants",
@@ -7251,7 +7251,7 @@
       "website": "https://www.uniswapfoundation.org/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:safe-ecosystem-foundation-grants",
       "fundingType": "grant",
       "title": "Safe Ecosystem Foundation Grants",
@@ -7330,7 +7330,7 @@
       "website": "https://safefoundation.org/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-audit-program",
       "fundingType": "grant",
       "title": "Arbitrum Audit Program",
@@ -7429,7 +7429,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:alchemy-x-arbitrum-grant",
       "fundingType": "grant",
       "title": "Alchemy x Arbitrum Grant",
@@ -7489,7 +7489,7 @@
       "website": "https://www.alchemy.com/arbitrum-grant"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-seed-grants",
       "fundingType": "grant",
       "title": "Starknet Seed Grants",
@@ -7555,7 +7555,7 @@
       "website": "https://www.starknet.io/grants/seed-grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-growth-grants",
       "fundingType": "grant",
       "title": "Starknet Growth Grants",
@@ -7629,7 +7629,7 @@
       "website": "https://www.starknet.io/grants/growth-grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-x-denarii-labs-accelerator",
       "fundingType": "accelerator",
       "title": "Starknet x Denarii Labs Accelerator",
@@ -7718,7 +7718,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:world-foundation-spark-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Spark Track Mini App Grant",
@@ -7767,7 +7767,7 @@
       "website": "https://world.org/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:world-foundation-scale-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Scale Track Mini App Grant",
@@ -7816,7 +7816,7 @@
       "website": "https://world.org/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:taiko-grants-2025-grant-fund",
       "fundingType": "grant",
       "title": "Taiko Grants (2025 Grant Fund)",
@@ -7908,7 +7908,7 @@
       "website": "https://taiko.xyz/grant-program"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:base-ecosystem-fund",
       "fundingType": "vc_fund",
       "title": "Base Ecosystem Fund",
@@ -8004,7 +8004,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:polymarket-builders-program",
       "fundingType": "grant",
       "title": "Polymarket Builders Program",
@@ -8071,7 +8071,7 @@
       "website": "https://builders.polymarket.com"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethonline-2026",
       "fundingType": "hackathon",
       "title": "ETHOnline 2026",
@@ -8251,7 +8251,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethglobal-tokyo-2026",
       "fundingType": "hackathon",
       "title": "ETHGlobal Tokyo 2026",
@@ -8373,7 +8373,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethglobal-mumbai",
       "fundingType": "hackathon",
       "title": "ETHGlobal Mumbai",
@@ -8507,7 +8507,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:lido-bug-bounty",
       "fundingType": "bounty",
       "title": "Lido Bug Bounty",
@@ -8656,7 +8656,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/62hsATkPdR14taAS7FTlXW/2b3efcb09394982db6e67d0b028a271c/G2czctJJ_400x400.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-bug-bounty",
       "fundingType": "bounty",
       "title": "Aave Bug Bounty",
@@ -8770,7 +8770,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/5nVG9oUSZ05hb2dlIuqPU6/5d6e4c5db151fdd8fb48448990056e05/Screenshot_2024-08-12_at_5.37.45___PM.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:optimism-bug-bounty",
       "fundingType": "bounty",
       "title": "Optimism Bug Bounty",
@@ -8917,7 +8917,7 @@
       "logoUrl": "https://qn5bmgziiocgawpp.public.blob.vercel-storage.com/75509-lZCayrCTytqHks6hhqjFb-81Kn1Z8SSg5DCSCLlX91oISNPhHMUL.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-bug-bounty",
       "fundingType": "bounty",
       "title": "Arbitrum Bug Bounty",
@@ -9026,7 +9026,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/4R1H4ktLiQcp601gnixkJa/20dc4d9cf5229ae712f1413d9afced4f/Arbitrum.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:polygon-bug-bounty",
       "fundingType": "bounty",
       "title": "Polygon Bug Bounty",
@@ -9155,7 +9155,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/8EEzTabH4B0Palx5UgpL8/4d800cd963e02d33e39872b4030e7e2f/Polygon__1_.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:sky-makerdao-bug-bounty",
       "fundingType": "bounty",
       "title": "Sky (MakerDAO) Bug Bounty",
@@ -9292,7 +9292,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/29CWfnhFWZUDZ0w83H0wj6/30bb70512c04338d29bd3bd5a261ad2c/Sky_Ecosystem.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ens-bug-bounty",
       "fundingType": "bounty",
       "title": "ENS Bug Bounty",
@@ -9432,7 +9432,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/4eTVMLtAvVcZKfzuVivfV0/fa593db62bd32e8d72b2194b76ae4205/ethereum-name-service-ens-logo.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:uniswap-bug-bounty",
       "fundingType": "bounty",
       "title": "Uniswap Bug Bounty",
@@ -9668,7 +9668,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/996f66ba-85cb-426e-8735-30c8cd8a6300/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:coinbase-base-bug-bounty",
       "fundingType": "bounty",
       "title": "Coinbase / Base Bug Bounty",
@@ -9810,7 +9810,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/32f837aa-461f-42b4-5c99-2aa6599cf500/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:morpho-bug-bounty",
       "fundingType": "bounty",
       "title": "Morpho Bug Bounty",
@@ -9982,7 +9982,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/56103ebb-f81c-409e-c60b-5eb6e9bb7900/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:pendle-bug-bounty",
       "fundingType": "bounty",
       "title": "Pendle Bug Bounty",
@@ -10065,7 +10065,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/2b01fc25-74fe-4674-66e2-b90805e65500/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:symbiotic-bug-bounty",
       "fundingType": "bounty",
       "title": "Symbiotic Bug Bounty",
@@ -10241,7 +10241,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/7f888151-1692-4106-e83e-146a0f8dec00/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:agglayer-bug-bounty",
       "fundingType": "bounty",
       "title": "Agglayer Bug Bounty",
@@ -10328,7 +10328,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/972937de-e6ee-4072-bb58-f92703b7df00/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethereum-foundation-bug-bounty-program",
       "fundingType": "bounty",
       "title": "Ethereum Foundation Bug Bounty Program",
@@ -10431,7 +10431,7 @@
       "website": "https://bbp-form.ethereum.org/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:chainlink-bug-bounty",
       "fundingType": "bounty",
       "title": "Chainlink Bug Bounty",
@@ -10571,7 +10571,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/2NbXmUd05dVTI4CddDDFEK/62bc8a522d1b1bf77183097a87ee45d7/1200px-Chainlink_Logo__1_.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:the-graph-bug-bounty",
       "fundingType": "bounty",
       "title": "The Graph Bug Bounty",
@@ -10668,7 +10668,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/2L62ScwrnMTV5zczetmm3N/3441bc33007755cf6d8865db69d0d50e/the-graph-grt-logo_copy.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:synthetix-bug-bounty",
       "fundingType": "bounty",
       "title": "Synthetix Bug Bounty",
@@ -10791,7 +10791,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/3GJoatBuqt8RlBr5f1yRa1/6f37cd51feefc6382e47d61e93a612e3/Synthetix-logo.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:balancer-bug-bounty",
       "fundingType": "bounty",
       "title": "Balancer Bug Bounty",
@@ -10890,7 +10890,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/5RONBs8MvUillmn49FRQ8G/58ec9b1dcf5079426bebf218c3948166/Balancer_Logo.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:compound-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Compound Finance Bug Bounty",
@@ -10996,7 +10996,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/5pzaBv2Ygrx3DN9sctxd0a/dcb98ece577d2c0ac8b6ea637e9a3069/Compound.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:spark-bug-bounty",
       "fundingType": "bounty",
       "title": "Spark Bug Bounty",
@@ -11118,7 +11118,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/6PSQWUew0V3et86JKkvxs0/152af27a6fa55003a4cc5511f0641d17/badge__1_.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-bug-bounty",
       "fundingType": "bounty",
       "title": "Rocket Pool Bug Bounty",
@@ -11221,7 +11221,7 @@
       "logoUrl": "https://qn5bmgziiocgawpp.public.blob.vercel-storage.com/14418-DXFyXv__MxF7LZmviqmzR.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:stakewise-bug-bounty",
       "fundingType": "bounty",
       "title": "StakeWise Bug Bounty",
@@ -11329,7 +11329,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/6pcegtZ9EgRSp41tiAroSX/e146d81a9b7bea7994de08885d5fd2b7/StakeWise_Logo.jpg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ether-fi-bug-bounty",
       "fundingType": "bounty",
       "title": "ether.fi Bug Bounty",
@@ -11476,7 +11476,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/6uARdqsJxpv7UY78Xbg27/bce4b93c8e971a1a55315d80310f1b9f/ether_fi1677585111698.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:1inch-aqua-bug-bounty",
       "fundingType": "bounty",
       "title": "1inch Aqua Bug Bounty",
@@ -11579,7 +11579,7 @@
       "logoUrl": "https://qn5bmgziiocgawpp.public.blob.vercel-storage.com/program-logos/sebastian%40immunefi.com-9KuIMXdORw2kDGjEQXDL0.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:sushiswap-bug-bounty",
       "fundingType": "bounty",
       "title": "SushiSwap Bug Bounty",
@@ -11688,7 +11688,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/ktA91VW40fkAtwAT2Ygs9/4bccd7ed0e2b2b2ef8f27e783801273e/Sushiswap-logo.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:layerzero-bug-bounty",
       "fundingType": "bounty",
       "title": "LayerZero Bug Bounty",
@@ -11793,7 +11793,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/3UXQcPOIAaOkE2QBCasSKa/14893bedf55bdb191e4cf99a67203e85/LayerZero_logo.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:stargate-bug-bounty",
       "fundingType": "bounty",
       "title": "Stargate Bug Bounty",
@@ -11891,7 +11891,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/7LX3n66MkHEBIYLZtNzQTA/811af3d0f225034e794af65976ba5d19/Stargate_logo.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:wormhole-bug-bounty",
       "fundingType": "bounty",
       "title": "Wormhole Bug Bounty",
@@ -12033,7 +12033,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/zjpjBpSpX6wiIdgfoLeKc/b7c1a836bbc7a4a850623ddee15f3158/wormhole-logo-full-color-rgb-2000px_72ppi__1_.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:yearn-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Yearn Finance Bug Bounty",
@@ -12136,7 +12136,7 @@
       "logoUrl": "https://qn5bmgziiocgawpp.public.blob.vercel-storage.com/46652-poMYBlE470F3ANFEzLX3a-PhDjdUVamAGgfjv2TMLhs2M2H40O54.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gearbox-bug-bounty",
       "fundingType": "bounty",
       "title": "Gearbox Bug Bounty",
@@ -12245,7 +12245,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/5GOsjS01FpGEPA6hXdth5H/ce653a8ad09690883d2184043b04d552/Gearbox_logo.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:instadapp-fluid-bug-bounty",
       "fundingType": "bounty",
       "title": "Instadapp (Fluid) Bug Bounty",
@@ -12356,7 +12356,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/7jHZEinQjaABm48Sct1BZs/3d224c5a05bff575e14b98970f939667/Instadapp.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethena-bug-bounty",
       "fundingType": "bounty",
       "title": "Ethena Bug Bounty",
@@ -12483,7 +12483,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/2SCfByxtr2f7bf1Z8Vefzb/cea115652062b3f56441d4d63702fe22/download_copy.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ssv-network-bug-bounty",
       "fundingType": "bounty",
       "title": "SSV Network Bug Bounty",
@@ -12590,7 +12590,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/66mTctNPGQxwpoc8NxKOzc/db72f4f7f79f09e6b26198097ee59b76/ssv.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:kelp-dao-bug-bounty",
       "fundingType": "bounty",
       "title": "Kelp DAO Bug Bounty",
@@ -12727,7 +12727,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/45teNS8w4f7XgiQvJnl82R/aafacb2bdce0fe3bbaf3b4453ad422ab/IwyLpOfL_400x400.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:linea-bug-bounty",
       "fundingType": "bounty",
       "title": "Linea Bug Bounty",
@@ -12825,7 +12825,7 @@
       "logoUrl": "https://qn5bmgziiocgawpp.public.blob.vercel-storage.com/79486-iBsXHAc2W40JUtjhEvU61-2Fr4tDIwLvSnpvuY4fUfVIpcBLgwQj.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:zksync-era-bug-bounty",
       "fundingType": "bounty",
       "title": "ZKsync Era Bug Bounty",
@@ -12949,7 +12949,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/5C91MGheTJXJfhYXd7Jjry/89c1af83fcb8de564462eb5e0e727012/era-arrows-white__1_.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:euler-bug-bounty",
       "fundingType": "bounty",
       "title": "Euler Bug Bounty",
@@ -13127,7 +13127,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/8652cfc9-3821-4ecf-caf5-25ffab4b3a00/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gmx-bug-bounty",
       "fundingType": "bounty",
       "title": "GMX Bug Bounty",
@@ -13239,7 +13239,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/3MNDLo0J4LVTW2PgGVCsrb/1b8813ff88a37704386e3c81237dfbbc/GMX_logo.jpeg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:cow-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "CoW Protocol Bug Bounty",
@@ -13339,7 +13339,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/2SCCBIzc5z3ZxUhwhW1NSK/c6616b0b6f3bbacfebd5a6ea18f929dd/CoW-Protocol-icon-circle-light-purple.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:reserve-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "Reserve Protocol Bug Bounty",
@@ -13441,7 +13441,7 @@
       "logoUrl": "https://imagedelivery.net/wtv4_V7VzVsxpAFaxzmpbw/9b09e384-f489-4960-ce29-ed0ba1bd6400/public"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:maple-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Maple Finance Bug Bounty",
@@ -13530,7 +13530,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/eUOQ1h8f4Rp7j6crz0YSq/669fab983d425d27fad87560219065a5/Maple_Logo.jpg"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:olympus-bug-bounty",
       "fundingType": "bounty",
       "title": "Olympus Bug Bounty",
@@ -13620,7 +13620,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/7csKh5iZlfBPWyb3cJUY5h/1b7fd615e0a6edce69010e2913edbef6/final_logo_01_07_22_OLYMPUS.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gnosis-chain-bug-bounty",
       "fundingType": "bounty",
       "title": "Gnosis Chain Bug Bounty",
@@ -13720,7 +13720,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/6ibSou9KOCjwRMOviQ4op0/76c3c2bda63a9c0c8c8432d71f234f8c/Aatar_green_white.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:origin-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "Origin Protocol Bug Bounty",
@@ -13821,7 +13821,7 @@
       "logoUrl": "https://images.ctfassets.net/t3wqy70tc3bv/V5uJkzVDim5cy4syFWXHn/081f82c419fd83a700d15a8c80e46eb6/ognresized.png"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:the-graph-grants-program",
       "fundingType": "grant",
       "title": "The Graph Grants Program",
@@ -13883,7 +13883,7 @@
       "website": "https://thegraph.com/grants/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-gmc-grants-round-40",
       "fundingType": "grant",
       "title": "Rocket Pool GMC Grants — Round 40",
@@ -13942,7 +13942,7 @@
       "website": "https://dao.rocketpool.net/c/grant-bounties/13"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-gmc-retrospective-awards-round-40",
       "fundingType": "grant",
       "title": "Rocket Pool GMC Retrospective Awards — Round 40",
@@ -14001,7 +14001,7 @@
       "website": "https://dao.rocketpool.net/c/grant-bounties/13"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:mantle-ecofund",
       "fundingType": "grant",
       "title": "Mantle EcoFund",
@@ -14074,7 +14074,7 @@
       "website": "https://www.mantle.xyz/ecofund"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbifuel-gas-fee-sponsorship-program",
       "fundingType": "grant",
       "title": "ArbiFuel (Gas Fee Sponsorship Program)",
@@ -14151,7 +14151,7 @@
       "website": "https://arbitrum.foundation/grants"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-gaming-ventures-agv",
       "fundingType": "grant",
       "title": "Arbitrum Gaming Ventures (AGV)",
@@ -14233,7 +14233,7 @@
       ]
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1039",
       "fundingType": "grant",
       "title": "ProPGF Batch 2 - Pods Track",
@@ -14277,7 +14277,7 @@
       "website": "https://filpgf.io"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1479",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 3",
@@ -14321,7 +14321,7 @@
       "website": "https://filpgf.io"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:992",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 2",
@@ -14366,7 +14366,7 @@
       "website": "https://filpgf.io"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1013",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 1",
@@ -14403,7 +14403,7 @@
       "website": "https://filpgf.io"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:usual-bug-bounty",
       "fundingType": "bounty",
       "title": "Usual Protocol Bug Bounty",
@@ -14483,7 +14483,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/56"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:scroll-bug-bounty",
       "fundingType": "bounty",
       "title": "Scroll Bug Bounty",
@@ -14586,7 +14586,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/272"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:midas-bug-bounty",
       "fundingType": "bounty",
       "title": "Midas Bug Bounty",
@@ -14744,7 +14744,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/122"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:metamask-validator-staking-bug-bounty",
       "fundingType": "bounty",
       "title": "MetaMask Validator Staking Bug Bounty",
@@ -14831,7 +14831,7 @@
       "website": "https://hackenproof.com/programs/metamask-validator-staking-smart-contracts"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-bug-bounty",
       "fundingType": "bounty",
       "title": "Starknet Bug Bounty (Blockchain/DLT)",
@@ -14915,7 +14915,7 @@
       "website": "https://hackenproof.com/programs/starknet-blockchain-slash-dlt"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:treehouse-bug-bounty",
       "fundingType": "bounty",
       "title": "Treehouse Bug Bounty",
@@ -15007,7 +15007,7 @@
       "website": "https://hackenproof.com/programs/treehouse-smart-contracts"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-v4-bug-bounty",
       "fundingType": "bounty",
       "title": "Aave V4 Bug Bounty",
@@ -15116,7 +15116,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/300"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:moonwell-bug-bounty",
       "fundingType": "bounty",
       "title": "Moonwell Bug Bounty",
@@ -15209,7 +15209,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/350"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:cap-bug-bounty",
       "fundingType": "bounty",
       "title": "Cap Bug Bounty",
@@ -15282,7 +15282,7 @@
       "website": "https://audits.sherlock.xyz/bug-bounties/114"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ondo-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Ondo Finance Bug Bounty",
@@ -15374,7 +15374,7 @@
       "website": "https://immunefi.com/bug-bounty/ondofinance/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:veda-bug-bounty",
       "fundingType": "bounty",
       "title": "Veda Bug Bounty",
@@ -15450,7 +15450,7 @@
       "website": "https://immunefi.com/bug-bounty/veda/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:nado-bug-bounty",
       "fundingType": "bounty",
       "title": "Nado Bug Bounty",
@@ -15542,7 +15542,7 @@
       "website": "https://hackenproof.com/programs/nado-smart-contracts"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arcadia-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Arcadia Finance Bug Bounty",
@@ -15622,7 +15622,7 @@
       "website": "https://hackenproof.com/programs/arcadia-finance-company-smart-contracts"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:royco-bug-bounty",
       "fundingType": "bounty",
       "title": "Royco Bug Bounty",
@@ -15699,7 +15699,7 @@
       "website": "https://immunefi.com/bug-bounty/royco/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:enzyme-onyx-bug-bounty",
       "fundingType": "bounty",
       "title": "Enzyme Onyx Bug Bounty",
@@ -15784,7 +15784,7 @@
       "website": "https://immunefi.com/bug-bounty/enzyme-onyx/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:0x-bug-bounty",
       "fundingType": "bounty",
       "title": "0x Bug Bounty",
@@ -15894,7 +15894,7 @@
       "website": "https://immunefi.com/bug-bounty/0x/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:strata-bug-bounty",
       "fundingType": "bounty",
       "title": "Strata Bug Bounty",
@@ -15987,7 +15987,7 @@
       "website": "https://immunefi.com/bug-bounty/strata/"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:alchemix-bug-bounty",
       "fundingType": "bounty",
       "title": "Alchemix Bug Bounty",

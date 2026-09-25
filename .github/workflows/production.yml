@@ -52,7 +52,7 @@ env:
   APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL }}
   ECR_REPOSITORY_MAIN: production-rfp-hub
   ECS_CONTAINER: rfp-hub-production
-  API_BASE_URL: https://api.ethrfps.app # canonical (adr/0007), not account-specific
+  API_BASE_URL: https://api.rfpsear.ch # canonical (adr/0013), not account-specific
 
 jobs:
   build_image:

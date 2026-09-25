@@ -352,8 +352,8 @@ describe("closed response components vs their producers", () => {
   // anything but ld+json is not a context.
   it("serves each canonical document under the media type its kind requires", () => {
     const expected: Record<string, string> = {
-      "/schemas/v1.0.0/opportunity.schema.json": "application/schema+json",
-      "/schemas/v1.0.0/context.jsonld": "application/ld+json",
+      "/schemas/v1.0.1/opportunity.schema.json": "application/schema+json",
+      "/schemas/v1.0.1/context.jsonld": "application/ld+json",
       "/schemas/index.json": "application/json",
       "/meta/rfphub-schema.meta.json": "application/schema+json",
       "/registries/entry.schema.json": "application/schema+json",

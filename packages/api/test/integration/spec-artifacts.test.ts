@@ -197,15 +197,17 @@ describe("the Standard's published directories, mirrored at the host root", () =
 
   it("promises an unbounded lifetime exactly where the URL carries the spec version", async () => {
     for (const artifact of specArtifacts) {
-      const versioned = artifact.path.startsWith(versionDir);
+      const versioned = /^\/schemas\/v[^/]+\//.test(artifact.path);
       expect(artifact.cacheControl, artifact.path).toBe(
         versioned ? IMMUTABLE_CACHE : REVALIDATE_CACHE,
       );
       const res = await get(artifact.path);
       expect(res.headers["cache-control"], artifact.path).toBe(artifact.cacheControl);
     }
-    // The frozen version directory is what licenses `immutable`, and it is where the bulk lives.
-    expect(specArtifacts.filter((a) => a.path.startsWith(versionDir)).length).toBeGreaterThan(30);
+    // The frozen version directories are what license `immutable`, and they are where the bulk lives.
+    expect(specArtifacts.filter((a) => a.cacheControl === IMMUTABLE_CACHE).length).toBeGreaterThan(
+      30,
+    );
   });
 
   it("sends a strong, content-derived ETag on every file and honours If-None-Match", async () => {
