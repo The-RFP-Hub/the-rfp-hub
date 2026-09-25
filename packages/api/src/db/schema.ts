@@ -355,7 +355,7 @@ export const opportunities = pgTable(
   {
     id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
     publicId: text().notNull().unique(), // Standard `id`, e.g. 'fundingmap:1459'
-    specVersion: text().notNull().default("1.0.0"),
+    specVersion: text().notNull().default("1.0.1"),
     fundingType: fundingType().notNull(),
     status: opportunityStatus().notNull(),
 

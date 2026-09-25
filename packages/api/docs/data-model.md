@@ -4,7 +4,7 @@ Storage model backing the public `/v1/` API.
 Target: **PostgreSQL 15+** with `pgvector` (semantic dedup) and `pg_trgm`. This is the
 *internal* model — a clean-slate redesign, intentionally NOT a copy of any single source
 system's schema. It maps onto, but is independent from, the public
-[RFP Hub Standard v1.0.0](../../standard/schemas/v1.0.0/opportunity.schema.json).
+[RFP Hub Standard v1.0.1](../../standard/schemas/v1.0.1/opportunity.schema.json).
 
 ## Implementation status
 
@@ -14,7 +14,7 @@ here so deferred work remains discoverable. The implemented slice lives in
 
 **Legend:** ✅ M2 · ✅ M3 (implemented) · ⏳ M4 (deferred, with its reason)
 
-> **Re-cut note.** This model tracks **RFP Hub Standard v1.0.0 as re-cut** (see the field
+> **Re-cut note.** This model tracks **RFP Hub Standard v1.0.1 as re-cut** (see the field
 > mapping table in `packages/standard/CHANGELOG.md`). Because the standard was re-cut *in place*
 > and nothing had been published from this database yet, `src/db/migrations` was **regenerated
 > from scratch** into a single `0000_recut_v1_0_0` migration rather than carrying a rename chain.

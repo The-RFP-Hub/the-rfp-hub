@@ -6,7 +6,7 @@ import { assertOpportunity, humanizeErrors, validateOpportunity } from "../src/i
 
 const here = dirname(fileURLToPath(import.meta.url));
 const standard = join(here, "..", "..", "standard");
-const conformance = join(standard, "conformance", "v1.0.0");
+const conformance = join(standard, "conformance", "v1.0.1");
 
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
 const loadDir = (d: string) =>
@@ -105,9 +105,11 @@ describe("validateOpportunity", () => {
     expect(() => validateOpportunity({}, { spec: "9.9.9" })).toThrow(/unsupported spec/);
   });
 
-  it("pins specVersion to the one version this schema defines", () => {
+  it("accepts exactly the versions that share this contract", () => {
     const doc = readJson(join(conformance, "pass", "minimal-required-only.json"));
-    expect(validateOpportunity({ ...doc, specVersion: "1.0.1" }).valid).toBe(false);
+    expect(validateOpportunity({ ...doc, specVersion: "1.0.0" }).valid).toBe(true);
+    expect(validateOpportunity({ ...doc, specVersion: "1.0.1" }).valid).toBe(true);
+    expect(validateOpportunity({ ...doc, specVersion: "1.0.2" }).valid).toBe(false);
     expect(validateOpportunity({ ...doc, specVersion: "2.0.0" }).valid).toBe(false);
   });
 });
@@ -126,7 +128,7 @@ describe("assertOpportunity", () => {
 });
 
 describe("real example entries (@the-rfp-hub/standard)", () => {
-  const examples = loadDir(join(standard, "schemas", "v1.0.0", "examples"));
+  const examples = loadDir(join(standard, "schemas", "v1.0.1", "examples"));
 
   it("has a meaningful sample", () => {
     expect(examples.length).toBeGreaterThanOrEqual(20);

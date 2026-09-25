@@ -394,7 +394,7 @@ function checkSearchNarrows(all, filtered) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const apiUrl = args.apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? "https://api.ethrfps.app";
+  const apiUrl = args.apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? "https://api.rfpsear.ch";
   const standardSpec = resolveSpec(args.standardSpec ?? "^3.1.0");
   const validateSpec = resolveSpec(args.validateSpec ?? "^0.3.1");
   const port = args.port ?? (await freePort());

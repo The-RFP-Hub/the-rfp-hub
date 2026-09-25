@@ -45,7 +45,7 @@ import {
 } from "../../../skills/funding-search/scripts/lib.mjs";
 
 const skillDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills/funding-search");
-const BASE = "https://api.ethrfps.app";
+const BASE = "https://api.rfpsear.ch";
 
 describe("truncateText", () => {
   it("returns short values unchanged", () => {

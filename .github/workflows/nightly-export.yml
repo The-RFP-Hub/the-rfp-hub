@@ -69,7 +69,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  API_BASE_URL: https://api.ethrfps.app
+  API_BASE_URL: https://api.rfpsear.ch
   EXPORT_ROOT_URL: https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports
 
 

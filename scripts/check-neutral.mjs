@@ -182,6 +182,12 @@ const RESERVED_HOST = /(^|\.)(invalid|test|example|localhost)$|^example\.(com|ne
 
 const CANONICAL_HOST = new URL(spec.baseUrl).host;
 
+/** Earlier identity authorities (`identityMigrations`): valid for the versions published there. */
+const FORMER = (spec.identityMigrations ?? []).map((m) => m.from);
+const isFormerSchemaUrl = (url) =>
+  FORMER.some((f) => f.versions.some((v) => url.startsWith(`${f.baseUrl}/schemas/v${v}/`)));
+const isVocab = (url, iri) => url.startsWith(iri) || `${url}#` === iri;
+
 // -------------------------------------------------------------------------------- scan ---
 
 /**
@@ -245,23 +251,25 @@ export function scanText(file, text) {
         !reserved &&
         /\/schemas\/v\d/.test(url) &&
         /\.jsonl?d?$/.test(new URL(url).pathname) &&
-        !url.startsWith(`${spec.baseUrl}/schemas/v`)
+        !url.startsWith(`${spec.baseUrl}/schemas/v`) &&
+        !isFormerSchemaUrl(url)
       ) {
         at(n, "identity", `schema URL '${url}' is not under '${spec.baseUrl}/schemas/'`);
       }
       if (
         !reserved &&
         VOCAB_SHAPED.test(url) &&
-        !url.startsWith(spec.vocabIri) &&
-        `${url}#` !== spec.vocabIri
+        !isVocab(url, spec.vocabIri) &&
+        !FORMER.some((f) => isVocab(url, f.vocabIri))
       ) {
         at(n, "identity", `vocab IRI '${url}', expected '${spec.vocabIri}'`);
       }
-      // `.app` is HSTS-preloaded: a browser will not issue a plaintext request to it at all, so
-      // an http:// URL here is not a lenient alternative, it is a broken one.
+      // Every URL on the project's domains is https; a plaintext one is a broken one.
       if (
         url.startsWith("http://") &&
-        (host === CANONICAL_HOST || host.endsWith(`.${CANONICAL_HOST}`))
+        [CANONICAL_HOST, ...FORMER.map((f) => new URL(f.baseUrl).host)].some(
+          (h) => host === h || host.endsWith(`.${h}`),
+        )
       ) {
         at(n, "identity", `plaintext URL '${url}' — every URL on ${CANONICAL_HOST} is https`);
       }

@@ -126,7 +126,7 @@ describe("isRetryable", () => {
   it("is false for a 4xx, a 2xx, another host and an unparseable URL", () => {
     expect(isRetryable("https://github.com/x", { ok: true, status: 404 })).toBe(false);
     expect(isRetryable("https://github.com/x", { ok: true, status: 200 })).toBe(false);
-    expect(isRetryable("https://api.ethrfps.app/x", { ok: true, status: 502 })).toBe(false);
+    expect(isRetryable("https://api.rfpsear.ch/x", { ok: true, status: 502 })).toBe(false);
     expect(isRetryable("not a url", { ok: true, status: 502 })).toBe(false);
   });
 });

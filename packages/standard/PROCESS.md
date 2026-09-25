@@ -222,6 +222,7 @@ authority:
 The freeze gate enforces all of it: the entry must be new, earlier entries must be untouched,
 `from` must be the base ref's identity, and the current `schemaDir` must not already be frozen.
 `check-spec` then accepts the previous authority's URLs only for the versions `from` lists.
+The first such move is [`adr/0013`](../../adr/0013-move-spec-identity-to-rfpsear-ch.md).
 
 ---
 

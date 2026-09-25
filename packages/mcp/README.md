@@ -16,7 +16,7 @@ If the agent only needs to search and fetch, skip this section: install the serv
 credential. To let it submit:
 
 1. Sign in to the deployment's **API keys** page —
-   [`https://ethrfps.app/keys`](https://ethrfps.app/keys) for the hosted Hub, or `/keys` on a local
+   [`https://rfpsear.ch/keys`](https://rfpsear.ch/keys) for the hosted Hub, or `/keys` on a local
    or staging frontend. Its MCP card prepares the safe scopes below.
 2. Choose `read` and `write`, leave `publish` off, and mint the key. This is the safe path: a
    submission is stored but waits for review instead of appearing immediately.
@@ -91,7 +91,7 @@ Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
       "command": "npx",
       "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
-        "RFPHUB_API_BASE": "https://api.ethrfps.app",
+        "RFPHUB_API_BASE": "https://api.rfpsear.ch",
         "RFPHUB_API_KEY": "rfph_…"
       }
     }
@@ -111,7 +111,7 @@ Root key `servers`, in `.vscode/mcp.json`:
       "command": "npx",
       "args": ["-y", "@the-rfp-hub/mcp@0.1.3"],
       "env": {
-        "RFPHUB_API_BASE": "https://api.ethrfps.app",
+        "RFPHUB_API_BASE": "https://api.rfpsear.ch",
         "RFPHUB_API_KEY": "${input:rfphub-key}"
       }
     }
@@ -145,7 +145,7 @@ command = "npx"
 args = ["-y", "@the-rfp-hub/mcp@0.1.3"]
 
 [mcp_servers.rfp-hub.env]
-RFPHUB_API_BASE = "https://api.ethrfps.app"
+RFPHUB_API_BASE = "https://api.rfpsear.ch"
 RFPHUB_API_KEY = "rfph_…"
 ```
 
@@ -179,7 +179,7 @@ whoever administers your environment.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `RFPHUB_API_BASE` | `https://api.ethrfps.app` | Which deployment to talk to. A **bare origin**, `https` unless it is loopback. The origin is bound into every write approval. |
+| `RFPHUB_API_BASE` | `https://api.rfpsear.ch` | Which deployment to talk to. A **bare origin**, `https` unless it is loopback. The origin is bound into every write approval. |
 | `RFPHUB_API_KEY` | *(none)* | Credential, needed **only** to submit. Never sent on a read. **Setting it is what registers the write tool**: without it, `tools/list` returns two tools and there is no write tool for a poisoned search result to reach for. |
 
 | Flag | Default | What it does |
@@ -201,8 +201,8 @@ refused outright:
   after the host would produce the same approval and reach different endpoints;
 - **anything that is not an absolute `http`/`https` URL.**
 
-`https://api.ethrfps.app`, `https://api.ethrfps.app/`, `https://api.ethrfps.app:443` and
-`https://API.ethrfps.app` are one destination and produce one approval id. Port 444, or a
+`https://api.rfpsear.ch`, `https://api.rfpsear.ch/`, `https://api.rfpsear.ch:443` and
+`https://API.rfpsear.ch` are one destination and produce one approval id. Port 444, or a
 different host, is a different destination and a different id.
 
 **Rotating the key means restarting the server.** Configuration is read once, at startup, and the

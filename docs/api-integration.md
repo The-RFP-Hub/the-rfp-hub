@@ -11,8 +11,8 @@ Shell blocks are marked `no-run`, `safe-read` or `staging-write` — see
 in [§1](#1-five-minute-quickstart) is `safe-read`: run them against any deployment, as often as you
 like.
 
-Throughout, `$API` is the API's origin — `https://api.ethrfps.app` in production,
-`https://api-staging.ethrfps.app` in staging, `http://localhost:3001` locally.
+Throughout, `$API` is the API's origin — `https://api.rfpsear.ch` in production,
+`https://api-staging.rfpsear.ch` in staging, `http://localhost:3001` locally.
 
 ---
 

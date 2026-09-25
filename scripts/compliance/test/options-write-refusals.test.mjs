@@ -9,7 +9,7 @@ import { reviewerCredential } from "../reviewer-preflight.mjs";
 
 const complete = {
   milestone: "m3",
-  api: "https://api-staging.ethrfps.app",
+  api: "https://api-staging.rfpsear.ch",
   namespace: "my-org",
   sessionToken: "t",
   adminToken: "a",
@@ -55,7 +55,7 @@ describe("refusals", () => {
   });
 
   it("refuses production, and offers no flag that unlocks it", () => {
-    const reasons = check({ ...complete, api: "https://api.ethrfps.app" });
+    const reasons = check({ ...complete, api: "https://api.rfpsear.ch" });
     expect(reasons[0]).toContain("is PRODUCTION");
     expect(reasons[0]).toContain("There is no flag and no variable that forces production");
     expect(reasons[0]).not.toContain("--allow-production");
@@ -89,14 +89,14 @@ describe("refusals", () => {
 describe("selecting across profiles", () => {
   const m3 = {
     milestone: "m3",
-    api: "https://api-staging.ethrfps.app",
+    api: "https://api-staging.rfpsear.ch",
     namespace: "my-org",
     sessionToken: "t",
     adminToken: "a",
   };
   const m4 = {
     milestone: "m4",
-    api: "https://api-staging.ethrfps.app",
+    api: "https://api-staging.rfpsear.ch",
     sessionToken: "t",
     apiKey: "rfph_x",
   };
@@ -128,7 +128,7 @@ describe("selecting across profiles", () => {
 describe("the m4 profile's refusals", () => {
   const submission = {
     milestone: "m4",
-    api: "https://api-staging.ethrfps.app",
+    api: "https://api-staging.rfpsear.ch",
     sessionToken: "t",
     apiKey: "rfph_x",
   };
@@ -153,7 +153,7 @@ describe("the m4 profile's refusals", () => {
   });
 
   it("refuses production before a single request is made", () => {
-    const reasons = check({ ...submission, api: "https://api.ethrfps.app" });
+    const reasons = check({ ...submission, api: "https://api.rfpsear.ch" });
     expect(reasons[0]).toContain("is PRODUCTION");
   });
 });

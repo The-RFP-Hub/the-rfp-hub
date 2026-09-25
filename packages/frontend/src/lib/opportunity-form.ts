@@ -26,7 +26,7 @@
  *    extra. Switching funding type, bounty compensation shape or payout model therefore CLEARS what
  *    the new shape forbids, in `buildDetails` and `buildPayout`.
  */
-import type { Opportunity } from "@the-rfp-hub/standard";
+import { type Opportunity, SPEC_VERSION } from "@the-rfp-hub/standard";
 
 type Rec = Record<string, unknown>;
 
@@ -1187,7 +1187,7 @@ export function toDocument(
   const document: Rec = { ...base };
   const set = (key: string, value: unknown): void => put(document, key, value);
 
-  set("specVersion", "1.0.0");
+  set("specVersion", SPEC_VERSION);
   set("id", form.id.trim());
   set("fundingType", form.fundingType);
   set("title", form.title.trim());

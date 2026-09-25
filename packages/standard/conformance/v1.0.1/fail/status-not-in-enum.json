@@ -1,0 +1,24 @@
+{
+  "specVersion": "1.0.1",
+  "id": "conformance:bad-status",
+  "fundingType": "grant",
+  "title": "Bad status",
+  "description": "'Active' is not a status value. The enum is upcoming/open/closed/archived; there is deliberately no 'draft'. Adapted from the pre-re-cut bad-status fixture.",
+  "status": "Active",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

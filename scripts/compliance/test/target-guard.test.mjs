@@ -13,22 +13,22 @@ import {
 
 describe("normalizeOrigin", () => {
   it("keeps scheme, host and a non-default port, and lower-cases the host", () => {
-    expect(normalizeOrigin("HTTPS://Staging.EthRfps.App/v1/")?.origin).toBe(
-      "https://staging.ethrfps.app",
+    expect(normalizeOrigin("HTTPS://Staging.RfpSear.CH/v1/")?.origin).toBe(
+      "https://staging.rfpsear.ch",
     );
-    expect(normalizeOrigin("https://staging.ethrfps.app:8443")?.origin).toBe(
-      "https://staging.ethrfps.app:8443",
+    expect(normalizeOrigin("https://staging.rfpsear.ch:8443")?.origin).toBe(
+      "https://staging.rfpsear.ch:8443",
     );
-    expect(normalizeOrigin("https://staging.ethrfps.app:443")?.origin).toBe(
-      "https://staging.ethrfps.app",
+    expect(normalizeOrigin("https://staging.rfpsear.ch:443")?.origin).toBe(
+      "https://staging.rfpsear.ch",
     );
   });
 
   it("refuses userinfo, a non-http scheme, a trailing-dot host and anything unparseable", () => {
-    expect(normalizeOrigin("https://user:pass@staging.ethrfps.app")).toBeNull();
-    expect(normalizeOrigin("ftp://staging.ethrfps.app")).toBeNull();
+    expect(normalizeOrigin("https://user:pass@staging.rfpsear.ch")).toBeNull();
+    expect(normalizeOrigin("ftp://staging.rfpsear.ch")).toBeNull();
     expect(normalizeOrigin("not a url")).toBeNull();
-    expect(normalizeOrigin("https://staging.ethrfps.app.")?.host).toBe("staging.ethrfps.app");
+    expect(normalizeOrigin("https://staging.rfpsear.ch.")?.host).toBe("staging.rfpsear.ch");
   });
 });
 
@@ -63,34 +63,39 @@ describe("targetRefusal", () => {
   });
 
   it("names production as production, and offers no way to force it", () => {
-    const reason = targetRefusal("https://api.ethrfps.app");
+    const reason = targetRefusal("https://api.rfpsear.ch");
     expect(reason).toContain("is PRODUCTION");
     expect(reason).toContain("There is no flag and no variable that forces production");
+  });
+
+  it("still treats the pre-move hostnames as the same deployments (adr/0013)", () => {
+    expect(targetRefusal("https://api.ethrfps.app")).toContain("is PRODUCTION");
+    expect(targetRefusal("https://api-staging.ethrfps.app")).toBeNull();
   });
 
   // Every one of these was ACCEPTED by the hostname heuristic this allowlist replaced.
   it("refuses everything the segment-wise heuristic used to let through", () => {
     for (const api of [
-      "https://api.ethrfps.app",
+      "https://api.rfpsear.ch",
       "https://API.ETHRFPS.APP",
-      "https://api.ethrfps.app.",
-      "https://ethrfps.app",
+      "https://api.rfpsear.ch.",
+      "https://rfpsear.ch",
       "https://104.21.1.2",
       "https://not-staging-anymore.example.org",
       "https://production-staging.example.org",
-      "https://staging.api.ethrfps.app.example.org",
+      "https://staging.api.rfpsear.ch.example.org",
       "https://api-staging.example.org",
       // Derived, never written out: a plaintext URL on this project's own domain is a neutrality
       // violation wherever it appears, including in a test that exists to refuse it.
       STAGING_ORIGINS[0].replace("https:", "http:"),
-      "ftp://api-staging.ethrfps.app",
+      "ftp://api-staging.rfpsear.ch",
     ]) {
       expect(targetRefusal(api), api).toEqual(expect.any(String));
     }
   });
 
   it("resolves the default port rather than reading it as a different origin", () => {
-    expect(targetRefusal("https://api-staging.ethrfps.app:443")).toBeNull();
+    expect(targetRefusal("https://api-staging.rfpsear.ch:443")).toBeNull();
   });
 
   it("says plainly that it sends live credentials, so plaintext is loopback-only", () => {
@@ -100,7 +105,7 @@ describe("targetRefusal", () => {
   it("refuses remote plaintext, an unparseable target and userinfo", () => {
     expect(targetRefusal("http://api-staging.example.org")).toContain("not https");
     expect(targetRefusal("not a url")).toContain("must be an absolute http(s) URL");
-    expect(targetRefusal("https://a:b@staging.ethrfps.app")).toContain("no userinfo");
+    expect(targetRefusal("https://a:b@staging.rfpsear.ch")).toContain("no userinfo");
   });
 });
 
@@ -113,12 +118,12 @@ describe("redirectRefusal", () => {
       request: async () => ({
         ok: true,
         status: 302,
-        location: "https://api.ethrfps.app/v1/health",
+        location: "https://api.rfpsear.ch/v1/health",
       }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    const reason = await redirectRefusal("https://staging.ethrfps.app");
-    expect(reason).toContain("redirects to https://api.ethrfps.app");
+    const reason = await redirectRefusal("https://staging.rfpsear.ch");
+    expect(reason).toContain("redirects to https://api.rfpsear.ch");
     expect(reason).toContain("is PRODUCTION");
     vi.doUnmock("../http.mjs");
     vi.resetModules();
@@ -131,11 +136,11 @@ describe("redirectRefusal", () => {
       request: async () => ({
         ok: true,
         status: 302,
-        location: "https://staging.ethrfps.app/v1/health",
+        location: "https://staging.rfpsear.ch/v1/health",
       }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    expect(await redirectRefusal("https://staging.ethrfps.app")).toContain(
+    expect(await redirectRefusal("https://staging.rfpsear.ch")).toContain(
       "redirects more than 5 times",
     );
     vi.doUnmock("../http.mjs");
@@ -149,7 +154,7 @@ describe("redirectRefusal", () => {
       request: async () => ({ ok: true, status: 200 }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    expect(await redirectRefusal("https://staging.ethrfps.app")).toBeNull();
+    expect(await redirectRefusal("https://staging.rfpsear.ch")).toBeNull();
     vi.doUnmock("../http.mjs");
     vi.resetModules();
   });

@@ -37,8 +37,8 @@ afterEach(() => {
 
 describe("the root layout's robots metadata", () => {
   it("indexes only the request that matches the declared canonical origin", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: true, follow: true });
@@ -46,31 +46,31 @@ describe("the root layout's robots metadata", () => {
 
   it("stays noindex when NEXT_PUBLIC_SITE_ORIGIN is unset — the normal state off production", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("stays noindex on a staging alias, even though the variable is set for production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("staging.ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("staging.rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("stays noindex when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("indexes behind a proxy that rewrote Host, on the forwarded host", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("frontend.internal:8080", "ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("frontend.internal:8080", "rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: true, follow: true });
@@ -79,8 +79,8 @@ describe("the root layout's robots metadata", () => {
   it("indexes on Vercel production with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: true, follow: true });
@@ -89,7 +89,7 @@ describe("the root layout's robots metadata", () => {
   it("stays noindex on a Vercel preview with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
 
     const metadata = await generateMetadata();
@@ -107,8 +107,8 @@ describe("the root layout's robots metadata", () => {
   it("follows the explicit variable, not Vercel's production domain, when both are present", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: false });
@@ -116,7 +116,7 @@ describe("the root layout's robots metadata", () => {
 
   it("keeps the title and description regardless of indexing", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     const metadata = await generateMetadata();
     expect(metadata.title).toEqual({

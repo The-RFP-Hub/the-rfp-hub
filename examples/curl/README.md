@@ -4,7 +4,7 @@ Copy-pastable `curl` commands for every `/v1/` endpoint. Every command below def
 API, so it works pasted as-is; export the variable to point them all somewhere else:
 
 ```bash
-export RFPHUB_API_BASE=https://api.ethrfps.app   # optional; default is http://localhost:3001
+export RFPHUB_API_BASE=https://api.rfpsear.ch   # optional; default is http://localhost:3001
 ```
 
 You need a running API to try these against — see
@@ -115,7 +115,7 @@ blank ones. List filters also accept both wire forms interchangeably: repeat the
 {
   "items": [
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1502",
       "fundingType": "hackathon",
       "title": "Onchain Summer Hackathon",
@@ -153,7 +153,7 @@ curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities/fundingmap:1
 
 ```json
 {
-  "specVersion": "1.0.0",
+  "specVersion": "1.0.1",
   "id": "fundingmap:1459",
   "fundingType": "grant",
   "title": "Ecosystem Builders Grant Round 4",
@@ -284,6 +284,6 @@ curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/docs/json" \
 The same commands work against a deployment — point `RFPHUB_API_BASE` at it (always `https`):
 
 ```bash
-export RFPHUB_API_BASE=https://api.ethrfps.app           # production
-export RFPHUB_API_BASE=https://api-staging.ethrfps.app   # staging
+export RFPHUB_API_BASE=https://api.rfpsear.ch           # production
+export RFPHUB_API_BASE=https://api-staging.rfpsear.ch   # staging
 ```

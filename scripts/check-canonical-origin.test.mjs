@@ -20,7 +20,7 @@ const script = join(repoRoot, "scripts", "check-canonical-origin.mjs");
 
 const VERCEL_PRODUCTION = {
   VERCEL_ENV: "production",
-  VERCEL_PROJECT_PRODUCTION_URL: "ethrfps.app",
+  VERCEL_PROJECT_PRODUCTION_URL: "rfpsear.ch",
 };
 
 function runGuard(envFileText, args = []) {
@@ -41,7 +41,7 @@ function runGuard(envFileText, args = []) {
 describe("resolveCanonicalOrigin", () => {
   it("derives the origin from Vercel's production environment", () => {
     expect(resolveCanonicalOrigin(VERCEL_PRODUCTION)).toEqual({
-      origin: "https://ethrfps.app",
+      origin: "https://rfpsear.ch",
       source: "VERCEL_PROJECT_PRODUCTION_URL",
     });
   });
@@ -76,7 +76,7 @@ describe("resolveCanonicalOrigin", () => {
   it("refuses a malformed explicit value instead of falling back to Vercel's", () => {
     const result = resolveCanonicalOrigin({
       ...VERCEL_PRODUCTION,
-      NEXT_PUBLIC_SITE_ORIGIN: "ethrfps.app",
+      NEXT_PUBLIC_SITE_ORIGIN: "rfpsear.ch",
     });
     expect(result.origin).toBeNull();
     expect(result.reason).toContain("wins over Vercel's own variables");
@@ -84,7 +84,7 @@ describe("resolveCanonicalOrigin", () => {
 
   it("names no origin off Vercel with nothing declared", () => {
     expect(
-      resolveCanonicalOrigin({ NEXT_PUBLIC_API_URL: "https://api.ethrfps.app" }).origin,
+      resolveCanonicalOrigin({ NEXT_PUBLIC_API_URL: "https://api.rfpsear.ch" }).origin,
     ).toBeNull();
   });
 });
@@ -92,17 +92,17 @@ describe("resolveCanonicalOrigin", () => {
 describe("the guard as the workflow runs it", () => {
   it("passes and prints the resolved origin for a production environment", () => {
     const { code, stdout } = runGuard(
-      'VERCEL_ENV="production"\nVERCEL_PROJECT_PRODUCTION_URL="ethrfps.app"\n',
+      'VERCEL_ENV="production"\nVERCEL_PROJECT_PRODUCTION_URL="rfpsear.ch"\n',
     );
     expect(code).toBe(0);
     expect(stdout).toContain(
-      "canonical origin: https://ethrfps.app (from VERCEL_PROJECT_PRODUCTION_URL)",
+      "canonical origin: https://rfpsear.ch (from VERCEL_PROJECT_PRODUCTION_URL)",
     );
   });
 
   it("says which variables the pull carried, and never their values, when production names no URL", () => {
     const { code, stderr } = runGuard(
-      'VERCEL="1"\nVERCEL_ENV="production"\nVERCEL_TARGET_ENV="production"\nNEXT_PUBLIC_API_URL="https://api.ethrfps.app"\nNEXT_PUBLIC_GA_ID="G-SECRET"\n',
+      'VERCEL="1"\nVERCEL_ENV="production"\nVERCEL_TARGET_ENV="production"\nNEXT_PUBLIC_API_URL="https://api.rfpsear.ch"\nNEXT_PUBLIC_GA_ID="G-SECRET"\n',
     );
     expect(code).toBe(1);
     expect(stderr).toContain("VERCEL_PROJECT_PRODUCTION_URL is absent");
@@ -110,11 +110,11 @@ describe("the guard as the workflow runs it", () => {
       "The pulled file names: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_GA_ID, VERCEL, VERCEL_ENV, VERCEL_TARGET_ENV (values withheld)",
     );
     expect(stderr).not.toContain("G-SECRET");
-    expect(stderr).not.toContain("api.ethrfps.app");
+    expect(stderr).not.toContain("api.rfpsear.ch");
   });
 
   it("fails the production build when the system variables were never exposed", () => {
-    const { code, stderr } = runGuard('NEXT_PUBLIC_API_URL="https://api.ethrfps.app"\n');
+    const { code, stderr } = runGuard('NEXT_PUBLIC_API_URL="https://api.rfpsear.ch"\n');
     expect(code).toBe(1);
     expect(stderr).toContain("::error::");
     expect(stderr).toContain("asks search engines not to index it");
@@ -128,7 +128,7 @@ describe("the guard as the workflow runs it", () => {
   });
 
   it("fails --expect none when a preview was given an origin of its own", () => {
-    const { code, stderr } = runGuard('NEXT_PUBLIC_SITE_ORIGIN="https://ethrfps.app"\n', [
+    const { code, stderr } = runGuard('NEXT_PUBLIC_SITE_ORIGIN="https://rfpsear.ch"\n', [
       "--expect",
       "none",
     ]);

@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 
 /** The production API. Overridable for staging and for the integration tests. */
-export const DEFAULT_API_BASE = "https://api.ethrfps.app";
+export const DEFAULT_API_BASE = "https://api.rfpsear.ch";
 
 /**
  * How long any one API request — headers and body together — may take. Fixed: a deadline an

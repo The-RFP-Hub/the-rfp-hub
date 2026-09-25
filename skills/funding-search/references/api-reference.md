@@ -5,7 +5,7 @@ in [the-rfp-hub](https://github.com/The-RFP-Hub/the-rfp-hub) repository, and the
 document at `{RFPHUB_API_BASE}/v1/docs/json`. This file is a convenience summary — if it ever
 disagrees with those two, they win.
 
-Base URL: `https://api.ethrfps.app` (override with `RFPHUB_API_BASE`). Both endpoints below are
+Base URL: `https://api.rfpsear.ch` (override with `RFPHUB_API_BASE`). Both endpoints below are
 public and anonymous: no `Authorization` header, no key.
 
 ## Contents
@@ -44,7 +44,7 @@ never silently ignored.
 
 ### `fundingType` values
 `grant`, `hackathon`, `bounty`, `accelerator`, `vc_fund`, `rfp` — a closed enum on the Standard
-schema (`packages/standard/schemas/v1.0.0/opportunity.schema.json`).
+schema (`packages/standard/schemas/v1.0.1/opportunity.schema.json`).
 
 ### `status` values
 `upcoming` (announced, not yet accepting applications — there is no separate "draft" state),
@@ -110,10 +110,10 @@ vocabularies, published at these canonical URLs (also mirrored under
 
 | Registry | Canonical URL | Governs |
 |---|---|---|
-| Deadline labels | `https://ethrfps.app/registries/deadline-labels.json` | `deadlines[].label` conventional values (`application`, `submission`, `registration`, `event start`, `event end`, `community feedback`) |
-| Program models | `https://ethrfps.app/registries/program-models.json` | `grant.programModel` (`grant`, `incentives`, `infra`, `program`) |
-| Bounty severities | `https://ethrfps.app/registries/bounty-severities.json` | `rewardTiers[].severity` (`critical`, `high`, `medium`, `low`, `informational`) |
-| Bounty asset types | `https://ethrfps.app/registries/bounty-asset-types.json` | `rewardTiers[].assetType` (`smart_contract`, `blockchain_dlt`, `websites_and_applications`) |
+| Deadline labels | `https://rfpsear.ch/registries/deadline-labels.json` | `deadlines[].label` conventional values (`application`, `submission`, `registration`, `event start`, `event end`, `community feedback`) |
+| Program models | `https://rfpsear.ch/registries/program-models.json` | `grant.programModel` (`grant`, `incentives`, `infra`, `program`) |
+| Bounty severities | `https://rfpsear.ch/registries/bounty-severities.json` | `rewardTiers[].severity` (`critical`, `high`, `medium`, `low`, `informational`) |
+| Bounty asset types | `https://rfpsear.ch/registries/bounty-asset-types.json` | `rewardTiers[].assetType` (`smart_contract`, `blockchain_dlt`, `websites_and_applications`) |
 
 None of these are search parameters — they describe values found inside `fundingDetails`, which
 this skill's projection does not surface (see SKILL.md §2).

@@ -1,0 +1,81 @@
+{
+  "specVersion": "1.0.1",
+  "id": "fundingmap:1254",
+  "fundingType": "hackathon",
+  "title": "TON AI Agent Hackathon",
+  "description": "Two-week hackathon with $20K prizes split across Agent Infrastructure ($10K for tooling, wallets, payments on TON) and User-Facing Agents ($10K for Telegram-integrated AI agents like commerce, trading, automation). Open to developers building AI on TON/Telegram stack; register via IdentityHub.",
+  "summary": "Two-week hackathon with $20K prizes split across Agent Infrastructure ($10K for tooling,...",
+  "status": "archived",
+  "sponsoringOrganizations": [
+    {
+      "name": "TON AI Agent Hackathon",
+      "slug": "ton-ai-agent-hackathon",
+      "website": "https://identityhub.app/contests/ai-hackathon"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "TON AI Agent Hackathon",
+      "slug": "ton-ai-agent-hackathon",
+      "website": "https://identityhub.app/contests/ai-hackathon"
+    }
+  ],
+  "source": {
+    "ingestedVia": "import",
+    "originalId": "1254",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "TON"
+  ],
+  "categories": [
+    "Funding Opportunity",
+    "AI"
+  ],
+  "applicationUrl": "https://identityhub.app/contests/ai-hackathon",
+  "website": "https://identityhub.app/contests/ai-hackathon",
+  "fundingInfo": {
+    "currency": "USD",
+    "budget": 20000
+  },
+  "opensAt": "2026-03-11T00:00:00.000Z",
+  "deadlines": [
+    {
+      "deadlineType": "fixed",
+      "date": "2026-03-25T23:59:00.000Z",
+      "label": "application"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-03-25T23:59:00.000Z",
+      "label": "registration"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-03-11T00:00:00.000Z",
+      "label": "event start"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-03-25T23:59:00.000Z",
+      "label": "event end"
+    }
+  ],
+  "createdAt": "2026-03-12T19:59:39.000Z",
+  "updatedAt": "2026-03-26T00:02:10.000Z",
+  "fundingDetails": {
+    "fundingType": "hackathon",
+    "location": "Virtual",
+    "online": null,
+    "tracks": [
+      "Agent Infrastructure",
+      "User-Facing AI Agents"
+    ],
+    "prizes": [
+      {
+        "track": null,
+        "amount": 20000
+      }
+    ]
+  }
+}

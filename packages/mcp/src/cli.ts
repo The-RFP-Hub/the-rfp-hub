@@ -69,7 +69,7 @@ Options (every mode):
                              where this user has no writable home, as in a container.
 
 Environment:
-  RFPHUB_API_BASE            API base URL (default https://api.ethrfps.app)
+  RFPHUB_API_BASE            API base URL (default https://api.rfpsear.ch)
   RFPHUB_API_KEY             credential. Searching and fetching are anonymous and never send it;
                              setting it is what registers the write tool at all
 `;

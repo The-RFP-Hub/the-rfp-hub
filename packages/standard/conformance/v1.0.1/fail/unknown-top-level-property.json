@@ -1,0 +1,25 @@
+{
+  "specVersion": "1.0.1",
+  "id": "conformance:unknown-prop",
+  "fundingType": "grant",
+  "title": "Leaks an internal field",
+  "description": "chainID is an internal field, not part of the neutral standard. The top level is closed and there is no extensions escape hatch — an unknown key is a hard error, and publisher-specific data stays in the publisher's own systems.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  },
+  "chainID": 1
+}

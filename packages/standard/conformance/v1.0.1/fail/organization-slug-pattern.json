@@ -1,0 +1,18 @@
+{
+  "specVersion": "1.0.1",
+  "id": "conformance:bad-slug",
+  "fundingType": "grant",
+  "title": "Organisation slug violates its pattern",
+  "description": "The operating organisation's slug carries uppercase and an underscore, outside ^[a-z0-9-]+$. Slugs are namespaces (provenance.publisher references them) and are now required on every organisation, so the lowercase URL-safe pattern is a hard constraint.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "Example_Foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

@@ -174,7 +174,7 @@ run("GET /v1/export/opportunities.{json,csv}", () => {
       "count",
       "opportunities",
     ]);
-    expect(body.specVersion).toBe("1.0.0");
+    expect(body.specVersion).toBe("1.0.1");
     expect(body.license).toBe(EXPORT_LICENSE);
     expect(body.count).toBe(body.opportunities.length);
     // `generatedAt` is NOW, not an ingest time: within a minute of the request either way.
@@ -450,7 +450,7 @@ describe("a download of an empty dataset", () => {
 
     expect(rendered.recordCount).toBe(0);
     expect(body).toEqual({
-      specVersion: "1.0.0",
+      specVersion: "1.0.1",
       license: EXPORT_LICENSE,
       generatedAt: "2026-08-13T09:41:00.000Z",
       count: 0,
