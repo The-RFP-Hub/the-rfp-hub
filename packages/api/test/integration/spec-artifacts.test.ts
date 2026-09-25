@@ -197,7 +197,7 @@ describe("the Standard's published directories, mirrored at the host root", () =
 
   it("promises an unbounded lifetime exactly where the URL carries the spec version", async () => {
     for (const artifact of specArtifacts) {
-      const versioned = artifact.path.startsWith(versionDir);
+      const versioned = /^\/schemas\/v[^/]+\//.test(artifact.path);
       expect(artifact.cacheControl, artifact.path).toBe(
         versioned ? IMMUTABLE_CACHE : REVALIDATE_CACHE,
       );

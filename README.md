@@ -28,11 +28,11 @@ The heart of the project is the **RFP Hub Standard** — a versioned, documented
 JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 [`@the-rfp-hub/standard`](./packages/standard) (CC0-1.0) and ships generated TypeScript types.
 
-- Schema: [`packages/standard/schemas/v1.0.0/opportunity.schema.json`](./packages/standard/schemas/v1.0.0/opportunity.schema.json)
-- Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.0/FIELDS.md)
-- Status of this version (maturity, known issues): [`STATUS.md`](./packages/standard/schemas/v1.0.0/STATUS.md)
-- Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.0/CROSSWALK.md)
-- Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
+- Schema: [`packages/standard/schemas/v1.0.1/opportunity.schema.json`](./packages/standard/schemas/v1.0.1/opportunity.schema.json)
+- Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.1/FIELDS.md)
+- Status of this version (maturity, known issues): [`STATUS.md`](./packages/standard/schemas/v1.0.1/STATUS.md)
+- Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.1/CROSSWALK.md)
+- Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.1/BENCHMARK.md)
 - What's normative vs. informative: [`NORMATIVE.md`](./packages/standard/NORMATIVE.md)
 
 Validate anything against it:
@@ -59,7 +59,7 @@ cross-package dependency is `packages/api` → `rfphub-validate`, through that p
 API, so the Hub validates with the same reference implementation everyone else runs.
 
 **Two version axes.** A package's `version` is its npm distribution version and moves freely; the
-**spec version** (`1.0.0`, in `specVersion` and the schema `$id`) is the data contract and moves
+**spec version** (`1.0.1`, in `specVersion` and the schema `$id`) is the data contract and moves
 only under [`PROCESS.md`](./packages/standard/PROCESS.md). They are different numbers on purpose.
 
 ## Governance
@@ -209,7 +209,7 @@ The same read-only tool covers governance, the reference frontend, the MCP serve
 and the handoff docs:
 
 ```bash no-run
-pnpm check:deployment --milestone m4 --site https://ethrfps.app --api https://api.ethrfps.app --browser
+pnpm check:deployment --milestone m4 --site https://rfpsear.ch --api https://api.rfpsear.ch --browser
 ```
 
 The one case that could look like a write — `submit_opportunity`'s fail-closed behavior — runs
@@ -293,7 +293,7 @@ Reading is public and unauthenticated, and stays that way. **Writing** is authen
 credential you hold decides not only whether a submission is accepted but whether it goes live:
 
 ```sh no-run
-API=https://api.ethrfps.app
+API=https://api.rfpsear.ch
 
 # Who am I, and what may I do?
 curl -H "Authorization: Bearer $TOKEN" $API/v1/me

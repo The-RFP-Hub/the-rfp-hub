@@ -1,13 +1,13 @@
 /**
  * THE APEX RESERVATION, ENFORCED RATHER THAN ASSERTED.
  *
- * `adr/0007` reserves the apex — `ethrfps.app` — for the spec and its site: "no service is ever
+ * `adr/0007` reserves the apex — now `rfpsear.ch` (`adr/0013`) — for the spec and its site: "no service is ever
  * mounted here". That reservation is the entire reason `/schemas/`, `/meta/`, `/registries/` and
  * `/ns/` are safe to use as permanent identifier paths, because nothing else can ever claim them.
  *
  * Until spec serving moves to static hosting, the same deployable answers on both hostnames, so
  * the reservation is a property of ONE process rather than two. Routing the apex to this service
- * and calling the apex reserved would be false the moment DNS lands: `GET https://ethrfps.app/v1/opportunities`
+ * and calling the apex reserved would be false the moment DNS lands: `GET https://rfpsear.ch/v1/opportunities`
  * would answer 200, the whole `/v1` API would be published at the identifier authority, and every
  * future apex path would become API collision surface — exactly what the reservation exists to
  * prevent. So the apex is enforced here, on the request, and asserted in tests with both `Host`
@@ -18,7 +18,7 @@
  *   - On the apex host, this service answers ONLY the Standard's own published files — the
  *     canonical documents and the directories they live in. Everything else is 404 — `/v1/**`,
  *     the service-info root, the docs UI, all of it.
- *   - On every other host (`api.ethrfps.app`, `api-staging.ethrfps.app`, `localhost:3001`, an
+ *   - On every other host (`api.rfpsear.ch`, `api-staging.rfpsear.ch`, `localhost:3001`, an
  *     ALB target-group health check hitting the task IP), nothing changes. Those files
  *     deliberately answer everywhere: an identifier that only resolves on one hostname
  *     is not more reserved, just harder to serve.
@@ -35,7 +35,7 @@
  * holding by topology rather than by refusal.
  *
  * This hook stays load-bearing anyway, for the routing this does not describe: a listener rule that
- * forwards `ethrfps.app` to this service directly — the arrangement before the frontend took the
+ * forwards the apex to this service directly — the arrangement before the frontend took the
  * apex, and the one an infrastructure edit could restore — would publish the whole API at the
  * identifier authority. The hook is the half of the contract that survives such an edit, and it
  * costs one set lookup per request to keep.
@@ -45,8 +45,18 @@ import { config } from "../config.js";
 import { canonicalDocuments, specConfig } from "../modules/shared/canonical-documents.js";
 import { specArtifactPaths } from "../modules/shared/spec-artifacts.js";
 
-/** `https://ethrfps.app` → `ethrfps.app`. The one hostname reserved for the spec. */
+/** `https://rfpsear.ch` → `rfpsear.ch`. The hostname reserved for the current spec identity. */
 export const APEX_HOST = new URL(specConfig.baseUrl).host;
+
+/**
+ * Every apex still reserved: the current one, and each earlier identity authority a published
+ * version's frozen `$id`s still name (`spec.config.json` `identityMigrations`). Moving the identity
+ * does not release the old apex — its identifiers are forever, and so is the reservation.
+ */
+export const APEX_HOSTS: ReadonlySet<string> = new Set([
+  APEX_HOST,
+  ...(specConfig.identityMigrations ?? []).map((m) => new URL(m.from.baseUrl).host),
+]);
 
 /**
  * Exactly what the apex serves: the Standard's own published files, and nothing else.
@@ -71,7 +81,7 @@ const APEX_PATHS: ReadonlySet<string> = new Set([
 export function isApexRequest(hostname: string | undefined): boolean {
   if (!hostname) return false;
   const host = hostname.toLowerCase().replace(/\.$/, "");
-  return host === APEX_HOST || host === `www.${APEX_HOST}`;
+  return APEX_HOSTS.has(host) || APEX_HOSTS.has(host.replace(/^www\./, ""));
 }
 
 /** Is this path one the apex is allowed to answer? */

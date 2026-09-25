@@ -190,7 +190,7 @@ describe("the namespace a write is authorised against", () => {
   /** A claimed listing: an imported id, published under and operated by the claimant. */
   const claimed = (over: Record<string, unknown> = {}) =>
     ({
-      specVersion: "1.0.0",
+      specVersion: "1.0.1",
       id: "host:123",
       fundingType: "grant",
       title: "Round One",
@@ -212,6 +212,12 @@ describe("the namespace a write is authorised against", () => {
     const authority = namespaceAuthority("edit", form, carried);
     expect(authority.namespace).toBe("acme");
     expect(namespaceOf(form.id)).toBe("host");
+  });
+
+  it("re-declares a listing stored as 1.0.0 at the current version when it is saved", () => {
+    const { form, carried } = fromDocument(claimed({ specVersion: "1.0.0" }));
+    const built = toDocument(form, carried, namespaceAuthority("edit", form, carried));
+    expect(built.document.specVersion).toBe("1.0.1");
   });
 
   it("lets a claimed listing be replaced without a local error", () => {
@@ -405,7 +411,7 @@ describe("toDocument", () => {
     expect(document.ecosystems).toBeUndefined();
     expect(document.fundingInfo).toBeUndefined();
     expect(document.deadlines).toBeUndefined();
-    expect(document.specVersion).toBe("1.0.0");
+    expect(document.specVersion).toBe("1.0.1");
     expect(document.operatingOrganizations).toEqual([{ name: "Acme Foundation", slug: "acme" }]);
   });
 
@@ -506,7 +512,7 @@ describe("the deadline conditional", () => {
 describe("switching funding type", () => {
   it("clears the previous branch's fields rather than carrying them into a closed object", () => {
     const stored = {
-      specVersion: "1.0.0",
+      specVersion: "1.0.1",
       id: "acme:hack",
       fundingType: "hackathon",
       title: "A Hackathon",
@@ -722,7 +728,7 @@ describe("null as a positive assertion", () => {
 
   it("reads a stored null back as the claim, not as an empty box", () => {
     const stored = {
-      specVersion: "1.0.0",
+      specVersion: "1.0.1",
       id: "acme:hack",
       fundingType: "hackathon",
       title: "A Hackathon",
@@ -778,7 +784,7 @@ describe("moveRow", () => {
 
 describe("fromDocument", () => {
   const stored = {
-    specVersion: "1.0.0",
+    specVersion: "1.0.1",
     id: "acme:1",
     fundingType: "grant",
     title: "Round One",
@@ -834,7 +840,7 @@ describe("fromDocument", () => {
  */
 describe("the maximal round trip", () => {
   const maximal = {
-    specVersion: "1.0.0",
+    specVersion: "1.0.1",
     id: "acme:maximal",
     fundingType: "grant",
     title: "Round One",
@@ -997,7 +1003,7 @@ describe("the maximal round trip", () => {
 /** The other four branches, each round-tripped through the form and back. */
 describe("every funding-details branch survives a round trip", () => {
   const base = {
-    specVersion: "1.0.0",
+    specVersion: "1.0.1",
     id: "acme:x",
     title: "A program",
     description: "A description.",

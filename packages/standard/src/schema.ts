@@ -1,4 +1,4 @@
-import opportunitySchemaJson from "../schemas/v1.0.0/opportunity.schema.json";
+import opportunitySchemaJson from "../schemas/v1.0.1/opportunity.schema.json";
 
 /**
  * The canonical RFP Hub Standard JSON Schema (draft 2020-12) for a funding opportunity.
@@ -9,4 +9,4 @@ export const opportunitySchema = opportunitySchemaJson as unknown as Readonly<
 >;
 
 /** The RFP Hub Standard version shipped by this package. */
-export const SPEC_VERSION = "1.0.0" as const;
+export const SPEC_VERSION = "1.0.1" as const;

@@ -9,11 +9,11 @@ These define the standard. A claim of conformance is a claim about these files.
 
 | Artifact | What it governs |
 |---|---|
-| [`schemas/v1.0.0/opportunity.schema.json`](./schemas/v1.0.0/opportunity.schema.json) | **The definition.** A document conforms to v1.0.0 when it validates against this file. |
+| [`schemas/v1.0.1/opportunity.schema.json`](./schemas/v1.0.1/opportunity.schema.json) | **The definition.** A document conforms to v1.0.1 when it validates against this file. v1.0.0 stays published beside it, frozen, and a document conforms to v1.0.0 when it validates against [that version's file](./schemas/v1.0.0/opportunity.schema.json). |
 | [`registries/`](./registries) — the **registered values** | The conventional values of the four open vocabularies the standard governs by registry: `deadlines[].label`, `fundingDetails.programModel` (the grant payload), and `severity` and `assetType` on a bounty reward tier. See the important qualification below. |
-| [`conformance/v1.0.0/`](./conformance/v1.0.0) | The published pass/fail cases. An implementation is conformant with respect to the suite when it accepts everything in `pass/` and rejects everything in `fail/`. |
+| [`conformance/v1.0.1/`](./conformance/v1.0.1) | The published pass/fail cases. An implementation is conformant with respect to the suite when it accepts everything in `pass/` and rejects everything in `fail/`. |
 | [`spec.config.json`](./spec.config.json) | The spec's identity — version, `$id`, vocabulary IRI, maturity. |
-| [`schemas/v1.0.0/context.jsonld`](./schemas/v1.0.0/context.jsonld) | The term IRIs a document expands to when read as linked data. |
+| [`schemas/v1.0.1/context.jsonld`](./schemas/v1.0.1/context.jsonld) | The term IRIs a document expands to when read as linked data. |
 
 **The qualification on registries.** A registry is normative about **what a value means**, not
 about **which values are allowed**. The schema deliberately keeps these fields open: an

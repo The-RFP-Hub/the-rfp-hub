@@ -1,0 +1,31 @@
+{
+  "specVersion": "1.0.1",
+  "id": "conformance:fixed-null-date",
+  "fundingType": "grant",
+  "title": "Fixed deadline with a null date",
+  "description": "A deadline whose deadlineType is 'fixed' but whose date is explicitly null. The if/then narrows date to a non-null string, without which this would slip through the required check.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "deadlines": [
+    {
+      "deadlineType": "fixed",
+      "date": null,
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

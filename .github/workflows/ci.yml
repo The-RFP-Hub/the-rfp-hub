@@ -21,7 +21,7 @@ on:
       clean-room-api-url:
         description: "API origin the built frontend is checked against"
         type: string
-        default: "https://api.ethrfps.app"
+        default: "https://api.rfpsear.ch"
       standard-spec:
         description: "Only used in 'published' mode. Range for @the-rfp-hub/standard."
         type: string
@@ -512,7 +512,7 @@ jobs:
           VALIDATE_SPEC_INPUT: ${{ github.event.inputs.validate-spec }}
         run: |
           set -euo pipefail
-          export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.ethrfps.app}"
+          export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.rfpsear.ch}"
           specs=()
           if [ -n "$STANDARD_SPEC_INPUT" ]; then
             specs+=(--standard-spec "$STANDARD_SPEC_INPUT")

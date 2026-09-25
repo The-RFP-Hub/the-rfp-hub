@@ -124,10 +124,11 @@ if (contextExample !== `${schemaBase}/context.jsonld`) {
   );
 }
 
-if (schema.properties.specVersion.const !== want) {
+const acceptedVersions = schema.properties.specVersion.enum ?? [];
+if (acceptedVersions.at(-1) !== want) {
   fail(
     "version-drift",
-    `specVersion const is '${schema.properties.specVersion.const}', expected '${want}'`,
+    `specVersion enum is ${JSON.stringify(acceptedVersions)}, expected it to end with '${want}'`,
   );
 }
 if (!schema.description.startsWith(`RFP Hub Standard v${want} —`)) {
@@ -182,16 +183,33 @@ const trimUrl = (u) => u.replace(/[.,;:!?'"`]+$/, "");
 // `/ns/` IRIs the docs legitimately cite, such as w3.org's JSON-LD link relation, do not match.
 const VOCAB_SHAPED = /\/ns\/[a-z0-9/-]*rfp(?![a-z0-9-])/i;
 
+// A version published under an earlier identity keeps it forever, so its own schema URLs and the
+// vocabulary it used stay legitimate — for exactly the versions recorded against that identity.
+const formerIdentities = (spec.identityMigrations ?? []).map((m) => m.from);
+const isFormerSchemaUrl = (url) =>
+  formerIdentities.some((f) =>
+    f.versions.some((v) => url.startsWith(`${f.baseUrl}/schemas/v${v}/`)),
+  );
+const isVocabIri = (url, iri) => url.startsWith(iri) || `${url}#` === iri;
+
 function sweepIdentityUrls(file, text) {
   for (const raw of text.match(URL_TOKEN) ?? []) {
     const url = trimUrl(raw);
-    if (/\/schemas\/v\d/.test(url) && !url.startsWith(`${spec.baseUrl}/schemas/v`)) {
+    if (
+      /\/schemas\/v\d/.test(url) &&
+      !url.startsWith(`${spec.baseUrl}/schemas/v`) &&
+      !isFormerSchemaUrl(url)
+    ) {
       fail(
         "identity-sweep",
         `${relative(pkgRoot, file)} carries schema URL '${url}', which is not under '${spec.baseUrl}/schemas/'`,
       );
     }
-    if (VOCAB_SHAPED.test(url) && !url.startsWith(spec.vocabIri) && `${url}#` !== spec.vocabIri) {
+    if (
+      VOCAB_SHAPED.test(url) &&
+      !isVocabIri(url, spec.vocabIri) &&
+      !formerIdentities.some((f) => isVocabIri(url, f.vocabIri))
+    ) {
       fail(
         "identity-sweep",
         `${relative(pkgRoot, file)} carries vocab IRI '${url}', expected '${spec.vocabIri}'`,
@@ -298,6 +316,29 @@ if (spec.identityStatus === "canonical") {
     // Guarded on the decision log being present at all: this script also runs from an
     // extracted package tarball, which ships the spec but not the repository around it.
     fail("identity-provenance", `identityAdoption.adr points at '${adr}', which does not exist`);
+  }
+  for (const [i, migration] of (spec.identityMigrations ?? []).entries()) {
+    const where = `identityMigrations[${i}]`;
+    const from = migration.from ?? {};
+    if (!migration.adr) {
+      fail("identity-provenance", `${where} names no decision record`);
+    } else if (existsSync(join(repoRoot, "adr")) && !existsSync(join(repoRoot, migration.adr))) {
+      fail(
+        "identity-provenance",
+        `${where}.adr points at '${migration.adr}', which does not exist`,
+      );
+    }
+    if (!from.baseUrl?.startsWith("https://") || !from.vocabIri?.startsWith("https://")) {
+      fail("identity-provenance", `${where}.from must carry https:// baseUrl and vocabIri`);
+    }
+    if (from.baseUrl === spec.baseUrl) {
+      fail("identity-provenance", `${where}.from.baseUrl is the current baseUrl`);
+    }
+    if (!Array.isArray(from.versions) || from.versions.length === 0) {
+      fail("identity-provenance", `${where}.from.versions lists no published version`);
+    } else if (from.versions.includes(want)) {
+      fail("identity-provenance", `${where}.from.versions includes the current version ${want}`);
+    }
   }
 }
 

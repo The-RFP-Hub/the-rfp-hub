@@ -123,7 +123,7 @@ are listed publicly at `GET /v1/publishers`.
 Then, as the maintainer:
 
 ```sh
-API=https://api.ethrfps.app
+API=https://api.rfpsear.ch
 
 # Mint a publishing key. The secret is in this response and nowhere else, ever.
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \

@@ -43,7 +43,7 @@ transcribed it from a public source, the right move is a **claim**, not a second
 
 **5. Where `applicationUrl` is present, it resolves.** `applicationUrl` is **optional** in the
 Standard — it is not in the `required` list of
-[`schemas/v1.0.0/opportunity.schema.json`](./packages/standard/schemas/v1.0.0/opportunity.schema.json)
+[`schemas/v1.0.1/opportunity.schema.json`](./packages/standard/schemas/v1.0.1/opportunity.schema.json)
 — so its absence is not a rejection reason for a third-party document, and four entries in the
 Hub's own seeded corpus have none, each named in [the API README](./packages/api/README.md). When
 it *is* there, it has to be a real, public way to apply; a

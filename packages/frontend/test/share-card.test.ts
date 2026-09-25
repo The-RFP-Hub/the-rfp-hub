@@ -44,20 +44,20 @@ const base: Opportunity = {
 
 describe("shareCardModel", () => {
   it("builds the eyebrow, ecosystems (capped at four) and URL", () => {
-    const model = shareCardModel(base, "https://ethrfps.app");
+    const model = shareCardModel(base, "https://rfpsear.ch");
 
     expect(model.eyebrow).toBe("Grant · Acme Foundation");
     expect(model.title).toBe("Retro Funding Round Four");
     expect(model.ecosystems).toBe("Optimism · Arbitrum · Base · zkSync");
     expect(model.award).toBe("$5k to $50k");
     expect(model.deadline).toBe("Sep 30, 2099");
-    expect(model.url).toBe("https://ethrfps.app/opportunities/acme%3Around-4");
+    expect(model.url).toBe("https://rfpsear.ch/opportunities/acme%3Around-4");
     expect(model.positioning).toBe("Funded by the Ethereum Foundation Ecosystem Support Program");
   });
 
   it("truncates a long title to 120 characters with an ellipsis", () => {
     const longTitle = "A".repeat(200);
-    const model = shareCardModel({ ...base, title: longTitle }, "https://ethrfps.app");
+    const model = shareCardModel({ ...base, title: longTitle }, "https://rfpsear.ch");
 
     expect(model.title).toHaveLength(120);
     expect(model.title.endsWith("…")).toBe(true);
@@ -70,7 +70,7 @@ describe("shareCardModel", () => {
         ...base,
         operatingOrganizations: [{ name: "B".repeat(100), slug: "b" }],
       },
-      "https://ethrfps.app",
+      "https://rfpsear.ch",
     );
 
     expect(model.eyebrow).toBe(`Grant · ${"B".repeat(59)}…`);
@@ -84,7 +84,7 @@ describe("shareCardModel", () => {
         operatingOrganizations: [] as unknown as Opportunity["operatingOrganizations"],
         deadlines: [{ deadlineType: "rolling", label: "application" }],
       },
-      "https://ethrfps.app",
+      "https://rfpsear.ch",
     );
 
     expect(model.eyebrow).toBe("Grant");
@@ -94,17 +94,17 @@ describe("shareCardModel", () => {
   });
 
   it("says so when there is no deadline at all", () => {
-    const model = shareCardModel({ ...base, deadlines: [] }, "https://ethrfps.app");
+    const model = shareCardModel({ ...base, deadlines: [] }, "https://rfpsear.ch");
     expect(model.deadline).toBe("No deadline");
   });
 
   it("hides the ecosystems line when the listing states none", () => {
-    const model = shareCardModel({ ...base, ecosystems: [] }, "https://ethrfps.app");
+    const model = shareCardModel({ ...base, ecosystems: [] }, "https://rfpsear.ch");
     expect(model.ecosystems).toBe("");
   });
 
   it("percent-encodes the id in the URL", () => {
-    const model = shareCardModel({ ...base, id: "legacy:round 4" }, "https://ethrfps.app");
-    expect(model.url).toBe("https://ethrfps.app/opportunities/legacy%3Around%204");
+    const model = shareCardModel({ ...base, id: "legacy:round 4" }, "https://rfpsear.ch");
+    expect(model.url).toBe("https://rfpsear.ch/opportunities/legacy%3Around%204");
   });
 });

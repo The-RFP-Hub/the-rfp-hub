@@ -16,7 +16,7 @@ metadata:
 
 ## 1. What this is
 
-The [RFP Hub](https://ethrfps.app) is a public directory of Ethereum-ecosystem funding
+The [RFP Hub](https://rfpsear.ch) is a public directory of Ethereum-ecosystem funding
 opportunities — grants, hackathons, bounties, accelerators, VC funds, and RFPs — published under
 an open [Standard](https://github.com/The-RFP-Hub/the-rfp-hub). This skill searches that
 directory. **It never applies on the user's behalf.** A result's `applyUrl` — when the record has
@@ -166,7 +166,7 @@ happened:
 
 1. [grant] A grant for public goods — Acme Foundation
    Award: 50,000 USD budget | Deadline: 2026-09-30
-   Apply: https://api.ethrfps.app/v1/r/fundingmap%3A1459/apply
+   Apply: https://api.rfpsear.ch/v1/r/fundingmap%3A1459/apply
 
 [End funding search results]
 

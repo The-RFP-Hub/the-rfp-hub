@@ -1,0 +1,84 @@
+{
+  "specVersion": "1.0.1",
+  "id": "fundingmap:1277",
+  "fundingType": "hackathon",
+  "title": "ETHGlobal Open Agents",
+  "description": "Open Agents is an event bringing together some of the top minds and experts in Ethereum Ecosystem. Join the largest Ethereum developer community to tackle the challenges that will define the next evolution in Web3. Connect networks; bring operations on chain; even create your own dApp. Whatever project you choose, you’ll build alongside mentors and partners and finish by presenting your work to some of the most respected minds in the industry.",
+  "summary": "ETHGlobal hackathon: Open Agents",
+  "status": "archived",
+  "sponsoringOrganizations": [
+    {
+      "name": "ETHGlobal Open Agents",
+      "slug": "ethglobal-open-agents",
+      "website": "https://ethglobal.com/events/openagents"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHGlobal Open Agents",
+      "slug": "ethglobal-open-agents",
+      "website": "https://ethglobal.com/events/openagents"
+    }
+  ],
+  "source": {
+    "ingestedVia": "import",
+    "originalId": "1277",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon",
+    "AI",
+    "Infrastructure"
+  ],
+  "applicationUrl": "https://ethglobal.com/events/openagents",
+  "website": "https://ethglobal.com/events/openagents",
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/ETHGlobal"
+    }
+  ],
+  "fundingInfo": {
+    "currency": "USD",
+    "budget": 50000
+  },
+  "opensAt": "2026-04-24T12:00:00.000Z",
+  "deadlines": [
+    {
+      "deadlineType": "fixed",
+      "date": "2026-05-06T23:59:59.000Z",
+      "label": "application"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-04-24T17:00:00.000Z",
+      "label": "registration"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-04-24T12:00:00.000Z",
+      "label": "event start"
+    },
+    {
+      "deadlineType": "fixed",
+      "date": "2026-05-06T23:59:59.999Z",
+      "label": "event end"
+    }
+  ],
+  "createdAt": "2026-03-20T00:01:31.000Z",
+  "updatedAt": "2026-05-07T00:05:55.000Z",
+  "fundingDetails": {
+    "fundingType": "hackathon",
+    "location": "Remote",
+    "online": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 50000
+      }
+    ]
+  }
+}

@@ -50,9 +50,9 @@ Selection
   (nothing)               Every registered read criterion runs, under its capability key.
 
 Targets
-  --api <url>             Origin of the deployed /v1/ API. Default https://api.ethrfps.app.
+  --api <url>             Origin of the deployed /v1/ API. Default https://api.rfpsear.ch.
   --base-url <url>        Accepted alias for --api.
-  --site <url>            Reference frontend. Default https://ethrfps.app.
+  --site <url>            Reference frontend. Default https://rfpsear.ch.
   --export-url <url>      Root the open-data export is published under; latest.json, latest.csv,
                           latest.manifest.json and LICENSE are read directly beneath it. No
                           default, and required when the export criterion runs.

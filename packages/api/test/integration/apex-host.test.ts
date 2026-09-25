@@ -1,7 +1,7 @@
 /**
  * THE APEX RESERVATION.
  *
- * `adr/0007` reserves `ethrfps.app` for the spec and its site — "no service is ever mounted here"
+ * `adr/0007` reserves `rfpsear.ch` for the spec and its site — "no service is ever mounted here"
  * — and that reservation is the whole justification for treating `/schemas/`, `/meta/`,
  * `/registries/` and `/ns/` as permanent identifier paths. Until spec serving moves to static
  * hosting the same process answers on both hostnames, so the reservation has to be a property of
@@ -9,7 +9,7 @@
  *
  * Every case is asserted with BOTH `Host` headers, because the interesting failure is not "the
  * apex 404s" — it is "the apex 404s AND the API host still works". A rule that quietly broke
- * `api.ethrfps.app` would pass a one-sided test.
+ * `api.rfpsear.ch` would pass a one-sided test.
  *
  * No database: the apex rule runs in `onRequest`, before any handler, so the denials never reach
  * one, and every allowed route asserted here is DB-free. The DB-backed half (`/v1/opportunities`
@@ -49,6 +49,18 @@ describe("the apex serves the spec and nothing else", () => {
     }
     for (const host of [API_HOST, `api-staging.${APEX_HOST}`, "localhost", "", undefined]) {
       expect(isApexRequest(host), String(host)).toBe(false);
+    }
+  });
+
+  it("keeps every earlier identity authority reserved after the identity moves", async () => {
+    const former = (specConfig.identityMigrations ?? []).map((m) => new URL(m.from.baseUrl).host);
+    expect(former.length).toBeGreaterThan(0);
+    for (const host of former) {
+      expect(isApexRequest(host), host).toBe(true);
+      expect(isApexRequest(`www.${host}`), host).toBe(true);
+      expect(isApexRequest(`api.${host}`), host).toBe(false);
+      expect((await get("/v1/opportunities", host)).statusCode).toBe(404);
+      expect((await get("/schemas/v1.0.0/opportunity.schema.json", host)).statusCode).toBe(200);
     }
   });
 

@@ -10,11 +10,26 @@ import { isLoopbackHost, request } from "./http.mjs";
 
 export { isLoopbackHost };
 
-/** The project's real staging origins, from `.github/workflows/*staging*.yml` and `adr/0007`. */
-export const STAGING_ORIGINS = ["https://staging.ethrfps.app", "https://api-staging.ethrfps.app"];
+/**
+ * The project's real staging origins, from `.github/workflows/*staging*.yml` and `adr/0013`. The
+ * `ethrfps.app` pair is the pre-move spelling of the same deployments (`adr/0013`).
+ */
+export const STAGING_ORIGINS = [
+  "https://staging.rfpsear.ch",
+  "https://api-staging.rfpsear.ch",
+  "https://staging.ethrfps.app",
+  "https://api-staging.ethrfps.app",
+];
 
 /** So a refusal can say "that is production", not just "that is not on the list". */
-export const PRODUCTION_HOSTS = ["ethrfps.app", "api.ethrfps.app", "www.ethrfps.app"];
+export const PRODUCTION_HOSTS = [
+  "rfpsear.ch",
+  "api.rfpsear.ch",
+  "www.rfpsear.ch",
+  "ethrfps.app",
+  "api.ethrfps.app",
+  "www.ethrfps.app",
+];
 
 export function normalizeOrigin(raw) {
   let url;

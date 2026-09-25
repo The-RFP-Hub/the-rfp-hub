@@ -26,17 +26,17 @@ afterEach(() => {
 
 describe("originFromHeaders", () => {
   it("combines the forwarded protocol with the host", () => {
-    expect(originFromHeaders("ethrfps.app", "https")).toBe("https://ethrfps.app");
+    expect(originFromHeaders("rfpsear.ch", "https")).toBe("https://rfpsear.ch");
   });
 
   it("defaults to https when no protocol was forwarded", () => {
     // The normal shape behind a platform's edge: it terminates TLS and forwards over plain HTTP
     // internally, so an ABSENT header means "https", never "whatever this internal hop used".
-    expect(originFromHeaders("ethrfps.app", null)).toBe("https://ethrfps.app");
+    expect(originFromHeaders("rfpsear.ch", null)).toBe("https://rfpsear.ch");
   });
 
   it("takes the first value when the header carries a chain of proxies", () => {
-    expect(originFromHeaders("ethrfps.app", "https, http")).toBe("https://ethrfps.app");
+    expect(originFromHeaders("rfpsear.ch", "https, http")).toBe("https://rfpsear.ch");
   });
 
   it("resolves nothing without a host — never guesses one", () => {
@@ -46,20 +46,20 @@ describe("originFromHeaders", () => {
   it("prefers x-forwarded-host, which is the address the browser actually used", () => {
     // The shape behind a CDN or load balancer that rewrites Host to an internal name: without this
     // preference, such a deployment could never match its own canonical origin.
-    expect(originFromHeaders("frontend.internal", "https", "ethrfps.app")).toBe(
-      "https://ethrfps.app",
+    expect(originFromHeaders("frontend.internal", "https", "rfpsear.ch")).toBe(
+      "https://rfpsear.ch",
     );
   });
 
   it("takes the first forwarded host when the header carries a chain of proxies", () => {
-    expect(originFromHeaders("frontend.internal", "https", "ethrfps.app, edge.internal")).toBe(
-      "https://ethrfps.app",
+    expect(originFromHeaders("frontend.internal", "https", "rfpsear.ch, edge.internal")).toBe(
+      "https://rfpsear.ch",
     );
   });
 
   it("falls back to Host when nothing forwarded a host", () => {
-    expect(originFromHeaders("ethrfps.app", "https", null)).toBe("https://ethrfps.app");
-    expect(originFromHeaders("ethrfps.app", "https", "")).toBe("https://ethrfps.app");
+    expect(originFromHeaders("rfpsear.ch", "https", null)).toBe("https://rfpsear.ch");
+    expect(originFromHeaders("rfpsear.ch", "https", "")).toBe("https://rfpsear.ch");
   });
 });
 
@@ -67,11 +67,11 @@ describe("requestOrigin", () => {
   it("reads the host and forwarded-proto headers off the actual request", async () => {
     const { headers } = await import("next/headers");
     const get = vi.fn((key: string) =>
-      key === "host" ? "staging.ethrfps.app" : key === "x-forwarded-proto" ? "https" : null,
+      key === "host" ? "staging.rfpsear.ch" : key === "x-forwarded-proto" ? "https" : null,
     );
     vi.mocked(headers).mockResolvedValue({ get } as unknown as Awaited<ReturnType<typeof headers>>);
 
-    await expect(requestOrigin()).resolves.toBe("https://staging.ethrfps.app");
+    await expect(requestOrigin()).resolves.toBe("https://staging.rfpsear.ch");
   });
 });
 
@@ -82,8 +82,8 @@ describe("canonicalSiteOrigin", () => {
   });
 
   it("normalizes through URL().origin, dropping a trailing slash or stray path", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app/");
-    expect(canonicalSiteOrigin()).toBe("https://ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch/");
+    expect(canonicalSiteOrigin()).toBe("https://rfpsear.ch");
   });
 
   it("is undefined for an unparsable value — never throws, never guesses", () => {
@@ -94,14 +94,14 @@ describe("canonicalSiteOrigin", () => {
   it("derives the origin from Vercel's production environment when nothing was declared", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    expect(canonicalSiteOrigin()).toBe("https://ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    expect(canonicalSiteOrigin()).toBe("https://rfpsear.ch");
   });
 
   it("is undefined on a Vercel preview, which is what keeps every preview out of the index", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     expect(canonicalSiteOrigin()).toBeUndefined();
   });
 
@@ -113,7 +113,7 @@ describe("canonicalSiteOrigin", () => {
   it("lets an explicit value win over Vercel's production domain", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     expect(canonicalSiteOrigin()).toBe("https://mirror.example.org");
   });
 
@@ -142,42 +142,42 @@ describe("isCanonicalRequest", () => {
 
   it("is false when NEXT_PUBLIC_SITE_ORIGIN is unset, whatever the request's own origin is", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });
 
   it("is true when the request origin matches the declared canonical origin exactly", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(true);
   });
 
   it("is false for a staging alias or a preview, even with the variable set on production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("staging.ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("staging.rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });
 
   it("is true behind a proxy that rewrote Host, because the forwarded host is the real one", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("frontend.internal:8080", "ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("frontend.internal:8080", "rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(true);
   });
 
   it("is false when the proxy forwards some other host, whatever Host says", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app", "staging.ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch", "staging.rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });
 
   it("is false for a malformed NEXT_PUBLIC_SITE_ORIGIN — a typo costs indexing, never privacy", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });
@@ -185,8 +185,8 @@ describe("isCanonicalRequest", () => {
   it("is true on Vercel production with nothing declared, once the request lands on that host", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     await expect(isCanonicalRequest()).resolves.toBe(true);
   });
@@ -194,7 +194,7 @@ describe("isCanonicalRequest", () => {
   it("is false on a Vercel preview with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("feature-branch.vercel.app");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);

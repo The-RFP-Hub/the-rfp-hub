@@ -25,13 +25,13 @@ const RETIRED_BASE = [
   "githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard",
 ].join("");
 const RETIRED_VOCAB = ["https://github.com/The-RFP-Hub/the-rfp-hub/ns/", "draft", "/rfp#"].join("");
-const CANONICAL = "https://ethrfps.app";
+const CANONICAL = "https://rfpsear.ch";
 const RETIRED_NS = `${CANONICAL}/ns/draft/rfp#`;
 const OFF_DOMAIN = ["https://cdn.somewhere", ".net/schemas/v1.0.0/opportunity.schema.json"].join(
   "",
 );
-const PLAINTEXT_API = ["http", "://api.ethrfps.app"].join("");
-const PLAINTEXT_APEX = ["http", "://ethrfps.app/schemas/index.json"].join("");
+const PLAINTEXT_API = ["http", "://api.rfpsear.ch"].join("");
+const PLAINTEXT_APEX = ["http", "://rfpsear.ch/schemas/index.json"].join("");
 const TRACKER = ["DEV", "1234"].join("-");
 
 const rules = (text) => scanText("f.md", text).map((f) => f.rule);
@@ -110,13 +110,13 @@ describe("identity", () => {
   it("catches a plaintext URL on the canonical domain, apex or subdomain", () => {
     expect(rules(`PUBLIC_BASE_URL=${PLAINTEXT_API}`)).toEqual(["identity"]);
     expect(rules(PLAINTEXT_APEX)).toEqual(["identity"]);
-    clean("https://api-staging.ethrfps.app is the staging API.");
+    clean("https://api-staging.rfpsear.ch is the staging API.");
   });
 
   it("leaves the canonical identifiers alone", () => {
-    clean('"$id": "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json"');
-    clean('"@vocab": "https://ethrfps.app/ns/rfp#"');
-    clean("https://ethrfps.app/meta/rfphub-schema.meta.json");
+    clean('"$id": "https://rfpsear.ch/schemas/v1.0.1/opportunity.schema.json"');
+    clean('"@vocab": "https://rfpsear.ch/ns/rfp#"');
+    clean("https://rfpsear.ch/meta/rfphub-schema.meta.json");
   });
 
   /**

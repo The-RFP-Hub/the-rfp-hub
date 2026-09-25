@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { createValidator } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const conformance = join(here, "..", "..", "standard", "conformance", "v1.0.0");
+const conformance = join(here, "..", "..", "standard", "conformance", "v1.0.1");
 
 /** A document the conformance suite REQUIRES every implementation to accept. */
 const VALID = JSON.parse(

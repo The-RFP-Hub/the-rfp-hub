@@ -212,7 +212,7 @@ the old authority keeps serving them. Moving to a new authority takes:
 - one entry **appended** to `spec.config.json`'s `identityMigrations`, with a `from` naming the
   previous identity and its versions, and an **accepted** ADR naming both identities.
 
-The freeze gate enforces each of these.
+The freeze gate enforces each of these. The first such move is [`adr/0013`](../../adr/0013-move-spec-identity-to-rfpsear-ch.md).
 
 ---
 

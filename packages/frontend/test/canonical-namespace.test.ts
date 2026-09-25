@@ -3,7 +3,7 @@
  *
  * THE CARVE-OUT, PINNED FROM BOTH SIDES.
  *
- * In production this package is what `https://ethrfps.app` resolves to, and that hostname is the
+ * In production this package is what `https://rfpsear.ch` resolves to, and that hostname is the
  * authority for every identifier the Standard publishes (`adr/0007`): `/schemas/`, `/meta/`,
  * `/registries/` and `/ns/`. The app therefore receives requests for URLs it must not answer, and
  * `next.config.ts` proxies them to the API instead. Two things can silently undo that, and this
@@ -24,7 +24,12 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import nextConfig, { CANONICAL_PREFIXES, canonicalProxyRewrites } from "../next.config";
+import nextConfig, {
+  CANONICAL_PREFIXES,
+  MOVED_HOSTS,
+  canonicalProxyRewrites,
+  movedHostRedirects,
+} from "../next.config";
 
 // `process.cwd()` rather than `import.meta.url` for symmetry with the other source-scanning suite
 // here; vitest runs both with the package directory as the cwd.
@@ -144,5 +149,45 @@ describe("no app route shadows the canonical namespace", () => {
     const config = readFileSync(join(packageRoot, "next.config.ts"), "utf8");
     expect(config).toContain("beforeFiles");
     for (const prefix of PREFIXES) expect(config).toContain(`"${prefix}"`);
+  });
+});
+
+describe("the pre-move hostnames redirect everything but the identifiers", () => {
+  const pathRules = movedHostRedirects().filter((r) => r.source !== "/");
+  const pattern = (source: string) => new RegExp(`^/${source.slice("/:path(".length, -1)}$`);
+
+  it("covers every moved host, the root included, permanently", () => {
+    const hosts = Object.keys(MOVED_HOSTS);
+    expect(hosts).toContain("ethrfps.app");
+    for (const host of hosts) {
+      const rules = movedHostRedirects().filter((r) => r.has[0]?.value.replace(/\\/g, "") === host);
+      expect(rules.map((r) => r.source)).toContain("/");
+      expect(
+        rules.every((r) => r.permanent && r.destination.startsWith(MOVED_HOSTS[host] ?? "-")),
+      ).toBe(true);
+    }
+  });
+
+  it("never redirects a canonical identifier path", () => {
+    for (const rule of pathRules) {
+      const re = pattern(rule.source);
+      for (const path of [
+        "/schemas/v1.0.0/opportunity.schema.json",
+        "/schemas",
+        "/meta/rfphub-schema.meta.json",
+        "/registries/index.json",
+        "/ns/rfp",
+      ]) {
+        expect(re.test(path), path).toBe(false);
+      }
+      for (const path of ["/directory", "/opportunities/a%3Ab", "/schemas-guide", "/nsfw"]) {
+        expect(re.test(path), path).toBe(true);
+      }
+    }
+  });
+
+  it("runs before every other redirect", async () => {
+    const all = await nextConfig.redirects?.();
+    expect(all?.slice(0, movedHostRedirects().length)).toEqual(movedHostRedirects());
   });
 });

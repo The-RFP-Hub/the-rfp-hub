@@ -57,7 +57,7 @@ Without --status, this skill searches OPEN opportunities only (most requests lik
 mean currently-open ones). Pass --status explicitly to see upcoming/closed/archived entries too,
 e.g. --status upcoming,open,closed,archived for everything.
 
-Env: RFPHUB_API_BASE (default https://api.ethrfps.app). Requests time out after 10000ms.
+Env: RFPHUB_API_BASE (default https://api.rfpsear.ch). Requests time out after 10000ms.
 See references/api-reference.md for the full parameter table and enum values.
 `;
 

@@ -77,8 +77,8 @@ describeWithDb("canonical spec documents + JSON-LD context advertisement", () =>
 
   it("serves every document the Standard publishes an identifier for", () => {
     expect(canonicalDocuments.map((doc) => doc.path)).toEqual([
-      "/schemas/v1.0.0/opportunity.schema.json",
-      "/schemas/v1.0.0/context.jsonld",
+      "/schemas/v1.0.1/opportunity.schema.json",
+      "/schemas/v1.0.1/context.jsonld",
       "/schemas/index.json",
       "/meta/rfphub-schema.meta.json",
       "/registries/entry.schema.json",
@@ -119,7 +119,7 @@ describeWithDb("canonical spec documents + JSON-LD context advertisement", () =>
   it("serves the same schema bytes at the /v1 convenience route", async () => {
     const canonicalRes = await app.inject({
       method: "GET",
-      url: "/schemas/v1.0.0/opportunity.schema.json",
+      url: "/schemas/v1.0.1/opportunity.schema.json",
     });
     const v1Res = await app.inject({ method: "GET", url: "/v1/opportunities/schema" });
     expect(v1Res.statusCode).toBe(200);
@@ -154,7 +154,7 @@ describeWithDb("canonical spec documents + JSON-LD context advertisement", () =>
   it("never advertises a context on an application/schema+json response", async () => {
     for (const url of [
       "/v1/opportunities/schema",
-      "/schemas/v1.0.0/opportunity.schema.json",
+      "/schemas/v1.0.1/opportunity.schema.json",
       "/meta/rfphub-schema.meta.json",
       "/registries/entry.schema.json",
     ]) {
@@ -165,7 +165,7 @@ describeWithDb("canonical spec documents + JSON-LD context advertisement", () =>
   });
 
   it("never advertises a context on the context document itself", async () => {
-    const res = await app.inject({ method: "GET", url: "/schemas/v1.0.0/context.jsonld" });
+    const res = await app.inject({ method: "GET", url: "/schemas/v1.0.1/context.jsonld" });
     expect(res.headers["content-type"]).toContain("application/ld+json");
     expect(res.headers.link).toBeUndefined();
   });

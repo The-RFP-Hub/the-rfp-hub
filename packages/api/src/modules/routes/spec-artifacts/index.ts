@@ -15,7 +15,7 @@ const identifierPaths: ReadonlySet<string> = new Set(canonicalDocuments.map((doc
  * `routes/canonical` serves the five documents an `$id` or a `@context` names. This module serves
  * everything else in the same three directories — the version directory's informative documents and
  * its examples, the `FROZEN` marker, the registry vocabularies — so that
- * `https://ethrfps.app/schemas/v1.0.0/…` is a directory a consumer can walk, not a shortlist of
+ * `https://rfpsear.ch/schemas/v1.0.1/…` is a directory a consumer can walk, not a shortlist of
  * five. See `modules/shared/spec-artifacts.ts` for why the whole tree and not just the identifiers.
  *
  * Mounted at the ROOT for the same reason the canonical documents are: these paths mirror the

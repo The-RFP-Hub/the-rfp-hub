@@ -1,10 +1,10 @@
 {
   "$comment": "The spec's identity, and the ONLY place a base URL or version string is hand-written. Every $id, the JSON-LD @vocab and every generated version string is stamped from this file by scripts/codegen.mjs, so the canonical-domain adoption was a two-line edit here plus `pnpm codegen` — no grep, no hand-edited URLs. See ARTIFACTS.md, schemas/v1.0.0/STATUS.md and adr/0007-canonical-domain-and-spec-identity.md.",
-  "specVersion": "1.0.0",
-  "schemaDir": "schemas/v1.0.0",
-  "baseUrl": "https://ethrfps.app",
-  "baseUrlNote": "CANONICAL. The project owns ethrfps.app, and the apex is reserved for the spec and its site — nothing else is ever served from it, so `/schemas/`, `/meta/` and `/registries/` are the standard's own namespace and no future service can collide with an $id. Services take single-label subdomains (api.ethrfps.app, and so on) precisely so one `*.ethrfps.app` wildcard certificate keeps covering them. `.app` is an HSTS-preloaded TLD: browsers force HTTPS, so `https://` is the only scheme this base is ever written with and there is no plaintext variant to support.",
-  "vocabIri": "https://ethrfps.app/ns/rfp#",
+  "specVersion": "1.0.1",
+  "schemaDir": "schemas/v1.0.1",
+  "baseUrl": "https://rfpsear.ch",
+  "baseUrlNote": "CANONICAL. The project owns rfpsear.ch, and the apex is reserved for the spec and its site — nothing else is ever served from it, so `/schemas/`, `/meta/` and `/registries/` are the standard's own namespace and no future service can collide with an $id. Services take single-label subdomains (api.rfpsear.ch, and so on) precisely so one `*.rfpsear.ch` wildcard certificate keeps covering them. `https://` is the only scheme this base is ever written with. v1.0.0 was published on the previous authority (see identityMigrations); its identifiers stay valid and served there, byte for byte.",
+  "vocabIri": "https://rfpsear.ch/ns/rfp#",
   "vocabIriNote": "CANONICAL and deliberately VERSIONLESS. A vocabulary namespace IRI must be versionless — term IRIs are versioned by the context DOCUMENT, never by the term — so it cannot live under schemas/<version>/. It sits at /ns/rfp# on the same authority as baseUrl, one hop from the apex, and it carries no maturity segment: the retired `draft` segment mirrored a maturity that has since been settled, and a namespace that renames itself when the spec matures is not a namespace. Anything under this IRI is a term the RFP Hub standard defines itself, as opposed to one it borrows from schema.org or DAOIP-5.",
   "identityStatus": "canonical",
   "identityAdoption": {
@@ -12,5 +12,17 @@
     "adr": "adr/0007-canonical-domain-and-spec-identity.md",
     "note": "The one-time provisional -> canonical swap. Before this date baseUrl was a raw-repository URL and vocabIri carried a `draft` segment, both marked PROVISIONAL in this file and in STATUS.md precisely so this swap would be a planned event rather than a mutation. `identityStatus` is the machine-readable record of that event: .github/workflows/spec-freeze.yml permits an identity-field change only on a provisional -> canonical transition that names an ADR, and only once — after this commit the base ref always reads `canonical`, so the exemption can never be taken again, and reverting to `provisional` is itself rejected."
   },
+  "identityMigrations": [
+    {
+      "date": "2026-09-25",
+      "adr": "adr/0013-move-spec-identity-to-rfpsear-ch.md",
+      "from": {
+        "baseUrl": "https://ethrfps.app",
+        "vocabIri": "https://ethrfps.app/ns/rfp#",
+        "versions": ["1.0.0"]
+      },
+      "note": "A canonical -> canonical move, sanctioned by an accepted ADR naming both identities. Versions published under the previous identity keep it forever: their directories are frozen and never re-stamped. Only the versionless $ids and the current version move. .github/workflows/spec-freeze.yml permits the move once per recorded entry, and only when the entry's `from` is the identity at the base ref."
+    }
+  ],
   "status": "stable"
 }

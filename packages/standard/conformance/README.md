@@ -35,7 +35,7 @@ The reference run lives in `packages/validate/test/validate.test.ts` (the
 ```bash
 pnpm --filter rfphub-validate test
 # or, against the published package:
-npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.0/pass
+npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.1/pass
 ```
 
 ## Scope

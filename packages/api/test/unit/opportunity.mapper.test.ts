@@ -13,7 +13,7 @@ import {
 } from "../../src/modules/mappers/opportunity.mapper.js";
 
 const EXAMPLES_DIR = fileURLToPath(
-  new URL("../../../standard/schemas/v1.0.0/examples", import.meta.url),
+  new URL("../../../standard/schemas/v1.0.1/examples", import.meta.url),
 );
 
 function loadExamples(): { file: string; opp: Opportunity }[] {
@@ -306,8 +306,8 @@ describe("ingest normalization", () => {
   it("accepts and STRIPS the self-identification properties", () => {
     const selfIdentifying = {
       ...BASE,
-      $schema: "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
-      "@context": "https://ethrfps.app/schemas/v1.0.0/context.jsonld",
+      $schema: "https://rfpsear.ch/schemas/v1.0.1/opportunity.schema.json",
+      "@context": "https://rfpsear.ch/schemas/v1.0.1/context.jsonld",
       "@type": "schema:Grant",
     } as Opportunity;
     const rebuilt = toStandard(rowFromInsert(fromStandard(selfIdentifying).opp)) as Record<

@@ -5,10 +5,10 @@
   "version": "0.1.0",
   "author": {
     "name": "The RFP Hub",
-    "url": "https://ethrfps.app"
+    "url": "https://rfpsear.ch"
   },
   "license": "MIT",
-  "homepage": "https://ethrfps.app",
+  "homepage": "https://rfpsear.ch",
   "repository": "https://github.com/The-RFP-Hub/the-rfp-hub",
   "skills": ["./"]
 }

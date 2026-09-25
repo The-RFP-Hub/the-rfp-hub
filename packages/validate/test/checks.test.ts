@@ -6,7 +6,7 @@ import { run } from "../src/cli/run.js";
 import { checks, runChecks, validateOpportunity } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const conformance = join(here, "..", "..", "standard", "conformance", "v1.0.0");
+const conformance = join(here, "..", "..", "standard", "conformance", "v1.0.1");
 
 const base = {
   specVersion: "1.0.0",

@@ -1,6 +1,6 @@
 # 0007. Adopt `ethrfps.app` as the canonical domain, and mint spec v1.0.0's identity on it
 
-- **Status:** accepted
+- **Status:** accepted — the domain choice is superseded by [ADR-0013](./0013-move-spec-identity-to-rfpsear-ch.md); v1.0.0 keeps this identity forever
 - **Deciders:** standard maintainers
 - **Date:** 2026-08-10
 - **Supersedes:** — *(no ADR. It discharges the identifier caveat that

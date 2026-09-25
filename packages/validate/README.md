@@ -115,7 +115,7 @@ re-reference rather than declare), plus the standard's `x-stability` / `x-since`
 `createValidator()` is reused by the API and tests, so validation is identical everywhere.
 
 The test suite runs the standard's own conformance suite
-(`@the-rfp-hub/standard/conformance/v1.0.0/{pass,fail}/`) rather than private fixtures, so the
+(`@the-rfp-hub/standard/conformance/v1.0.1/{pass,fail}/`) rather than private fixtures, so the
 reference implementation is held to exactly the contract external implementers are given.
 
 ## Develop

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://rfpsear.ch/schemas/v1.0.1/opportunity.schema.json",
+  "@context": "https://rfpsear.ch/schemas/v1.0.1/context.jsonld",
+  "@type": "schema:Grant",
+  "specVersion": "1.0.1",
+  "id": "conformance:self-id",
+  "fundingType": "grant",
+  "title": "Self-identifying instance",
+  "description": "Carries $schema, @context and @type at the top level. All three are permitted against additionalProperties: false so a generic validator can discover the contract and a JSON-LD processor can consume the record, and all three are otherwise ignored by validation.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}
