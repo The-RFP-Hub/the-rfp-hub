@@ -202,6 +202,27 @@ to be its own base bytes with those identifier strings substituted, and nothing 
 this exemption "only the identifier changed" is a statement about the file, not about its parse
 tree.
 
+### Moving a canonical identity
+
+A canonical identity can move to another authority later, but a published version never moves
+with it. The frozen directories keep the identifiers they shipped with, forever, and the authority
+that minted them has to keep serving them. What moves is everything that names the **current**
+authority:
+
+- a **new version directory** carrying the new identity — its contract may be identical to the
+  previous version's, and its `specVersion` may accept the previous version's value so documents
+  that declare it stay valid;
+- the `$id` of the versionless artifacts (`meta/`, `registries/entry.schema.json`), and nothing
+  else in them, byte for byte, exactly as under the adoption;
+- `spec.config.json`'s `baseUrl` and `vocabIri`, with one entry **appended** to
+  `identityMigrations`: its date, an **accepted** ADR that names both the old and the new
+  `baseUrl` and `vocabIri`, and a `from` recording the previous identity and the versions
+  published under it.
+
+The freeze gate enforces all of it: the entry must be new, earlier entries must be untouched,
+`from` must be the base ref's identity, and the current `schemaDir` must not already be frozen.
+`check-spec` then accepts the previous authority's URLs only for the versions `from` lists.
+
 ---
 
 ## Deprecation
