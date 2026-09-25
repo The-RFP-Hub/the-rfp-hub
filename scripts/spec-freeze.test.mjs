@@ -571,6 +571,127 @@ describe("once a version is frozen at the base ref", () => {
   });
 });
 
+// ------------------------------------------------------------- the identity migration ---
+
+describe("a canonical -> canonical identity migration", () => {
+  const MOVED_BASE = "https://moved.example";
+  const MOVED_VOCAB = "https://moved.example/ns/rfp#";
+  const MIGRATION_ADR = "adr/0013-move-the-identity.md";
+  const migrationAdr = `# 0013. Move the identity
+
+- **Status:** accepted
+
+From ${NEW_BASE} (${NEW_VOCAB}) to ${MOVED_BASE} (${MOVED_VOCAB}).
+`;
+  const entry = (over = {}) => ({
+    date: "2026-09-25",
+    adr: MIGRATION_ADR,
+    from: { baseUrl: NEW_BASE, vocabIri: NEW_VOCAB, versions: ["1.0.0"] },
+    ...over,
+  });
+  const movedSpec = (migrations, schemaDir = "schemas/v1.0.1") =>
+    json({
+      ...JSON.parse(
+        specConfig(MOVED_BASE, MOVED_VOCAB, {
+          status: "stable",
+          identity: {
+            identityStatus: "canonical",
+            identityAdoption: { date: "2026-08-10", adr: ADR },
+            identityMigrations: migrations,
+          },
+        }),
+      ),
+      specVersion: schemaDir.replace("schemas/v", ""),
+      schemaDir,
+    });
+  const migrationHead = (over = {}) => ({
+    ...frozenTree(),
+    [s("spec.config.json")]: movedSpec([entry()]),
+    [s("schemas/v1.0.1/opportunity.schema.json")]: schemaDoc(MOVED_BASE).replace(
+      /v1\.0\.0/g,
+      "v1.0.1",
+    ),
+    [s("schemas/v1.0.1/context.jsonld")]: contextDoc(MOVED_VOCAB),
+    [s("schemas/v1.0.1/FROZEN")]: "RFP Hub Standard v1.0.1 — FROZEN.\n",
+    [s("meta/rfphub-schema.meta.json")]: metaDoc(MOVED_BASE),
+    [s("registries/entry.schema.json")]: entryDoc(MOVED_BASE),
+    [MIGRATION_ADR]: migrationAdr,
+    ...over,
+  });
+
+  it("accepts a new version on the new identity, with the versionless $ids re-stamped", () => {
+    const result = run(frozenTree(), migrationHead());
+    expect(messages(result)).toBe("");
+    expect(result.ok).toBe(true);
+    expect(result.notes.join("\n")).toContain("identity migration");
+  });
+
+  it("still rejects re-stamping the frozen version under cover of the migration", () => {
+    const head = migrationHead({
+      [s("schemas/v1.0.0/opportunity.schema.json")]: schemaDoc(MOVED_BASE),
+    });
+    expect(messages(run(frozenTree(), head))).toContain("v1.0.0 is FROZEN");
+  });
+
+  it("rejects moving the identity onto the frozen version directory", () => {
+    const head = migrationHead({ [s("spec.config.json")]: movedSpec([entry()], "schemas/v1.0.0") });
+    expect(messages(run(frozenTree(), head))).toContain("a published version keeps its identity");
+  });
+
+  it("rejects a versionless artifact that changes more than its $id", () => {
+    const head = migrationHead({
+      [s("meta/rfphub-schema.meta.json")]: metaDoc(MOVED_BASE, { minProperties: 1 }),
+    });
+    expect(messages(run(frozenTree(), head))).toContain("changes more than its identifiers");
+  });
+
+  it("rejects an identity change with no migration entry", () => {
+    const head = migrationHead({ [s("spec.config.json")]: movedSpec([]) });
+    const result = run(frozenTree(), head);
+    expect(result.ok).toBe(false);
+    expect(messages(result)).toContain("must gain exactly one entry");
+  });
+
+  it("rejects an entry whose `from` is not the base identity", () => {
+    const head = migrationHead({
+      [s("spec.config.json")]: movedSpec([
+        entry({ from: { baseUrl: OLD_BASE, vocabIri: OLD_VOCAB, versions: ["1.0.0"] } }),
+      ]),
+    });
+    expect(messages(run(frozenTree(), head))).toContain("not the identity at the base ref");
+  });
+
+  it("rejects a record that is not accepted, or never names both identities", () => {
+    const proposed = migrationHead({
+      [MIGRATION_ADR]: migrationAdr.replace("accepted", "proposed"),
+    });
+    expect(messages(run(frozenTree(), proposed))).toContain("**Status:** accepted");
+    const vague = migrationHead({
+      [MIGRATION_ADR]: migrationAdr.replace(NEW_VOCAB, "the old one"),
+    });
+    expect(messages(run(frozenTree(), vague))).toContain(`never names '${NEW_VOCAB}'`);
+  });
+
+  it("rejects rewriting an earlier migration entry", () => {
+    const first = migrationHead();
+    const THIRD = "https://third.example";
+    const THIRD_VOCAB = "https://third.example/ns/rfp#";
+    const rewritten = {
+      ...first,
+      [s("spec.config.json")]: json({
+        ...JSON.parse(movedSpec([entry({ date: "2020-01-01" })], "schemas/v1.0.2")),
+        baseUrl: THIRD,
+        vocabIri: THIRD_VOCAB,
+        identityMigrations: [
+          entry({ date: "2020-01-01" }),
+          entry({ from: { baseUrl: MOVED_BASE, vocabIri: MOVED_VOCAB, versions: ["1.0.1"] } }),
+        ],
+      }),
+    };
+    expect(messages(run(first, rewritten))).toContain("append-only");
+  });
+});
+
 // ------------------------------------------------------- the command the workflow runs ---
 
 /**

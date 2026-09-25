@@ -53,6 +53,13 @@
 // transition cannot recur, and canonical -> provisional is rejected outright so it cannot be
 // re-armed.
 //
+//   THE MIGRATION. A canonical identity can later move to another canonical authority, but never
+//   by re-stamping a published version: the frozen directories keep the identity they shipped
+//   with, forever. What may move is the versionless artifacts' `$id` (byte-checked like the
+//   adoption) and spec.config.json's identity fields, and only when the change appends one
+//   `identityMigrations` entry whose `from` is the base's identity, whose ADR is accepted and names
+//   both identities, and whose `schemaDir` is a version not yet frozen. See adr/0013.
+//
 // What this cannot defend against is repo configuration: it must be a required status check, main
 // must require PRs, and .github/ plus this file should be CODEOWNERS-protected — none of which is
 // expressible from inside the tree. The workflow's push trigger is the tripwire for direct pushes.
@@ -374,6 +381,27 @@ export function evaluate(repo, baseSha, headSha) {
     }
   }
 
+  // ---------------- canonical -> canonical: an identity migration ---------------------------
+  let migration = false;
+  const identityOf = (spec) => (spec === null ? null : `${spec.baseUrl} ${spec.vocabIri}`);
+  if (
+    specTouched &&
+    !adoption &&
+    baseSpec?.identityStatus === "canonical" &&
+    headSpec.identityStatus === "canonical" &&
+    identityOf(baseSpec) !== identityOf(headSpec)
+  ) {
+    const problem = migrationProblem(repo, headSha, baseSpec, headSpec, frozenAtBase);
+    if (problem === null) {
+      migration = true;
+      notes.push(
+        `identity migration ${baseSpec.baseUrl} -> ${headSpec.baseUrl}, recorded in ${headSpec.identityMigrations.at(-1).adr}`,
+      );
+    } else {
+      fail("the identity fields change, but not as a recorded identity migration:", [problem]);
+    }
+  }
+
   // ---------------- versioned directories -------------------------------------------------
   const versionedViolations = violations.length;
   for (const { status, path } of changed) {
@@ -420,14 +448,14 @@ export function evaluate(repo, baseSha, headSha) {
       c.path === `${STANDARD}/registries/entry.schema.json`,
   );
   if (anyFrozen && versionless.length > 0) {
-    if (adoption) {
+    if (adoption || migration) {
       const before = violations.length;
       for (const entry of versionless) {
         checkAgainstAdoption(repo, baseSha, headSha, headSpec, entry, fail);
       }
       if (violations.length === before) {
         notes.push(
-          "versionless normative artifacts re-stamp their $id and nothing else (adoption)",
+          `versionless normative artifacts re-stamp their $id and nothing else (${adoption ? "adoption" : "migration"})`,
         );
       }
     } else {
@@ -442,6 +470,10 @@ export function evaluate(repo, baseSha, headSha) {
     const identity = (s) => (s === null ? "<absent>" : `${s.baseUrl} ${s.vocabIri}`);
     if (identity(baseSpec) === identity(headSpec)) {
       notes.push("spec.config.json touched, but identity fields (baseUrl, vocabIri) are unchanged");
+    } else if (migration) {
+      notes.push("spec.config.json identity fields moved by a recorded identity migration:");
+      notes.push(`  base: ${identity(baseSpec)}`);
+      notes.push(`  head: ${identity(headSpec)}`);
     } else if (adoption) {
       notes.push("spec.config.json identity fields adopted under the one-time exemption:");
       notes.push(`  base: ${identity(baseSpec)}`);
@@ -481,6 +513,45 @@ function adrProblem(repo, headSha, headSpec) {
     ["vocabIri", headSpec.vocabIri],
   ]) {
     if (!text.includes(value)) return `'${adr}' never names the ${field} it sanctions ('${value}')`;
+  }
+  return null;
+}
+
+/**
+ * Is this change a well-formed identity migration? Every clause is what keeps it from being a way
+ * to rename a published version: the record is appended, never rewritten; it starts from exactly
+ * the identity the base publishes; its decision record names both ends; and the identity it moves
+ * to belongs to a version that is not frozen yet — the published ones keep theirs.
+ *
+ * @returns {string|null} the reason it is not, or null when it is.
+ */
+function migrationProblem(repo, headSha, baseSpec, headSpec, frozenAtBase) {
+  const before = baseSpec.identityMigrations ?? [];
+  const after = headSpec.identityMigrations ?? [];
+  if (after.length !== before.length + 1) {
+    return "identityMigrations must gain exactly one entry";
+  }
+  if (JSON.stringify(after.slice(0, -1)) !== JSON.stringify(before)) {
+    return "earlier identityMigrations entries were rewritten; the record is append-only";
+  }
+  const entry = after.at(-1);
+  if (entry.from?.baseUrl !== baseSpec.baseUrl || entry.from?.vocabIri !== baseSpec.vocabIri) {
+    return "the new identityMigrations entry's `from` is not the identity at the base ref";
+  }
+  const ver = headSpec.schemaDir?.replace(/^schemas\//, "");
+  if (!ver || frozenAtBase.has(ver)) {
+    return `schemaDir '${headSpec.schemaDir}' is frozen at the base ref; a published version keeps its identity`;
+  }
+  const adr = entry.adr;
+  if (!adr || !ADR_PATH.test(adr))
+    return `'${adr}' is not a decision record path (adr/NNNN-slug.md)`;
+  const text = repo.read(headSha, adr);
+  if (text === null) return `'${adr}' is not a file at HEAD`;
+  if (!/^-\s+\*\*Status:\*\*\s*accepted\s*$/im.test(text)) {
+    return `'${adr}' does not carry '- **Status:** accepted'`;
+  }
+  for (const value of [baseSpec.baseUrl, baseSpec.vocabIri, headSpec.baseUrl, headSpec.vocabIri]) {
+    if (!text.includes(value)) return `'${adr}' never names '${value}'`;
   }
   return null;
 }
@@ -578,9 +649,10 @@ If you believe the freeze itself is wrong, that is a governance question: open a
 (GOVERNANCE.md). Do not remove the marker to land a change.
 
 On identifiers specifically: the provisional -> canonical adoption was a one-time, pre-declared
-event and it has been spent (adr/0007). identityStatus reads \`canonical\` and there is no second
-transition. An identifier on a frozen version is frozen bytes; changing one takes a NEW spec
-version like any other breaking change.
+event and it has been spent (adr/0007). An identifier on a frozen version is frozen bytes. Moving
+the standard to another authority is an identity migration (adr/0013): a NEW version directory
+carries the new identity, spec.config.json appends one identityMigrations entry naming an accepted
+ADR, and only the versionless $ids move with it.
 `;
 
 export function main(argv) {
