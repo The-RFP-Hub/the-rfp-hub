@@ -26,7 +26,8 @@ identifiers are frozen bytes, so the move takes a new version directory.
 | `@vocab` | `https://ethrfps.app/ns/rfp#` | `https://rfpsear.ch/ns/rfp#` |
 | `specVersion` | `"1.0.0"` | `"1.0.0"` or `"1.0.1"` |
 
-Every other constraint, `$def`, example and conformance case is v1.0.0's. A document that
+Every other constraint, `$def` and conformance case is v1.0.0's. v1.0.1 ships no examples of its
+own: [v1.0.0's 30](../v1.0.0/examples) declare `1.0.0`, which v1.0.1 accepts. A document that
 validates against v1.0.0 validates against v1.0.1, and the only document valid under v1.0.1 and
 not under v1.0.0 is one declaring `specVersion: "1.0.1"`. Under the bidirectional definition in
 [`PROCESS.md`](../../PROCESS.md#what-breaking-means) that one value is a loosening; it is also

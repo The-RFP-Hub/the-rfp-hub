@@ -68,7 +68,7 @@ against the URL the document was fetched from.
 | `/schemas/v1.0.1/context.jsonld` | `application/ld+json` |
 | `/schemas/v1.0.1/{FIELDS,CROSSWALK,BENCHMARK,STATUS}.md` | `text/markdown; charset=utf-8` |
 | `/schemas/v1.0.1/FROZEN` | `text/plain; charset=utf-8` |
-| `/schemas/v1.0.1/examples/*.json` (30 documents) | `application/json` |
+| `/schemas/v1.0.0/examples/*.json` (30 documents, valid under v1.0.1 too) | `application/json` |
 | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
 | `/registries/entry.schema.json` | `application/schema+json` |
 | `/registries/{index,deadline-labels,program-models,bounty-severities,bounty-asset-types}.json` | `application/json` |

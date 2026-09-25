@@ -128,7 +128,7 @@ describe("assertOpportunity", () => {
 });
 
 describe("real example entries (@the-rfp-hub/standard)", () => {
-  const examples = loadDir(join(standard, "schemas", "v1.0.1", "examples"));
+  const examples = loadDir(join(standard, "schemas", "v1.0.0", "examples"));
 
   it("has a meaningful sample", () => {
     expect(examples.length).toBeGreaterThanOrEqual(20);
