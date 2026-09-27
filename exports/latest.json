@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.0",
   "license": "CC0-1.0",
-  "generatedAt": "2026-09-26T08:42:24.983Z",
+  "generatedAt": "2026-09-27T09:22:47.780Z",
   "count": 160,
   "opportunities": [
     {
@@ -3106,7 +3106,7 @@
       "fundingType": "hackathon",
       "title": "ETHGlobal Tokyo 2026",
       "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool published on the event's prizes page totals $45,000 across 5 sponsors; that total is recorded as the budget.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "ETHGlobal",
@@ -15442,7 +15442,7 @@
       "fundingType": "hackathon",
       "title": "HackNex Season 2",
       "description": "InnovoCon Season 2 is a national-level tech fest hosted by JIS College of Engineering, Kalyani, bringing together developers, designers, innovators, gamers, and tech enthusiasts from across the country to build, compete, and innovate. The event features HackNex Season 2, a 24-hour hackathon focused on solving real-world problems across domains like AI/ML, FinTech, HealthTech, Web3, GreenTech, EdTech, and Hardware. Alongside the hackathon, InnovoCon also includes Zenith eSports Tournament and a Poster Presentation Competition, creating a complete ecosystem of technology, creativity, and competition. With a total prize pool of INR 50,000, expert mentorship, networking opportunities, workshops, and hands-on innovation, InnovoCon Season 2 aims to inspire the next generation of creators and problem-solvers.\n\n**Which prize pool is which.** The INR 50,000 above is InnovoCon Season 2's fest-wide pool, covering the eSports tournament and the poster competition as well as this hackathon. The amounts in this record are the hackathon's own published prize table, which the listing platform states in US dollars ($289 available in prizes); no rupee breakdown of it is published.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "InnovoCon",
