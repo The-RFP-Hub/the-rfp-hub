@@ -36,7 +36,7 @@ import {
 import type { Opportunity, SubmissionResult } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 // Next's real Link only emits `onNavigate` inside an App Router. This focused component suite does
 // not mount a router, so the test double translates an anchor click into that documented event.
@@ -863,6 +863,11 @@ describe("when problems appear", () => {
 describe("drafts and dirty navigation", () => {
   it("offers an account's stored draft without silently replacing the blank form", () => {
     localStorage.clear();
+    // Drafts expire after 30 days, so "now" is pinned just after the save.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-08-26T09:00:00Z") });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     writeOpportunityDraft(7, fill({ title: "Restored title" }), {
       now: new Date("2026-08-25T20:50:37Z"),
     });

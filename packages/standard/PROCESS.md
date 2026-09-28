@@ -202,6 +202,18 @@ to be its own base bytes with those identifier strings substituted, and nothing 
 this exemption "only the identifier changed" is a statement about the file, not about its parse
 tree.
 
+### Moving a canonical identity
+
+A published version never changes identity: its frozen files keep their identifiers forever, and
+the old authority keeps serving them. Moving to a new authority takes:
+
+- a **new version directory** on the new identity (its contract may be the previous one's);
+- the versionless `$id`s (`meta/`, `registries/entry.schema.json`) re-stamped, nothing else;
+- one entry **appended** to `spec.config.json`'s `identityMigrations`, with a `from` naming the
+  previous identity and its versions, and an **accepted** ADR naming both identities.
+
+The freeze gate enforces each of these.
+
 ---
 
 ## Deprecation
