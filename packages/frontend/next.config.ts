@@ -39,7 +39,7 @@ const securityHeaders = [
 /**
  * THE FOUR PATH PREFIXES THIS SITE DOES NOT OWN.
  *
- * `adr/0007` (moved by `adr/0013`) reserves the apex — `rfpsear.ch` — for the Standard and its site, and mints every
+ * `adr/0007` reserves the apex — `rfpsear.ch` since `adr/0013` — for the Standard and its site, and mints every
  * identifier the spec publishes underneath it: schema `$id`s under `/schemas/`, the meta-schema
  * under `/meta/`, the registry entry schema under `/registries/`, and the versionless vocabulary
  * namespace under `/ns/`. Those strings are forever. This package is the spec's site, and in
@@ -100,12 +100,8 @@ export function canonicalProxyRewrites(apiUrl: string | undefined): ProxyRewrite
 }
 
 /**
- * The site's hostnames before the move to `rfpsear.ch` (`adr/0013`), and where each one went.
- *
- * Everything on them redirects permanently EXCEPT the canonical prefixes: spec v1.0.0's frozen
- * identifiers name `https://ethrfps.app/schemas/v1.0.0/…` and `https://ethrfps.app/ns/rfp#`, and an
- * identifier that redirects is an identifier that resolves somewhere else (see above). Those paths
- * fall through to the proxy rewrite and keep answering on the old host, byte for byte.
+ * Pre-move hostnames (`adr/0013`). Everything redirects except the canonical prefixes, which keep
+ * serving spec v1.0.0's frozen identifiers on the old host.
  */
 export const MOVED_HOSTS: Readonly<Record<string, string>> = Object.freeze({
   "ethrfps.app": "https://rfpsear.ch",

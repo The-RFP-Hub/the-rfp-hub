@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { identityRules } from "../packages/standard/scripts/identity.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const spec = JSON.parse(readFileSync(join(repoRoot, "packages/standard/spec.config.json"), "utf8"));
@@ -182,11 +183,7 @@ const RESERVED_HOST = /(^|\.)(invalid|test|example|localhost)$|^example\.(com|ne
 
 const CANONICAL_HOST = new URL(spec.baseUrl).host;
 
-/** Earlier identity authorities (`identityMigrations`): valid for the versions published there. */
-const FORMER = (spec.identityMigrations ?? []).map((m) => m.from);
-const isFormerSchemaUrl = (url) =>
-  FORMER.some((f) => f.versions.some((v) => url.startsWith(`${f.baseUrl}/schemas/v${v}/`)));
-const isVocab = (url, iri) => url.startsWith(iri) || `${url}#` === iri;
+const identity = identityRules(spec);
 
 // -------------------------------------------------------------------------------- scan ---
 
@@ -251,25 +248,17 @@ export function scanText(file, text) {
         !reserved &&
         /\/schemas\/v\d/.test(url) &&
         /\.jsonl?d?$/.test(new URL(url).pathname) &&
-        !url.startsWith(`${spec.baseUrl}/schemas/v`) &&
-        !isFormerSchemaUrl(url)
+        !identity.schemaUrlAllowed(url)
       ) {
         at(n, "identity", `schema URL '${url}' is not under '${spec.baseUrl}/schemas/'`);
       }
-      if (
-        !reserved &&
-        VOCAB_SHAPED.test(url) &&
-        !isVocab(url, spec.vocabIri) &&
-        !FORMER.some((f) => isVocab(url, f.vocabIri))
-      ) {
+      if (!reserved && VOCAB_SHAPED.test(url) && !identity.vocabAllowed(url)) {
         at(n, "identity", `vocab IRI '${url}', expected '${spec.vocabIri}'`);
       }
       // Every URL on the project's domains is https; a plaintext one is a broken one.
       if (
         url.startsWith("http://") &&
-        [CANONICAL_HOST, ...FORMER.map((f) => new URL(f.baseUrl).host)].some(
-          (h) => host === h || host.endsWith(`.${h}`),
-        )
+        identity.hosts.some((h) => host === h || host.endsWith(`.${h}`))
       ) {
         at(n, "identity", `plaintext URL '${url}' — every URL on ${CANONICAL_HOST} is https`);
       }

@@ -36,6 +36,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { identityRules } from "./identity.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..");
@@ -183,33 +184,18 @@ const trimUrl = (u) => u.replace(/[.,;:!?'"`]+$/, "");
 // `/ns/` IRIs the docs legitimately cite, such as w3.org's JSON-LD link relation, do not match.
 const VOCAB_SHAPED = /\/ns\/[a-z0-9/-]*rfp(?![a-z0-9-])/i;
 
-// A version published under an earlier identity keeps it forever, so its own schema URLs and the
-// vocabulary it used stay legitimate — for exactly the versions recorded against that identity.
-const formerIdentities = (spec.identityMigrations ?? []).map((m) => m.from);
-const isFormerSchemaUrl = (url) =>
-  formerIdentities.some((f) =>
-    f.versions.some((v) => url.startsWith(`${f.baseUrl}/schemas/v${v}/`)),
-  );
-const isVocabIri = (url, iri) => url.startsWith(iri) || `${url}#` === iri;
+const identity = identityRules(spec);
 
 function sweepIdentityUrls(file, text) {
   for (const raw of text.match(URL_TOKEN) ?? []) {
     const url = trimUrl(raw);
-    if (
-      /\/schemas\/v\d/.test(url) &&
-      !url.startsWith(`${spec.baseUrl}/schemas/v`) &&
-      !isFormerSchemaUrl(url)
-    ) {
+    if (/\/schemas\/v\d/.test(url) && !identity.schemaUrlAllowed(url)) {
       fail(
         "identity-sweep",
         `${relative(pkgRoot, file)} carries schema URL '${url}', which is not under '${spec.baseUrl}/schemas/'`,
       );
     }
-    if (
-      VOCAB_SHAPED.test(url) &&
-      !isVocabIri(url, spec.vocabIri) &&
-      !formerIdentities.some((f) => isVocabIri(url, f.vocabIri))
-    ) {
+    if (VOCAB_SHAPED.test(url) && !identity.vocabAllowed(url)) {
       fail(
         "identity-sweep",
         `${relative(pkgRoot, file)} carries vocab IRI '${url}', expected '${spec.vocabIri}'`,

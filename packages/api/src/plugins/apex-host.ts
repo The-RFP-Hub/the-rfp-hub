@@ -45,14 +45,10 @@ import { config } from "../config.js";
 import { canonicalDocuments, specConfig } from "../modules/shared/canonical-documents.js";
 import { specArtifactPaths } from "../modules/shared/spec-artifacts.js";
 
-/** `https://rfpsear.ch` → `rfpsear.ch`. The hostname reserved for the current spec identity. */
+/** `https://rfpsear.ch` → `rfpsear.ch`. The one hostname reserved for the spec. */
 export const APEX_HOST = new URL(specConfig.baseUrl).host;
 
-/**
- * Every apex still reserved: the current one, and each earlier identity authority a published
- * version's frozen `$id`s still name (`spec.config.json` `identityMigrations`). Moving the identity
- * does not release the old apex — its identifiers are forever, and so is the reservation.
- */
+/** Plus every earlier apex (`identityMigrations`): frozen versions' `$id`s still name it. */
 export const APEX_HOSTS: ReadonlySet<string> = new Set([
   APEX_HOST,
   ...(specConfig.identityMigrations ?? []).map((m) => new URL(m.from.baseUrl).host),

@@ -41,7 +41,7 @@ import schema from "@the-rfp-hub/standard/schemas/v1.0.1/opportunity.schema.json
 | `schemas/v1.0.1/opportunity.schema.json` | The **normative** schema. Everything else is derived from it or governed by it. |
 | `schemas/v1.0.1/context.jsonld` | JSON-LD context. Term IRIs are versionless; the context *document* is what gets versioned. |
 | `schemas/v1.0.0/examples/` | 30 curated real-world entries, valid under v1.0.0 and v1.0.1. |
-| `conformance/v1.0.1/{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
+| `conformance/v1.0.0/` + `v1.0.1/` `{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
 | `registries/` | Four open vocabularies: deadline labels, program models, and bounty reward-tier severities and asset types. The schema keeps these fields free-text; the registry fixes what each value means. `ecosystems` is open too and deliberately has no registry — see [`ARTIFACTS.md`](./ARTIFACTS.md). (`eligibility-keys` was retired on 2026-08-05 when `eligibility` became free text.) |
 | `meta/rfphub-schema.meta.json` | Metaschema constraining our schema file's shape and legalising `x-stability` / `x-since` / `x-deprecated`. |
 | `spec.config.json` | The spec's identity. Every generated version string and URL is stamped from here. |
@@ -58,7 +58,7 @@ edit a generated file by hand.
 
 See [`schemas/v1.0.1/FIELDS.md`](./schemas/v1.0.1/FIELDS.md) for the full field reference (its
 tables are generated from the schema), [`CHANGELOG.md`](./CHANGELOG.md) for the release record,
-and [`schemas/v1.0.1/BENCHMARK.md`](./schemas/v1.0.1/BENCHMARK.md) for real-data validation
+and [`schemas/v1.0.0/BENCHMARK.md`](./schemas/v1.0.0/BENCHMARK.md) for real-data validation
 results.
 
 ## How this standard is governed

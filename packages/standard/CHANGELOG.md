@@ -42,7 +42,9 @@ the move is a new version: **v1.0.1 is v1.0.0's contract under new identifiers.*
   immutable. `check-spec` accepts the previous authority's URLs only for the versions published
   under it.
 - `schemas/index.json` lists every published version, not only the current one.
-- Conformance: `pass/spec-version-1-0-0-still-accepted.json`, `fail/specversion-unknown-patch.json`.
+- Conformance: v1.0.1's suite is v1.0.0's plus `pass/spec-version-1-0-0-still-accepted.json` and
+  `fail/specversion-unknown-patch.json`. Examples, `CROSSWALK.md` and `BENCHMARK.md` are not
+  duplicated.
 
 ---
 

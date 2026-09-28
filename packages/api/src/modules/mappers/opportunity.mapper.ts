@@ -198,8 +198,7 @@ export function fromStandard(
 
   const opp: OpportunityInsertData = {
     publicId: std.id,
-    // Every accepted `specVersion` shares one contract (1.0.1 accepts 1.0.0), so a row is stored
-    // and served under the current one.
+    // 1.0.1 accepts 1.0.0 (same contract); rows are stored at the current version.
     specVersion: SPEC_VERSION,
     fundingType: std.fundingType,
     status: std.status,

@@ -204,7 +204,6 @@ describe("the Standard's published directories, mirrored at the host root", () =
       const res = await get(artifact.path);
       expect(res.headers["cache-control"], artifact.path).toBe(artifact.cacheControl);
     }
-    // The frozen version directories are what license `immutable`, and they are where the bulk lives.
     expect(specArtifacts.filter((a) => a.cacheControl === IMMUTABLE_CACHE).length).toBeGreaterThan(
       30,
     );

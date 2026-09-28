@@ -10,10 +10,7 @@ import { isLoopbackHost, request } from "./http.mjs";
 
 export { isLoopbackHost };
 
-/**
- * The project's real staging origins, from `.github/workflows/*staging*.yml` and `adr/0013`. The
- * `ethrfps.app` pair is the pre-move spelling of the same deployments (`adr/0013`).
- */
+/** The project's real staging origins, pre-move `ethrfps.app` spellings included (`adr/0013`). */
 export const STAGING_ORIGINS = [
   "https://staging.rfpsear.ch",
   "https://api-staging.rfpsear.ch",

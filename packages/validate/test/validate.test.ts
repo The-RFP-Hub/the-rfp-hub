@@ -6,7 +6,9 @@ import { assertOpportunity, humanizeErrors, validateOpportunity } from "../src/i
 
 const here = dirname(fileURLToPath(import.meta.url));
 const standard = join(here, "..", "..", "standard");
-const conformance = join(standard, "conformance", "v1.0.1");
+const conformance = join(standard, "conformance", "v1.0.0");
+/** v1.0.1 keeps v1.0.0's contract: its suite is v1.0.0's plus its own two cases. */
+const suite = [conformance, join(standard, "conformance", "v1.0.1")];
 
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
 const loadDir = (d: string) =>
@@ -21,7 +23,7 @@ const loadDir = (d: string) =>
  * exercises, so a red run here names the violated constraint directly.
  */
 describe("conformance suite — pass/", () => {
-  const cases = loadDir(join(conformance, "pass"));
+  const cases = suite.flatMap((dir) => loadDir(join(dir, "pass")));
 
   it("covers the cases the re-cut is required to accept", () => {
     const names = cases.map((c) => c.name);
@@ -41,7 +43,7 @@ describe("conformance suite — pass/", () => {
 });
 
 describe("conformance suite — fail/", () => {
-  const cases = loadDir(join(conformance, "fail"));
+  const cases = suite.flatMap((dir) => loadDir(join(dir, "fail")));
 
   it("covers the cases the re-cut is required to reject", () => {
     const names = cases.map((c) => c.name);

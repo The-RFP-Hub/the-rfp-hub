@@ -31,8 +31,8 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 - Schema: [`packages/standard/schemas/v1.0.1/opportunity.schema.json`](./packages/standard/schemas/v1.0.1/opportunity.schema.json)
 - Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.1/FIELDS.md)
 - Status of this version (maturity, known issues): [`STATUS.md`](./packages/standard/schemas/v1.0.1/STATUS.md)
-- Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.1/CROSSWALK.md)
-- Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.1/BENCHMARK.md)
+- Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.0/CROSSWALK.md)
+- Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
 - What's normative vs. informative: [`NORMATIVE.md`](./packages/standard/NORMATIVE.md)
 
 Validate anything against it:

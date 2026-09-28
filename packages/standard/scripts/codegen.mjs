@@ -75,8 +75,7 @@ schemaText = stamp(
   `$1${spec.specVersion}$2`,
   "schema description version",
 );
-// A version may also accept the versions whose data contract it repeats (1.0.1 accepts 1.0.0), so
-// `specVersion` is an enum, and it is hand-written: codegen only insists the current one is in it.
+// `specVersion` is a hand-written enum (1.0.1 also accepts 1.0.0); it must end with the current one.
 {
   const accepted = JSON.parse(schemaText).properties.specVersion.enum ?? [];
   if (accepted.at(-1) !== spec.specVersion) {
