@@ -30,8 +30,8 @@ npm run typecheck
 Point at a different API (always `https` for a hosted instance):
 
 ```bash
-RFPHUB_API_BASE=https://api.ethrfps.app npm start           # production
-RFPHUB_API_BASE=https://api-staging.ethrfps.app npm start   # staging
+RFPHUB_API_BASE=https://api.rfpsear.ch npm start           # production
+RFPHUB_API_BASE=https://api-staging.rfpsear.ch npm start   # staging
 ```
 
 ## What it exercises

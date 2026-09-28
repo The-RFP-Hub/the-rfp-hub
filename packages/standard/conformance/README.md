@@ -22,6 +22,9 @@ so the file is readable on its own. (The one exception is
 `fail/missing-required-properties.json`, which cannot carry a `description` — omitting it is
 the case.)
 
+A version's suite is its own directory **plus every earlier version's whose contract it keeps**.
+v1.0.1 keeps v1.0.0's contract, so its suite is `v1.0.0/` plus the two cases in `v1.0.1/`.
+
 ## Running the suite
 
 An implementation is conformant with respect to this suite when every document in `pass/`
@@ -35,7 +38,7 @@ The reference run lives in `packages/validate/test/validate.test.ts` (the
 ```bash
 pnpm --filter rfphub-validate test
 # or, against the published package:
-npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.0/pass
+npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.1/pass
 ```
 
 ## Scope

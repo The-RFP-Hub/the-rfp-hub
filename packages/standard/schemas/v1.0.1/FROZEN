@@ -1,0 +1,9 @@
+RFP Hub Standard v1.0.1 — FROZEN 2026-09-25.
+
+This version's NORMATIVE bytes are immutable: opportunity.schema.json, context.jsonld and
+../../conformance/v1.0.1/, on the same terms as ../v1.0.0/FROZEN. Examples, CROSSWALK.md,
+BENCHMARK.md and the rest of the conformance suite are v1.0.0's. The INFORMATIVE documents — FIELDS.md, CROSSWALK.md,
+BENCHMARK.md, STATUS.md — stay corrigible.
+
+v1.0.1 is v1.0.0's contract under the identity on rfpsear.ch; see
+adr/0013-move-spec-identity-to-rfpsear-ch.md and ./STATUS.md.

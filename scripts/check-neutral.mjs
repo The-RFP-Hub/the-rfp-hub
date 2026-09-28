@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { identityRules } from "../packages/standard/scripts/identity.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const spec = JSON.parse(readFileSync(join(repoRoot, "packages/standard/spec.config.json"), "utf8"));
@@ -182,6 +183,8 @@ const RESERVED_HOST = /(^|\.)(invalid|test|example|localhost)$|^example\.(com|ne
 
 const CANONICAL_HOST = new URL(spec.baseUrl).host;
 
+const identity = identityRules(spec);
+
 // -------------------------------------------------------------------------------- scan ---
 
 /**
@@ -245,23 +248,17 @@ export function scanText(file, text) {
         !reserved &&
         /\/schemas\/v\d/.test(url) &&
         /\.jsonl?d?$/.test(new URL(url).pathname) &&
-        !url.startsWith(`${spec.baseUrl}/schemas/v`)
+        !identity.schemaUrlAllowed(url)
       ) {
         at(n, "identity", `schema URL '${url}' is not under '${spec.baseUrl}/schemas/'`);
       }
-      if (
-        !reserved &&
-        VOCAB_SHAPED.test(url) &&
-        !url.startsWith(spec.vocabIri) &&
-        `${url}#` !== spec.vocabIri
-      ) {
+      if (!reserved && VOCAB_SHAPED.test(url) && !identity.vocabAllowed(url)) {
         at(n, "identity", `vocab IRI '${url}', expected '${spec.vocabIri}'`);
       }
-      // `.app` is HSTS-preloaded: a browser will not issue a plaintext request to it at all, so
-      // an http:// URL here is not a lenient alternative, it is a broken one.
+      // Every URL on the project's domains is https; a plaintext one is a broken one.
       if (
         url.startsWith("http://") &&
-        (host === CANONICAL_HOST || host.endsWith(`.${CANONICAL_HOST}`))
+        identity.hosts.some((h) => host === h || host.endsWith(`.${h}`))
       ) {
         at(n, "identity", `plaintext URL '${url}' — every URL on ${CANONICAL_HOST} is https`);
       }

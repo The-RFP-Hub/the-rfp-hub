@@ -177,7 +177,7 @@ run("/v1 API", () => {
     const res = await app.inject({ method: "GET", url: "/v1/opportunities/itest:hack-1" });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.specVersion).toBe("1.0.0");
+    expect(body.specVersion).toBe("1.0.1");
     expect(body.fundingType).toBe("hackathon");
     // the tag is reattached on read from the funding_type column (type_data is stored tag-free)
     expect(body.fundingDetails).toMatchObject({ fundingType: "hackathon", online: true });

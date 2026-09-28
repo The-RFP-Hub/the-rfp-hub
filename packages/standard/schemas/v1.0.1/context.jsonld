@@ -1,0 +1,115 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@vocab": "https://rfpsear.ch/ns/rfp#",
+    "schema": "https://schema.org/",
+    "daoip5": "https://www.daostar.org/schemas#",
+
+    "specVersion": { "@id": "schema:schemaVersion", "@protected": true },
+    "id": { "@id": "schema:identifier", "@protected": true },
+    "fundingType": { "@id": "schema:additionalType", "@protected": true },
+    "title": { "@id": "schema:name", "@protected": true },
+    "description": { "@id": "schema:description", "@protected": true },
+    "summary": { "@id": "schema:disambiguatingDescription", "@protected": true },
+    "status": { "@id": "daoip5:isOpen", "@protected": true },
+
+    "sponsoringOrganizations": {
+      "@id": "schema:funder",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "name": "schema:name" }
+    },
+    "operatingOrganizations": {
+      "@id": "schema:sponsor",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "name": "schema:name" }
+    },
+    "contacts": { "@id": "schema:contactPoint", "@container": "@set" },
+    "role": "schema:roleName",
+    "email": "schema:email",
+
+    "source": {
+      "@id": "provenance",
+      "@context": {
+        "id": null,
+        "createdAt": null,
+        "originalId": "schema:identifier",
+        "submittedAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" }
+      }
+    },
+    "publisher": "schema:publisher",
+    "submittedBy": "schema:contributor",
+    "ingestedVia": "ingestedVia",
+    "verifiedAgainstSource": "verifiedAgainstSource",
+    "verifiedAt": { "@id": "verifiedAt", "@type": "schema:DateTime" },
+    "snapshotUrl": { "@id": "schema:archivedAt", "@type": "@id" },
+
+    "applicationUrl": { "@id": "schema:url", "@type": "@id", "@protected": true },
+    "website": { "@id": "schema:sameAs", "@type": "@id" },
+    "logoUrl": { "@id": "schema:logo", "@type": "@id" },
+    "bannerUrl": { "@id": "schema:image", "@type": "@id" },
+    "socialLinks": {
+      "@id": "socialLinks",
+      "@container": "@set",
+      "@context": {
+        "platform": "socialPlatform",
+        "url": { "@id": "schema:url", "@type": "@id" }
+      }
+    },
+    "additionalReferences": "schema:citation",
+
+    "ecosystems": { "@id": "ecosystems", "@container": "@set" },
+    "categories": { "@id": "schema:about", "@container": "@set" },
+
+    "eligibility": { "@id": "schema:eligibleCustomerType", "@protected": true },
+    "prerequisites": "schema:competencyRequired",
+    "serviceAgreement": "serviceAgreement",
+
+    "fundingInfo": { "@id": "schema:amount", "@protected": true },
+    "currency": "schema:currency",
+    "budget": { "@id": "daoip5:totalGrantPoolSize", "@protected": true },
+    "allocated": "allocated",
+    "minAward": "minAward",
+    "maxAward": "maxAward",
+
+    "milestones": { "@id": "milestones", "@container": "@list" },
+    "amount": "schema:value",
+    "criteria": "criteria",
+
+    "deadlines": {
+      "@id": "deadlines",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "label": "schema:name" }
+    },
+    "date": { "@id": "daoip5:closeDate", "@type": "schema:DateTime" },
+
+    "opensAt": { "@id": "schema:startDate", "@type": "schema:DateTime" },
+    "postedAt": { "@id": "schema:datePublished", "@type": "schema:DateTime" },
+    "createdAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" },
+    "updatedAt": { "@id": "schema:dateModified", "@type": "schema:DateTime" },
+
+    "fundingDetails": {
+      "@id": "fundingDetails",
+      "@context": { "funding": "schema:amount" }
+    },
+
+    "tracks": { "@id": "tracks", "@container": "@set" },
+    "prizes": { "@id": "prizes", "@container": "@set" },
+    "skills": { "@id": "skills", "@container": "@set" },
+    "rewardTiers": { "@id": "rewardTiers", "@container": "@set" },
+    "stages": { "@id": "stages", "@container": "@set" },
+    "portfolio": { "@id": "portfolio", "@container": "@set" },
+
+    "fundingMechanisms": { "@id": "daoip5:grantFundingMechanism", "@container": "@set" },
+    "programModel": "programModel",
+    "bountyKind": "bountyKind",
+    "severityScheme": "severityScheme",
+    "rewardPoolStatus": "rewardPoolStatus",
+    "milestoneBased": "milestoneBased",
+    "recurring": "recurring",
+    "scope": "scope",
+    "requirements": { "@id": "requirements", "@container": "@set" }
+  }
+}

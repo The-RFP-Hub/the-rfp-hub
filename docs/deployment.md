@@ -399,7 +399,7 @@ network-free. See [`scripts/compliance/README.md`](../scripts/compliance/README.
 
 ```sh staging-write
 COMPLIANCE_API_KEY=rfph_... COMPLIANCE_ADMIN_TOKEN=... \
-  pnpm accept:writes --milestone m4 --api https://api-staging.ethrfps.app --interactive-approval
+  pnpm accept:writes --milestone m4 --api https://api-staging.rfpsear.ch --interactive-approval
 ```
 
 `accept:writes --milestone m4` is the write-acceptance counterpart, **staging only** — there is no

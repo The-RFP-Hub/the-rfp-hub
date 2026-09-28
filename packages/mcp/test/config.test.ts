@@ -26,7 +26,7 @@ function load(env: Record<string, string>, options: { stateDir?: string } = {}) 
 
 describe("the API base must be https, or loopback", () => {
   it("accepts https for any host", () => {
-    expect(canonicalOrigin("https://api.ethrfps.app")).toBe("https://api.ethrfps.app");
+    expect(canonicalOrigin("https://api.rfpsear.ch")).toBe("https://api.rfpsear.ch");
     expect(canonicalOrigin("https://staging.example.test:8443")).toBe(
       "https://staging.example.test:8443",
     );
@@ -96,16 +96,16 @@ describe("origin canonicalization keeps one approval per destination", () => {
         documentHash: document,
       });
 
-    const canonical = digest("https://api.ethrfps.app");
-    expect(digest("https://api.ethrfps.app/")).toBe(canonical);
-    expect(digest("https://api.ethrfps.app:443")).toBe(canonical);
-    expect(digest("https://API.ethrfps.APP")).toBe(canonical);
-    expect(digest("https://api.ethrfps.app:444")).not.toBe(canonical);
+    const canonical = digest("https://api.rfpsear.ch");
+    expect(digest("https://api.rfpsear.ch/")).toBe(canonical);
+    expect(digest("https://api.rfpsear.ch:443")).toBe(canonical);
+    expect(digest("https://API.rfpsear.CH")).toBe(canonical);
+    expect(digest("https://api.rfpsear.ch:444")).not.toBe(canonical);
   });
 
   it("normalizes apiBase to the same origin the approval binds", () => {
-    const config = load({ RFPHUB_API_BASE: "https://API.ethrfps.app:443/" });
-    expect(config.apiBase).toBe("https://api.ethrfps.app");
+    const config = load({ RFPHUB_API_BASE: "https://API.rfpsear.ch:443/" });
+    expect(config.apiBase).toBe("https://api.rfpsear.ch");
     expect(config.apiBase).toBe(config.apiOrigin);
   });
 });

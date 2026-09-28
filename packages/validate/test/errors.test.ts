@@ -107,7 +107,7 @@ describe("humanizeErrors", () => {
     };
     const lines = humanizeErrors(validateOpportunity(doc).errors, doc);
     expect(lines.some((l) => l.startsWith("/status") && l.includes("upcoming, open"))).toBe(true);
-    expect(lines.some((l) => l.startsWith("/specVersion") && l.includes('"1.0.0"'))).toBe(true);
+    expect(lines.some((l) => l.startsWith("/specVersion") && l.includes("1.0.1"))).toBe(true);
   });
 });
 

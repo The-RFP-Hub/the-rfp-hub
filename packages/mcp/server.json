@@ -20,7 +20,7 @@
       "environmentVariables": [
         {
           "name": "RFPHUB_API_BASE",
-          "description": "Base URL of the RFP Hub API. Defaults to https://api.ethrfps.app. The origin of this URL is bound into every write approval.",
+          "description": "Base URL of the RFP Hub API. Defaults to https://api.rfpsear.ch. The origin of this URL is bound into every write approval.",
           "isRequired": false,
           "isSecret": false
         },

@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Opportunity } from "@the-rfp-hub/standard";
+import { type Opportunity, SPEC_VERSION } from "@the-rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { describe, expect, it } from "vitest";
 import type { OpportunityRow } from "../../src/db/schema.js";
@@ -73,7 +73,8 @@ describe("opportunity.mapper round-trip (Standard → row → Standard)", () => 
       const { opp: insert } = fromStandard(opp);
       const rebuilt = toStandard(rowFromInsert(insert));
       expect(validateOpportunity(rebuilt).valid).toBe(true);
-      expect(normalize(rebuilt)).toEqual(normalize(opp));
+      // The examples declare 1.0.0; every row is stored and served at the current version.
+      expect(normalize(rebuilt)).toEqual(normalize({ ...opp, specVersion: SPEC_VERSION }));
     });
   }
 });
@@ -306,8 +307,8 @@ describe("ingest normalization", () => {
   it("accepts and STRIPS the self-identification properties", () => {
     const selfIdentifying = {
       ...BASE,
-      $schema: "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
-      "@context": "https://ethrfps.app/schemas/v1.0.0/context.jsonld",
+      $schema: "https://rfpsear.ch/schemas/v1.0.1/opportunity.schema.json",
+      "@context": "https://rfpsear.ch/schemas/v1.0.1/context.jsonld",
       "@type": "schema:Grant",
     } as Opportunity;
     const rebuilt = toStandard(rowFromInsert(fromStandard(selfIdentifying).opp)) as Record<

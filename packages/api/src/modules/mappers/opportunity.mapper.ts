@@ -10,7 +10,13 @@
  * verbatim on the opportunity row as jsonb, so the read mappers no longer take an organization row.
  * `operatingOrganizations` is the required, primary array — entry [0] is the display org.
  */
-import type { Deadline, Funding, Milestone, Opportunity } from "@the-rfp-hub/standard";
+import {
+  type Deadline,
+  type Funding,
+  type Milestone,
+  type Opportunity,
+  SPEC_VERSION,
+} from "@the-rfp-hub/standard";
 import type { OpportunityInsert, OpportunityRow, OrganizationInsert } from "../../db/schema.js";
 import { nextDeadlineAt } from "../shared/deadlines.js";
 
@@ -192,7 +198,8 @@ export function fromStandard(
 
   const opp: OpportunityInsertData = {
     publicId: std.id,
-    specVersion: std.specVersion,
+    // 1.0.1 accepts 1.0.0 (same contract); rows are stored at the current version.
+    specVersion: SPEC_VERSION,
     fundingType: std.fundingType,
     status: std.status,
     title: std.title,

@@ -11,8 +11,8 @@ const parse = (...argv) => parseArgs(argv);
 describe("targets", () => {
   it("defaults to production, because reading production is the point", () => {
     const opts = parse();
-    expect(opts.api).toBe("https://api.ethrfps.app");
-    expect(opts.site).toBe("https://ethrfps.app");
+    expect(opts.api).toBe("https://api.rfpsear.ch");
+    expect(opts.site).toBe("https://rfpsear.ch");
   });
 
   it("--base-url is an accepted alias for --api: it is the name the nightly job spells", () => {

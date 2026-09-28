@@ -217,7 +217,7 @@ describe("API-sourced export", () => {
     const jsonText = await readFile(path(archive(names, "json")), "utf8");
     const json = JSON.parse(jsonText);
     expect(json.license).toBe("CC0-1.0");
-    expect(json.specVersion).toBe("1.0.0");
+    expect(json.specVersion).toBe("1.0.1");
     expect(json.count).toBe(5);
     // joined AND ordered: all five records, sorted by id, not in the order the pages arrived
     expect(json.opportunities.map((o: Opportunity) => o.id)).toEqual([

@@ -74,7 +74,7 @@ env:
   APP_BASE_URL: ${{ vars.STAGING_APP_BASE_URL }}
   ECR_REPOSITORY_MAIN: staging-rfp-hub
   ECS_CONTAINER: rfp-hub-staging
-  API_BASE_URL: https://api-staging.ethrfps.app # canonical (adr/0007), not account-specific
+  API_BASE_URL: https://api-staging.rfpsear.ch # canonical (adr/0013), not account-specific
 
 jobs:
   build_image:

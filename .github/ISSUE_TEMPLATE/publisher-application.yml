@@ -111,7 +111,7 @@ body:
     attributes:
       label: Do entries for these programmes already exist on the Hub?
       description: >-
-        Search https://api.ethrfps.app/v1/opportunities and paste any ids you find. Existing entries
+        Search https://api.rfpsear.ch/v1/opportunities and paste any ids you find. Existing entries
         are **claimed**, not duplicated — the id, the history and anything already pointing at it
         survive, and publisher ownership transfers to you.
       placeholder: "some-namespace:1459 — our Builder Grants round"

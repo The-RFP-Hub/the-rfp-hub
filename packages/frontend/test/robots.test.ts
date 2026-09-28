@@ -36,8 +36,8 @@ afterEach(() => {
 
 describe("robots.txt", () => {
   it("allows the public surface on the canonical origin, but disallows the workbench prefixes", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({
@@ -48,16 +48,16 @@ describe("robots.txt", () => {
   });
 
   it("points at this deployment's own sitemap on the canonical origin", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const file = await robots();
-    expect(file.sitemap).toBe("https://ethrfps.app/sitemap.xml");
+    expect(file.sitemap).toBe("https://rfpsear.ch/sitemap.xml");
   });
 
   it("disallows everything when NEXT_PUBLIC_SITE_ORIGIN is unset — the normal state off production", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
-    await mockHost("ethrfps.app");
+    await mockHost("rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
@@ -65,8 +65,8 @@ describe("robots.txt", () => {
   });
 
   it("disallows everything on a staging alias, even though the variable is set for production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("staging.ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("staging.rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
@@ -75,8 +75,8 @@ describe("robots.txt", () => {
 
   it("disallows everything when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
     // The whole fail-closed chain, not just the helper that parses the value.
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
@@ -84,8 +84,8 @@ describe("robots.txt", () => {
   });
 
   it("allows the public surface behind a proxy that rewrote Host", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
-    await mockHost("frontend.internal:8080", "ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("frontend.internal:8080", "rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({
@@ -96,7 +96,7 @@ describe("robots.txt", () => {
   });
 
   it("disallows everything on an unrecognized Vercel preview host", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
     await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
 
     const file = await robots();
@@ -106,8 +106,8 @@ describe("robots.txt", () => {
   it("allows the public surface on Vercel production with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
-    await mockHost("ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
+    await mockHost("rfpsear.ch");
 
     const file = await robots();
     expect(file.rules).toEqual({
@@ -115,13 +115,13 @@ describe("robots.txt", () => {
       allow: "/",
       disallow: [...NOINDEX_ROUTE_PREFIXES],
     });
-    expect(file.sitemap).toBe("https://ethrfps.app/sitemap.xml");
+    expect(file.sitemap).toBe("https://rfpsear.ch/sitemap.xml");
   });
 
   it("disallows everything on a Vercel preview with nothing declared", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
     vi.stubEnv("VERCEL_ENV", "preview");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
 
     const file = await robots();
@@ -140,7 +140,7 @@ describe("robots.txt", () => {
   it("follows the explicit variable, not Vercel's production domain, when both are present", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
     vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "rfpsear.ch");
     await mockHost("mirror.example.org");
 
     const file = await robots();

@@ -30,6 +30,7 @@
  * `/v1/opportunities/{id}` URLs under whatever `PUBLIC_BASE_URL` names, and the apex is the
  * SPECIFICATION's origin, which is not where records live.
  */
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import { isPublishableUrl } from "../shared/url-policy.js";
 import { type XmlElement, el, renderXmlDocument, text } from "../shared/xml.js";
 import type { OpportunitySummary } from "./opportunity.mapper.js";
@@ -70,8 +71,7 @@ export interface FeedDocumentOptions extends FeedBaseOptions {
 const COLLECTION_PATH = "/v1/opportunities";
 
 export const FEED_TITLE = "RFP Hub — funding opportunities";
-export const FEED_DESCRIPTION =
-  "The most recently published Ethereum-ecosystem funding opportunities from the RFP Hub, newest first. Each entry is an RFP Hub Standard v1.0.0 record; the full object is one request away at its link.";
+export const FEED_DESCRIPTION = `The most recently published Ethereum-ecosystem funding opportunities from the RFP Hub, newest first. Each entry is an RFP Hub Standard v${SPEC_VERSION} record; the full object is one request away at its link.`;
 const GENERATOR = "RFP Hub API";
 
 /** Is `PUBLIC_BASE_URL` an absolute origin, rather than the relative `/` default? */
