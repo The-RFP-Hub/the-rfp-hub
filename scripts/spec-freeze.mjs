@@ -53,12 +53,8 @@
 // transition cannot recur, and canonical -> provisional is rejected outright so it cannot be
 // re-armed.
 //
-//   THE MIGRATION. A canonical identity can later move to another canonical authority, but never
-//   by re-stamping a published version: the frozen directories keep the identity they shipped
-//   with, forever. What may move is the versionless artifacts' `$id` (byte-checked like the
-//   adoption) and spec.config.json's identity fields, and only when the change appends one
-//   `identityMigrations` entry whose `from` is the base's identity, whose ADR is accepted and names
-//   both identities, and whose `schemaDir` is a version not yet frozen. See adr/0013.
+//   THE MIGRATION. A canonical identity may move to a new version directory, never by re-stamping
+//   a frozen one; see `migrationProblem()` and PROCESS.md "Moving a canonical identity".
 //
 // What this cannot defend against is repo configuration: it must be a required status check, main
 // must require PRs, and .github/ plus this file should be CODEOWNERS-protected — none of which is
@@ -517,14 +513,7 @@ function adrProblem(repo, headSha, headSpec) {
   return null;
 }
 
-/**
- * Is this change a well-formed identity migration? Every clause is what keeps it from being a way
- * to rename a published version: the record is appended, never rewritten; it starts from exactly
- * the identity the base publishes; its decision record names both ends; and the identity it moves
- * to belongs to a version that is not frozen yet — the published ones keep theirs.
- *
- * @returns {string|null} the reason it is not, or null when it is.
- */
+/** @returns {string|null} why this is not a well-formed identity migration, or null. */
 function migrationProblem(repo, headSha, baseSpec, headSpec, frozenAtBase) {
   const before = baseSpec.identityMigrations ?? [];
   const after = headSpec.identityMigrations ?? [];
