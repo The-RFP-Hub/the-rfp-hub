@@ -1,6 +1,5 @@
 "use client";
 
-import { BrandMark } from "@/components/BrandMark";
 import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
 import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
@@ -344,11 +343,7 @@ export function Chrome({ children }: { children: ReactNode }) {
         data-authenticated={session.authenticated ? "true" : "false"}
       >
         <GuardedLink href="/" className="brand">
-          <BrandMark className="brand-mark" />
-          <span className="brand-text">
-            RFP Hub
-            <span className="brand-tagline">an open index of Ethereum funding</span>
-          </span>
+          <span className="brand-text">RFP Hub</span>
         </GuardedLink>
 
         <nav className="shell-nav" aria-label="Sections">
@@ -360,10 +355,10 @@ export function Chrome({ children }: { children: ReactNode }) {
             showIcons={false}
           />
 
-          {session.error ? (
-            <span className="muted">sign-in unavailable</span>
-          ) : !session.ready ? (
-            <span className="muted">restoring session…</span>
+          {/* When the session check fails, the slot stays empty: browsing needs no account, and a
+              note in the header only alarms the readers who never meant to sign in. */}
+          {session.error ? null : !session.ready ? (
+            <span className="muted shell-session-note">restoring session…</span>
           ) : session.authenticated ? (
             <>
               {notifications ? (
@@ -407,6 +402,13 @@ export function Chrome({ children }: { children: ReactNode }) {
               <IconLabel icon={ArrowRightOnRectangleIcon}>Log in</IconLabel>
             </button>
           )}
+
+          <GuardedLink
+            href={session.authenticated ? "/listings/new" : `${HOW_IT_WORKS}#publish`}
+            className="shell-submit"
+          >
+            Submit a program →
+          </GuardedLink>
 
           {session.authenticated ? (
             <div className="shell-account-panel" id="account-navigation" hidden={!accountMenuOpen}>
@@ -481,7 +483,6 @@ export function Chrome({ children }: { children: ReactNode }) {
       <footer className="shell-footer">
         <div className="shell-footer-links">
           <GuardedLink href="/" className="shell-footer-brand" aria-label="RFP Hub home">
-            <BrandMark className="footer-mark" />
             RFP Hub
           </GuardedLink>
           <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>

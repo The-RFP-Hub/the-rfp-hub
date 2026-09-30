@@ -39,7 +39,10 @@
   --line-faint: #e8e6e1;
   --line: #d6d3ce;
   --panel: #f4f3f0;
-  --ink-soft: #57534e;
+  /* The landing's hero band, behind the header, headline and figures. */
+  --hero: #f4f4eb;
+  /* Secondary ink: a neutral mid-grey. 3.95:1 on paper — below AA for small text, by choice. */
+  --ink-soft: #7e7e7e;
   --ink-faint: #a8a29e;
 
   /*
@@ -88,8 +91,9 @@
   --text-h1: 1.95rem;
   --text-metric: 1.6rem;
   /* The landing and the facts strip: display numbers, and the mono state chip on an org card. */
-  --text-hero: clamp(2rem, 3.6vw, 2.9rem);
+  --text-hero: clamp(2.4rem, 5vw, 3.9rem);
   --text-tally: clamp(1.9rem, 3.2vw, 2.6rem);
+  --text-hero-sub: clamp(1.1rem, 1.6vw, 1.3rem);
   --text-tile: 2.4rem;
   --text-state: 0.62rem;
 
@@ -157,14 +161,19 @@ h3 {
  * a printout and a colourblind reader, and adding colour is not a reason to spend it. The hover
  * thickens the rule rather than changing the hue.
  */
+/*
+ * Links carry the accent ink at rest and gain their underline on hover. `:where()` keeps the hover
+ * rule at a single class's weight, so a block link (a card, a tile, a nav item) that sets
+ * `text-decoration: none` keeps it on hover too instead of underlining every line inside it.
+ */
 a {
   color: var(--accent-ink);
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 2px;
 }
 
-a:hover {
-  text-decoration-thickness: 2px;
+:where(a):hover {
+  text-decoration: underline;
 }
 
 /*
@@ -279,6 +288,7 @@ button:disabled {
  * decorated shape.
  */
 .button-primary {
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--paper);
   border-color: var(--accent);
@@ -459,16 +469,11 @@ caption {
   gap: var(--space-6);
   min-block-size: 5rem;
   padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--ink);
 }
 
 .shell-header[data-authenticated="true"] {
   min-block-size: 4.25rem;
   padding: var(--space-3) 0;
-}
-
-.shell-header[data-authenticated="true"] .brand-tagline {
-  display: none;
 }
 
 /*
@@ -499,27 +504,11 @@ caption {
  * wordmark, not the tagline, which is why the lockup is centred on the text column rather than the
  * whole two-line block.
  */
-.brand-mark {
-  flex: none;
-  width: 1.7em;
-  height: 1.7em;
-  color: var(--ink);
-}
-
 /* Seven characters, and never two lines: a wrapped wordmark turns the header into two rows. */
 .brand-text {
   display: flex;
   flex-direction: column;
   white-space: nowrap;
-}
-
-.brand-tagline {
-  display: block;
-  font-family: var(--font-body), sans-serif;
-  font-size: var(--text-xs);
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--ink-soft);
 }
 
 /*
@@ -548,12 +537,25 @@ caption {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-4);
+  gap: var(--space-6);
   min-width: 0;
 }
 
 .shell-nav-primary li {
   min-width: 0;
+}
+
+/* The one action in the header: a bold link in the primary-action olive, like `.button-primary`. */
+.shell-submit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--control-touch);
+  margin-left: var(--space-2);
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /*
@@ -818,13 +820,6 @@ caption {
   font-weight: 800;
   color: var(--ink);
   text-decoration: none;
-}
-
-.footer-mark {
-  flex: none;
-  width: 1.2em;
-  height: 1.2em;
-  color: var(--ink);
 }
 
 .shell-footer-note {
@@ -1767,6 +1762,21 @@ ul.plain {
   color: var(--ink);
 }
 
+.result-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* The global `input { width: 100% }` would stretch the box and push its label onto three lines. */
+.result-toggle input {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+
 /* The directory's card view: the same opportunity-card used on the landing page, in a grid. Three
  * columns at desktop, narrowing with the viewport; see the 56rem/40rem media queries below. */
 .directory-cards {
@@ -2079,7 +2089,6 @@ pre.code-block {
     padding: var(--space-3) 0;
   }
 
-  .shell-header[data-authenticated="true"] .brand-tagline,
   .shell-header[data-authenticated="true"] .shell-nav-primary {
     display: none;
   }
@@ -2099,10 +2108,28 @@ pre.code-block {
     gap: 0 var(--space-3);
   }
 
-  .shell-header[data-authenticated="false"] .shell-login {
+  /* Compact: the section links keep their row and the primary action takes a full row under it. */
+  .shell-nav {
+    flex-wrap: wrap;
+  }
+
+  .shell-submit {
+    order: 1;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  /* The session note stands in for Log in while it cannot be offered, so it takes the same slot. */
+  .shell-header[data-authenticated="false"] .shell-login,
+  .shell-header[data-authenticated="false"] .shell-session-note {
     position: absolute;
     inset-block-start: var(--space-3);
     inset-inline-end: 0;
+  }
+
+  .shell-session-note {
+    white-space: nowrap;
+    font-size: var(--text-sm);
   }
 
   .shell-nav {
@@ -2369,7 +2396,6 @@ pre.code-block {
  * did not fit — wordmark, bell and "Menu" asked ~300px of the 288 available, wrapping "RFP Hub"
  * onto a second row — so the wordmark steps down a size and two gaps tighten to buy that back. */
 @media (max-width: 22rem) {
-  .brand-tagline,
   .shell-menu-user {
     display: none;
   }
@@ -2395,160 +2421,257 @@ pre.code-block {
  * the largest awards. Nothing here introduces a colour the rest of the sheet does not already own:
  * the one olive number on the tally is `--accent-ink`, the same step a textual link uses.
  */
+/* Centred: headline, line and search on one axis. */
+/*
+ * The hero is framed by equal space: 96px from the navigation to the headline (the main area's
+ * 32px, this margin and this padding) and 96px from the pills to the figures (this padding plus the
+ * tally's margin).
+ */
 .landing-hero {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  margin-top: var(--space-8);
+  padding: var(--space-8) 0;
+}
+
+.landing-hero-copy {
+  position: relative;
+  width: 100%;
+  max-width: 48rem;
+}
+
+/*
+ * The arcs and marks behind the hero, filling the hero box exactly and spilling into the page
+ * gutters. The SVG stretches with the box and the marks are placed in percent of the same box, so
+ * each mark stays on the arc it was computed from; the arcs fade out at the top and bottom edges.
+ */
+.landing-decor {
+  position: absolute;
+  inset: 0 calc(var(--space-8) * -1);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-decor svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+.landing-decor circle {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.landing-mark-tile {
+  position: absolute;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: var(--space-12);
-  align-items: start;
-  padding: var(--space-8) 0 var(--space-6);
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 1px solid var(--line-faint);
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 2px rgb(26 25 23 / 0.04), 0 4px 12px rgb(26 25 23 / 0.05);
 }
 
-.landing-position {
-  font-family: var(--font-mono), monospace;
-  font-size: var(--text-sm);
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
-  margin: 0 0 var(--space-2);
+.landing-mark-logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--mark) center / contain no-repeat;
 }
 
-.landing-position a {
-  color: inherit;
+/* Three a side, on the 450 and 570 arcs, offset so the two sides do not mirror. */
+.landing-mark-tile[data-mark="ethereum"] {
+  --mark: url("/hero-logos/ethereum.svg");
+  left: 16.4%;
+  top: 11.7%;
+}
+
+.landing-mark-tile[data-mark="uniswap"] {
+  --mark: url("/hero-logos/uniswap.svg");
+  left: 4%;
+  top: 52.3%;
+}
+
+.landing-mark-tile[data-mark="chainlink"] {
+  --mark: url("/hero-logos/chainlink.svg");
+  left: 15.9%;
+  top: 85%;
+}
+
+.landing-mark-tile[data-mark="morpho"] {
+  --mark: url("/hero-logos/morpho.svg");
+  left: 84.1%;
+  top: 15%;
+}
+
+.landing-mark-tile[data-mark="optimism"] {
+  --mark: url("/hero-logos/optimism.svg");
+  left: 95.7%;
+  top: 63.6%;
+}
+
+.landing-mark-tile[data-mark="ens"] {
+  --mark: url("/hero-logos/ens.svg");
+  left: 83.6%;
+  top: 88.4%;
+}
+
+.landing-hero .landing-sub {
+  margin-inline: auto;
 }
 
 .landing-hero h1 {
   font-size: var(--text-hero);
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
   text-wrap: balance;
 }
 
-.landing-paths {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
+.landing-sub {
+  max-width: 36rem;
+  font-size: var(--text-hero-sub);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin: var(--space-4) 0 0;
 }
 
-.landing-path {
+/* One field with the action inset: icon, input and the primary button share a single border. */
+.landing-search {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4);
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 40rem;
+  margin: var(--space-8) auto 0;
+  text-align: left;
+  padding: var(--space-1);
+  padding-left: var(--space-4);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  text-decoration: none;
-  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(26 25 23 / 0.04);
 }
 
-.landing-path:hover,
-.landing-path:focus-visible {
+.landing-search:focus-within {
   border-color: var(--ink);
 }
 
-.landing-path-publish {
-  background: var(--panel);
-}
-
-.landing-path-title {
-  font-family: var(--font-display), sans-serif;
-  font-weight: 700;
-  font-size: var(--text-h3);
-  letter-spacing: -0.015em;
-}
-
-.landing-path-note {
-  font-size: var(--text-sm);
+.landing-search-icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
   color: var(--ink-soft);
-}
-
-.landing-search {
-  display: flex;
-  margin-top: var(--space-6);
-  max-width: 40rem;
 }
 
 .landing-search input {
   flex: 1;
   min-width: 0;
-  border-radius: var(--radius) 0 0 var(--radius);
+  border: 0;
+  background: transparent;
 }
 
-.landing-search button {
-  border-radius: 0 var(--radius) var(--radius) 0;
-  border-left: 0;
+.landing-search input:focus {
+  outline: none;
 }
 
-.landing-data {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+/* Under the search and flush with its left edge; slimmer than the directory's filter pills. */
+.landing-hero .type-pills {
+  max-width: 40rem;
+  margin: var(--space-3) auto 0;
+  justify-content: flex-start;
+}
+
+.landing-hero .type-pills button {
+  border-color: #eaeaea;
+  min-block-size: 2rem;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
   font-size: var(--text-sm);
 }
 
-.landing-data a {
-  font-family: var(--font-mono), monospace;
-  font-size: var(--text-xs);
-  text-decoration: none;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0 var(--space-2);
+/* Below this width the side marks would crowd the search column, so the decoration steps out. */
+@media (max-width: 72rem) {
+  .landing-decor {
+    display: none;
+  }
 }
 
+.landing-search .button-primary {
+  flex: none;
+  padding-inline: var(--space-6);
+}
+
+/* The index at a glance: four figures on the page itself, no panel, hairlines between. */
 .landing-tally {
-  margin: 0;
-  border-top: 2px solid var(--ink);
-}
-
-.landing-tally-row {
   display: grid;
-  /*
-   * A FIXED FIRST COLUMN, SIZED FROM THE NUMBER'S OWN TYPE. `ch` resolved against the row's body
-   * font, not the display face the figure is set in, so a wide value like $144M outgrew the track
-   * and pushed its own caption right while 92 and 6 stayed put. Four captions that start at four
-   * different x positions read as four unrelated facts.
-   */
-  grid-template-columns: calc(var(--text-tally) * 3.5) 1fr;
-  gap: 0 var(--space-4);
-  align-items: baseline;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: calc(var(--space-8) * 2) 0 0;
 }
 
-.landing-tally-row dt {
-  display: contents;
+/* Centred, to sit on the hero's axis. */
+.landing-tally-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-6);
+  text-align: center;
+}
+
+/* Hairline dividers that fade out at both ends, like the arcs above them. */
+.landing-tally-item + .landing-tally-item {
+  background: linear-gradient(to bottom, transparent, var(--line) 30%, var(--line) 70%, transparent)
+    left / 1px 100% no-repeat;
 }
 
 .landing-tally-value {
+  order: -1;
+  margin: 0;
   font-family: var(--font-display), sans-serif;
   font-weight: 800;
-  font-size: var(--text-tally);
-  line-height: 1;
+  font-size: var(--text-tile);
+  line-height: 1.1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  text-align: left;
-  grid-row: span 2;
 }
 
 .landing-tally-unit {
-  font-weight: 700;
-}
-
-.landing-tally-why {
-  margin: 0;
-  grid-column: 2;
   font-size: var(--text-sm);
   color: var(--ink-soft);
 }
 
-.landing-tally-row.is-hot .landing-tally-unit {
-  font-weight: 800;
+/*
+ * On the landing the page itself takes the hero colour, so the header, headline and figures share
+ * one band with no seam; the white body below and the footer frame it.
+ */
+body:has(.landing) {
+  background: var(--hero);
 }
 
+/*
+ * Everything under the hero sits on white, edge to edge. The shadow paints the bleed and the clip
+ * trims it to the sides, so the band reaches the viewport edges without widening the page.
+ */
+.landing-body {
+  margin-top: calc(var(--space-8) * 2);
+  padding-bottom: calc(var(--space-8) * 2);
+  background: #fff;
+  box-shadow: 0 0 0 100vmax #fff;
+  clip-path: inset(0 -100vmax);
+}
+
+/* 64px between the landing's sections, the same distance the tally keeps from its neighbours. */
 .landing-block {
-  padding: var(--space-8) 0 0;
+  padding: calc(var(--space-8) * 2) 0 0;
 }
 
 .landing-block-head {
@@ -2603,7 +2726,7 @@ pre.code-block {
   flex: 1;
   padding: var(--space-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) * 3);
   text-decoration: none;
   color: var(--ink);
   min-width: 0;
@@ -2614,6 +2737,11 @@ pre.code-block {
   border-color: var(--ink);
 }
 
+/* The card's hover is its border plus the title's underline, never every line of text in it. */
+.opportunity-card:hover .opportunity-card-title {
+  text-decoration: underline;
+}
+
 .opportunity-card-top {
   display: flex;
   justify-content: space-between;
@@ -2622,7 +2750,7 @@ pre.code-block {
 }
 
 .opportunity-card-deadline {
-  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   color: var(--ink-soft);
   text-align: right;
@@ -2695,64 +2823,58 @@ pre.code-block {
 }
 
 /*
- * THE TYPE CHIP IS INK, LIKE EVERY OTHER BADGE. Type is a category, not a state, and the temptation
- * to give the four types four hues was real; the sheet's rule that no state depends on hue and no
- * badge carries the accent wins, and the type is told by its word. Mono and uppercase are what make
- * it scan as a label rather than as a second title.
+ * THE TYPE CHIP CARRIES A HUE PER TYPE, so a strip of cards sorts at a glance. The word is still
+ * the label — every chip says its type in text — so the colour is a second channel, never the only
+ * one. Six earthy hues (clay, ochre, plum, slate-teal, peat, graphite), none of them the olive
+ * accent, each text/fill pair at least 6:1 (WCAG AA).
  */
 .type-chip {
-  font-family: var(--font-mono), monospace;
+  --chip-ink: var(--ink-soft);
+  --chip-fill: transparent;
+  --chip-line: var(--ink-soft);
+  /* Sentence case: the label as written, so only an acronym (RFP) reads in capitals. */
   font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   padding: 0 var(--space-2);
-  border: 1px solid var(--ink-soft);
+  border: 1px solid var(--chip-line);
   border-radius: 4px;
-  color: var(--ink-soft);
+  color: var(--chip-ink);
+  background: var(--chip-fill);
   white-space: nowrap;
 }
 
-.landing-tiles {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-3);
+/* A typed chip is a soft fill only: its border takes the fill colour, so no outline reads. */
+.type-chip[data-type] {
+  --chip-line: var(--chip-fill);
 }
 
-.landing-tile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  text-decoration: none;
-  color: var(--ink);
-  height: 100%;
+.type-chip[data-type="grant"] {
+  --chip-ink: #8a3b22;
+  --chip-fill: #f6e6de;
 }
 
-.landing-tile:hover,
-.landing-tile:focus-visible {
-  border-color: var(--ink);
+.type-chip[data-type="hackathon"] {
+  --chip-ink: #6b5311;
+  --chip-fill: #f3ecd3;
 }
 
-.landing-tile-count {
-  font-family: var(--font-display), sans-serif;
-  font-weight: 800;
-  font-size: var(--text-tile);
-  letter-spacing: -0.03em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
+.type-chip[data-type="bounty"] {
+  --chip-ink: #6e2a4f;
+  --chip-fill: #f3e3ec;
 }
 
-.landing-tile-label {
-  font-weight: 700;
+.type-chip[data-type="rfp"] {
+  --chip-ink: #264a58;
+  --chip-fill: #e1ebee;
 }
 
-.landing-tile-note {
-  display: block;
-  font-weight: 400;
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
+.type-chip[data-type="accelerator"] {
+  --chip-ink: #5a4232;
+  --chip-fill: #ede5dc;
+}
+
+.type-chip[data-type="vc_fund"] {
+  --chip-ink: #3d3d3a;
+  --chip-fill: #e9e8e4;
 }
 
 /* -------------------------------------------------------- opportunity --- */
@@ -2889,7 +3011,6 @@ pre.code-block {
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
-  font-family: var(--font-mono), monospace;
   font-size: var(--text-state);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2933,7 +3054,6 @@ pre.code-block {
 }
 
 .act-eyebrow {
-  font-family: var(--font-mono), monospace;
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2997,14 +3117,19 @@ pre.code-block {
     padding-top: var(--space-6);
   }
 
+  .landing-tally {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--space-6);
+  }
+
+  .landing-tally-item:nth-child(odd) {
+    background: none;
+  }
+
   .landing-featured,
   .facts-strip,
   .acts {
     grid-template-columns: 1fr;
-  }
-
-  .landing-tiles {
-    grid-template-columns: 1fr 1fr;
   }
 
   .directory-cards {
@@ -3020,11 +3145,6 @@ pre.code-block {
 }
 
 @media (max-width: 40rem) {
-  .landing-paths,
-  .landing-tiles {
-    grid-template-columns: 1fr;
-  }
-
   .directory-cards {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3068,8 +3188,17 @@ pre.code-block {
   padding-inline: var(--space-4);
 }
 
+/* The same silhouette the Type column uses, so a pill and its rows read as one thing. */
+.type-pill-icon {
+  color: var(--ink-soft);
+}
+
+.type-pills button[aria-pressed="true"] .type-pill-icon {
+  color: inherit;
+}
+
 .type-pill-count {
-  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   color: var(--ink-soft);
 }
@@ -3103,7 +3232,7 @@ pre.code-block {
 }
 
 .directory-table .directory-deadline {
-  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
   white-space: nowrap;
 }
@@ -3158,7 +3287,11 @@ pre.code-block {
 
 .crumb {
   font-size: var(--text-sm);
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-8);
+}
+
+.opportunity-status {
+  margin: 0 0 var(--space-2);
 }
 
 .opportunity-head {
@@ -3214,7 +3347,6 @@ pre.code-block {
 /* --------------------------------------------------- how it works, folded --- */
 
 .eyebrow {
-  font-family: var(--font-mono), monospace;
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;

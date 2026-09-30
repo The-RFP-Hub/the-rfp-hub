@@ -195,7 +195,7 @@ test.describe("M3-7 the public directory", () => {
       // …and the control is holding the value rather than sitting blank over a narrowed list.
       await expect(page.getByLabel("Status", { exact: true })).toHaveValue("open");
 
-      await page.getByRole("link", { name: "Show closed and upcoming too" }).click();
+      await page.getByRole("checkbox", { name: "Include closed & upcoming" }).check();
       await expect(
         page.getByRole("link", { name: `Closed probe ${token}` }),
         "and one click puts the closed round back",

@@ -1,5 +1,15 @@
 "use client";
 
+import { OpportunityCard } from "@/components/OpportunityCard";
+import { TypePills } from "@/components/TypePills";
+import { ResourceView } from "@/components/states";
+import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
+import { formatCount } from "@/lib/format";
+import { type LandingSummary, compactUsd, summarizeLanding } from "@/lib/landing";
+import { DIRECTORY } from "@/lib/links";
+import { loadOpenSet } from "@/lib/open-set";
+import { useResource } from "@/lib/resource";
+import { useApi } from "@/lib/session";
 /**
  * THE FRONT PAGE IS A PITCH FOR THE INDEX, and the index itself lives at `/directory`.
  *
@@ -13,30 +23,10 @@
  * arithmetic and a unit test pins it. The open set is small (about a hundred) so it fits in one or
  * two pages of the list route; the loop below stops at a hard cap either way.
  */
-import { OpportunityCard } from "@/components/OpportunityCard";
-import { ResourceView } from "@/components/states";
-import { FUNDED_BY } from "@/lib/credits";
-import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
-import { formatCount } from "@/lib/format";
-import { type LandingSummary, TILE_TYPES, compactUsd, summarizeLanding } from "@/lib/landing";
-import { DIRECTORY, HOW_IT_WORKS } from "@/lib/links";
-import { loadOpenSet } from "@/lib/open-set";
-import { fundingTypePlural } from "@/lib/presentation";
-import { useResource } from "@/lib/resource";
-import { useApi, useSession } from "@/lib/session";
-import type { FundingType } from "@/lib/types";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
-
-const TILE_COPY: Readonly<Record<FundingType, string>> = {
-  grant: "Rolling and dated programs",
-  hackathon: "In person and online",
-  bounty: "Security, paid by severity",
-  rfp: "Fixed scope, named budget",
-  accelerator: "",
-  vc_fund: "",
-};
 
 export function Landing() {
   const api = useApi();
@@ -46,27 +36,27 @@ export function Landing() {
 
   return (
     <div className="landing">
-      <Hero summary={state.status === "ready" ? state.data : null} apiBaseUrl={api.baseUrl} />
-      <ResourceView resource={state} what="the index" onRetry={reload}>
-        {(summary) => (
-          <>
-            <ClosingSoon summary={summary} />
-            <TypeTiles summary={summary} />
-            <Featured summary={summary} />
-            <p className="landing-all">
-              <Link className="button-primary" href={DIRECTORY}>
-                See all {formatCount(summary.open)} open opportunities →
-              </Link>
-            </p>
-          </>
-        )}
-      </ResourceView>
+      <Hero summary={state.status === "ready" ? state.data : null} />
+      <div className="landing-body">
+        <ResourceView resource={state} what="the index" onRetry={reload}>
+          {(summary) => (
+            <>
+              <ClosingSoon summary={summary} />
+              <Featured summary={summary} />
+              <p className="landing-all">
+                <Link className="button-primary" href={DIRECTORY}>
+                  See all {formatCount(summary.open)} open opportunities →
+                </Link>
+              </p>
+            </>
+          )}
+        </ResourceView>
+      </div>
     </div>
   );
 }
 
-function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBaseUrl: string }) {
-  const session = useSession();
+function Hero({ summary }: { summary: LandingSummary | null }) {
   const router = useRouter();
   const [q, setQ] = useState("");
 
@@ -75,111 +65,91 @@ function Hero({ summary, apiBaseUrl }: { summary: LandingSummary | null; apiBase
     router.push(selectionToHref({ ...DEFAULT_SELECTION, q: q.trim() }));
   };
 
-  const publishHref = session.authenticated ? "/listings/new" : `${HOW_IT_WORKS}#publish`;
-
   return (
-    <section className="landing-hero" aria-labelledby="landing-heading">
-      <div className="landing-hero-copy">
-        <p className="landing-position">
-          Funded by the{" "}
-          <a href={FUNDED_BY.href} target="_blank" rel="noopener noreferrer">
-            {FUNDED_BY.name}
-          </a>
-        </p>
-        <h1 id="landing-heading">
-          Find all funding opportunities in the Ethereum ecosystem: RFPs, Grants, Hackathons,
-          Bounties and more
-        </h1>
-        <p className="lede">
-          Every listing links out to the program&rsquo;s own site. You apply there.
-        </p>
+    <>
+      <section className="landing-hero" aria-labelledby="landing-heading">
+        <HeroDecor />
+        <div className="landing-hero-copy">
+          <h1 id="landing-heading">Find funding across the Ethereum ecosystem</h1>
+          <p className="landing-sub">
+            Open grants, hackathons, bounties and RFPs from organizations supporting Ethereum.
+          </p>
 
-        <div className="landing-paths">
-          <Link className="landing-path" href={DIRECTORY}>
-            <span className="landing-path-title">I&rsquo;m looking for funding →</span>
-            <span className="landing-path-note">
-              {summary
-                ? `Browse ${formatCount(summary.open)} open opportunities`
-                : "Browse the directory"}
-            </span>
-          </Link>
-          <Link className="landing-path landing-path-publish" href={publishHref}>
-            <span className="landing-path-title">I publish a program →</span>
-            <span className="landing-path-note">Log in and submit a listing</span>
-          </Link>
+          <search>
+            <form className="landing-search" onSubmit={search}>
+              <MagnifyingGlassIcon className="landing-search-icon" aria-hidden="true" />
+              <label htmlFor="landing-q" className="visually-hidden">
+                Search the directory
+              </label>
+              <input
+                id="landing-q"
+                type="search"
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                placeholder="Search by topic, org or city…"
+              />
+              <button type="submit" className="button-primary">
+                Search
+              </button>
+            </form>
+          </search>
+
+          <TypePills
+            selected=""
+            counts={summary?.byType ?? null}
+            showAll={false}
+            onPick={(fundingType) =>
+              router.push(selectionToHref({ ...DEFAULT_SELECTION, fundingType }))
+            }
+          />
         </div>
-
-        <search>
-          <form className="landing-search" onSubmit={search}>
-            <label htmlFor="landing-q" className="visually-hidden">
-              Search the directory
-            </label>
-            <input
-              id="landing-q"
-              type="search"
-              value={q}
-              onChange={(event) => setQ(event.target.value)}
-              placeholder="Search by topic, org or city…"
-            />
-            <button type="submit">Search</button>
-          </form>
-        </search>
-
-        <p className="landing-data muted">
-          Open data
-          <a href={`${apiBaseUrl}/v1/export/opportunities.json`}>JSON</a>
-          <a href={`${apiBaseUrl}/v1/export/opportunities.csv`}>CSV</a>
-          <a href={`${apiBaseUrl}/v1/feeds/opportunities.rss`}>RSS</a>
-          <span>CC0, updated nightly</span>
-        </p>
-      </div>
+      </section>
 
       <dl className="landing-tally" aria-label="The index at a glance">
-        <TallyRow value={summary ? formatCount(summary.open) : "—"} unit="open opportunities">
-          grants, hackathons, bounties, RFPs
-        </TallyRow>
-        <TallyRow
-          value={summary ? compactUsd(summary.awardsUsd) : "—"}
-          unit="in maximum awards listed"
-        >
-          {summary
-            ? `USD ceilings of ${formatCount(summary.awardsCounted)} listings`
-            : "USD ceilings only"}
-        </TallyRow>
-        <TallyRow value={summary ? formatCount(summary.organizations) : "—"} unit="organizations">
-          with an open program
-        </TallyRow>
-        <TallyRow
+        <TallyItem value={summary ? formatCount(summary.open) : "—"} unit="Open opportunities" />
+        <TallyItem value={summary ? compactUsd(summary.awardsUsd) : "—"} unit="In max awards" />
+        <TallyItem
+          value={summary ? formatCount(summary.organizations) : "—"}
+          unit="Organizations"
+        />
+        <TallyItem
           value={summary ? formatCount(summary.closingSoonTotal) : "—"}
-          unit="closing in the next 30 days"
-          hot
-        >
-          fixed deadlines only
-        </TallyRow>
+          unit="Closing in 30 days"
+        />
       </dl>
-    </section>
+    </>
   );
 }
 
-function TallyRow({
-  value,
-  unit,
-  hot,
-  children,
-}: {
-  value: string;
-  unit: string;
-  hot?: boolean;
-  children: React.ReactNode;
-}) {
+/**
+ * Decorative: faint concentric arcs with a few funders' marks resting on them, at the hero's edges.
+ * Every mark belongs to an organization with an open listing in the index and is the organization's
+ * own artwork in its own colours (see `public/hero-logos/`). Hidden from assistive tech and on
+ * narrow screens. The positions sit on the arcs, which share the frame's 1240 × 440 coordinate space.
+ */
+const HERO_MARKS = ["ethereum", "uniswap", "chainlink", "morpho", "optimism", "ens"] as const;
+
+function HeroDecor() {
   return (
-    <div className={`landing-tally-row${hot ? " is-hot" : ""}`}>
-      <dt>
-        <span className="landing-tally-value">{value}</span>
-        <span className="visually-hidden"> </span>
-        <span className="landing-tally-unit">{unit}</span>
-      </dt>
-      <dd className="landing-tally-why">{children}</dd>
+    <div className="landing-decor" aria-hidden="true">
+      <svg viewBox="0 0 1240 440" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <circle cx="620" cy="220" r="450" />
+        <circle cx="620" cy="220" r="570" />
+      </svg>
+      {HERO_MARKS.map((mark) => (
+        <span key={mark} className="landing-mark-tile" data-mark={mark}>
+          <span className="landing-mark-logo" />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function TallyItem({ value, unit }: { value: string; unit: string }) {
+  return (
+    <div className="landing-tally-item">
+      <dt className="landing-tally-unit">{unit}</dt>
+      <dd className="landing-tally-value">{value}</dd>
     </div>
   );
 }
@@ -205,48 +175,12 @@ function ClosingSoon({ summary }: { summary: LandingSummary }) {
   );
 }
 
-function TypeTiles({ summary }: { summary: LandingSummary }) {
-  const other = Object.entries(summary.byType)
-    .filter(([type]) => !TILE_TYPES.includes(type as FundingType))
-    .reduce((sum, [, count]) => sum + count, 0);
-  return (
-    <section className="landing-block" aria-labelledby="types-heading">
-      <div className="landing-block-head">
-        <h2 id="types-heading">Browse by type</h2>
-        {other > 0 ? (
-          <Link href={DIRECTORY}>
-            plus {formatCount(other)} accelerator{other === 1 ? "" : "s"} and funds →
-          </Link>
-        ) : null}
-      </div>
-      <ul className="plain landing-tiles">
-        {TILE_TYPES.map((type) => (
-          <li key={type}>
-            <Link
-              className="landing-tile"
-              data-type={type}
-              href={selectionToHref({ ...DEFAULT_SELECTION, fundingType: type })}
-            >
-              <span className="landing-tile-count">{formatCount(summary.byType[type] ?? 0)}</span>
-              <span className="landing-tile-label">
-                {fundingTypePlural(type)}
-                <span className="landing-tile-note">{TILE_COPY[type]}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function Featured({ summary }: { summary: LandingSummary }) {
   if (summary.featured.length === 0) return null;
   return (
     <section className="landing-block" aria-labelledby="featured-heading">
       <div className="landing-block-head">
         <h2 id="featured-heading">Largest open awards</h2>
-        <span className="muted footnote">ranked by the stated ceiling, nothing else</span>
       </div>
       <ul className="plain landing-featured">
         {summary.featured.map((item) => (

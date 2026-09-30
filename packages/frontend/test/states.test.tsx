@@ -430,6 +430,7 @@ describe("the accent never carries state", () => {
       'button[aria-pressed="true"],\nbutton[aria-selected="true"]',
       ".button-primary",
       ".button-primary:hover",
+      ".shell-submit", // the header's one action, as a link in the primary-action olive
       'input[type="range"],\ninput[type="radio"],\ninput[type="checkbox"]',
       '.shell-nav-primary a[aria-current="page"],\n.shell-notifications[aria-current="page"]',
       '.shell-nav-group a[aria-current="page"]',
@@ -437,7 +438,6 @@ describe("the accent never carries state", () => {
       '.section-nav a[aria-current="page"]',
       ".shell-footer a",
       "tbody tr:hover",
-      ".landing-tile:hover,\n.landing-tile:focus-visible",
     ];
     const normalise = (selector: string) => selector.replace(/\s+/g, " ").trim();
     const allowlist = new Set(allowed.map(normalise));

@@ -1,6 +1,7 @@
 "use client";
 
-import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
+import { DecorativeIcon, IconLabel } from "@/components/IconLabel";
+import { FUNDING_TYPE_ICONS, TypePills } from "@/components/TypePills";
 /**
  * The public directory: every PUBLISHED opportunity, as a visitor with no account reads it.
  *
@@ -29,7 +30,6 @@ import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel
  *      unfiltered first page having lost the search they came for.
  *   3. A FILTERED VIEW COULD NOT BE SHARED OR RELOADED.
  */
-import { OrgMark } from "@/components/OrgMark";
 import { UntrustedText } from "@/components/UntrustedText";
 import { StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView, TechnicalDetails } from "@/components/states";
@@ -73,28 +73,14 @@ import {
   CalendarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  CodeBracketIcon,
-  DocumentTextIcon,
   GlobeAltIcon,
   MagnifyingGlassIcon,
-  RocketLaunchIcon,
   SignalIcon,
   TagIcon,
-  TrophyIcon,
 } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-
-/** One quickly recognizable silhouette per opportunity type, backed by the written Type column. */
-const FUNDING_TYPE_ICONS: Readonly<Record<FundingType, HeroIcon>> = {
-  rfp: DocumentTextIcon,
-  grant: BanknotesIcon,
-  hackathon: CodeBracketIcon,
-  bounty: TrophyIcon,
-  accelerator: RocketLaunchIcon,
-  vc_fund: BuildingOffice2Icon,
-};
 
 /** Optional controls live behind one disclosure, but their active state must remain visible. */
 function advancedFilterCount(selection: DirectorySelection): number {
@@ -207,7 +193,7 @@ export function DirectoryList() {
            * reader who wants the other two types.
            */}
           <TypePills
-            applied={applied}
+            selected={applied.fundingType}
             counts={applied.status === "open" ? counts : null}
             onPick={(fundingType) => commit({ fundingType })}
           />
@@ -592,52 +578,6 @@ export function DirectoryList() {
   );
 }
 
-/** The four types a first-time reader thinks in, then everything else behind the select. */
-const PILL_TYPES: readonly FundingType[] = ["grant", "hackathon", "bounty", "rfp"];
-
-function pillLabel(type: FundingType): string {
-  return fundingTypePlural(type);
-}
-
-function TypePills({
-  applied,
-  counts,
-  onPick,
-}: {
-  applied: DirectorySelection;
-  counts: Record<string, number> | null;
-  onPick: (fundingType: string) => void;
-}) {
-  const total = counts ? Object.values(counts).reduce((sum, n) => sum + n, 0) : null;
-  const other = applied.fundingType && !PILL_TYPES.includes(applied.fundingType as FundingType);
-  return (
-    <fieldset className="type-pills">
-      <legend className="visually-hidden">Funding type</legend>
-      <button type="button" aria-pressed={applied.fundingType === ""} onClick={() => onPick("")}>
-        All{total !== null ? <span className="type-pill-count">{formatCount(total)}</span> : null}
-      </button>
-      {PILL_TYPES.map((type) => (
-        <button
-          key={type}
-          type="button"
-          aria-pressed={applied.fundingType === type}
-          onClick={() => onPick(type)}
-        >
-          {pillLabel(type)}
-          {counts ? (
-            <span className="type-pill-count">{formatCount(counts[type] ?? 0)}</span>
-          ) : null}
-        </button>
-      ))}
-      {other ? (
-        <button type="button" aria-pressed onClick={() => onPick(applied.fundingType)}>
-          {fundingTypeLabel(applied.fundingType)}
-        </button>
-      ) : null}
-    </fieldset>
-  );
-}
-
 /** How the result line says the order, as a phrase rather than the control's label. */
 const ORDERING_PHRASES: Readonly<Record<Ordering, string>> = {
   "nextDeadlineAt:asc": "closing soonest",
@@ -695,9 +635,10 @@ function EmptyResult({ applied, page }: { applied: DirectorySelection; page: num
 /**
  * What is on screen, in words, plus the one-click way out of the default narrowing.
  *
- * The toggle is a LINK rather than a button so that the state it leads to is an address: it can be
- * middle-clicked, bookmarked and sent to somebody. That it also happens to make the back button
- * work is a consequence of the same decision, not a second mechanism.
+ * The toggle is a checkbox, but its state still lives in the ADDRESS: ticking it pushes the same
+ * `status=any` URL the old link pointed at, so the result stays bookmarkable and sendable, and Back
+ * walks out of it. A specific status picked under "More filters" is not an on/off question, so that
+ * case keeps a plain link back to every status.
  */
 function ResultLine({
   applied,
@@ -712,6 +653,7 @@ function ResultLine({
   totalPages: number;
   stale: boolean;
 }) {
+  const router = useRouter();
   const noun = total === 1 ? "opportunity" : "opportunities";
   const status = applied.status ? `${opportunityStatusLabel(applied.status).toLowerCase()} ` : "";
   const narrowed = applied.status === DEFAULT_SELECTION.status;
@@ -735,14 +677,23 @@ function ResultLine({
         {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
 
-      {narrowed ? (
-        <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>
-          Show closed and upcoming too
-        </Link>
-      ) : applied.status === "" ? (
-        <Link href={selectionToHref({ ...applied, status: DEFAULT_SELECTION.status, page: 1 })}>
-          Show only what is open
-        </Link>
+      {narrowed || applied.status === "" ? (
+        <label className="result-toggle">
+          <input
+            type="checkbox"
+            checked={applied.status === ""}
+            onChange={(event) =>
+              router.push(
+                selectionToHref({
+                  ...applied,
+                  status: event.target.checked ? "" : DEFAULT_SELECTION.status,
+                  page: 1,
+                }),
+              )
+            }
+          />
+          Include closed &amp; upcoming
+        </label>
       ) : (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>Show every status</Link>
       )}
@@ -779,7 +730,7 @@ export function DirectoryRow({
   return (
     <tr>
       <td className="directory-type" data-label="Type">
-        <span className="type-chip" title={typeLabel}>
+        <span className="type-chip" data-type={item.fundingType} title={typeLabel}>
           <DecorativeIcon icon={FUNDING_TYPE_ICONS[item.fundingType]} />
           {fundingTypeChipLabel(item.fundingType)}
         </span>
@@ -799,12 +750,6 @@ export function DirectoryRow({
       <td className="muted directory-organization" data-label="Organization">
         {operator ? (
           <span className="directory-org">
-            <OrgMark
-              slug={operator.slug}
-              name={operator.name}
-              verified={false}
-              className="org-mark-small"
-            />
             <UntrustedText value={operator.name} />
           </span>
         ) : null}
