@@ -1,11 +1,11 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-09-29T09:57:44.391Z",
+  "generatedAt": "2026-09-30T09:49:24.414Z",
   "count": 160,
   "opportunities": [
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:0x-bug-bounty",
       "fundingType": "bounty",
       "title": "0x Bug Bounty",
@@ -120,7 +120,7 @@
       "updatedAt": "2026-08-14T20:36:43.695Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:1inch-aqua-bug-bounty",
       "fundingType": "bounty",
       "title": "1inch Aqua Bug Bounty",
@@ -231,7 +231,7 @@
       "updatedAt": "2026-08-14T20:36:43.518Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-bug-bounty",
       "fundingType": "bounty",
       "title": "Aave Bug Bounty",
@@ -348,7 +348,7 @@
       "updatedAt": "2026-08-14T20:36:43.418Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-grants",
       "fundingType": "grant",
       "title": "Aave Grants",
@@ -408,7 +408,7 @@
       "updatedAt": "2026-08-14T20:36:43.308Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:aave-v4-bug-bounty",
       "fundingType": "bounty",
       "title": "Aave V4 Bug Bounty",
@@ -520,7 +520,7 @@
       "updatedAt": "2026-08-14T20:36:43.666Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:agglayer-bug-bounty",
       "fundingType": "bounty",
       "title": "Agglayer Bug Bounty",
@@ -615,7 +615,7 @@
       "updatedAt": "2026-08-14T20:36:43.468Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:alchemix-bug-bounty",
       "fundingType": "bounty",
       "title": "Alchemix Bug Bounty",
@@ -713,7 +713,7 @@
       "updatedAt": "2026-08-14T20:36:43.702Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:alchemy-x-arbitrum-grant",
       "fundingType": "grant",
       "title": "Alchemy x Arbitrum Grant",
@@ -786,7 +786,7 @@
       "updatedAt": "2026-08-14T20:36:43.344Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbifuel-gas-fee-sponsorship-program",
       "fundingType": "grant",
       "title": "ArbiFuel (Gas Fee Sponsorship Program)",
@@ -876,7 +876,7 @@
       "updatedAt": "2026-08-14T20:36:43.621Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-audit-program",
       "fundingType": "grant",
       "title": "Arbitrum Audit Program",
@@ -991,7 +991,7 @@
       "updatedAt": "2026-08-14T20:36:43.340Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-bug-bounty",
       "fundingType": "bounty",
       "title": "Arbitrum Bug Bounty",
@@ -1104,7 +1104,7 @@
       "updatedAt": "2026-08-14T20:36:43.425Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-dda-developer-tooling-on-arbitrum-one-and-nova",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Dev Tooling on One and Stylus",
@@ -1183,7 +1183,7 @@
       "updatedAt": "2026-08-14T20:36:43.250Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-dda-education-community-growth-and-events",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Education, Community Growth and Events",
@@ -1276,7 +1276,7 @@
       "updatedAt": "2026-08-14T20:36:43.255Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arbitrum-gaming-ventures-agv",
       "fundingType": "grant",
       "title": "Arbitrum Gaming Ventures (AGV)",
@@ -1373,7 +1373,7 @@
       "updatedAt": "2026-08-14T20:36:43.626Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:arcadia-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Arcadia Finance Bug Bounty",
@@ -1459,7 +1459,7 @@
       "updatedAt": "2026-08-14T20:36:43.686Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:balancer-bug-bounty",
       "fundingType": "bounty",
       "title": "Balancer Bug Bounty",
@@ -1561,7 +1561,7 @@
       "updatedAt": "2026-08-14T20:36:43.486Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:base-ecosystem-fund",
       "fundingType": "vc_fund",
       "title": "Base Ecosystem Fund",
@@ -1673,7 +1673,7 @@
       "updatedAt": "2026-08-14T20:36:43.372Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:cap-bug-bounty",
       "fundingType": "bounty",
       "title": "Cap Bug Bounty",
@@ -1749,7 +1749,7 @@
       "updatedAt": "2026-08-14T20:36:43.673Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:chainlink-bug-bounty",
       "fundingType": "bounty",
       "title": "Chainlink Bug Bounty",
@@ -1892,7 +1892,7 @@
       "updatedAt": "2026-08-14T20:36:43.475Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:coinbase-base-bug-bounty",
       "fundingType": "bounty",
       "title": "Coinbase / Base Bug Bounty",
@@ -2042,7 +2042,7 @@
       "updatedAt": "2026-08-14T20:36:43.451Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:compound-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Compound Finance Bug Bounty",
@@ -2151,7 +2151,7 @@
       "updatedAt": "2026-08-14T20:36:43.490Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:cow-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "CoW Protocol Bug Bounty",
@@ -2254,7 +2254,7 @@
       "updatedAt": "2026-08-14T20:36:43.583Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ens-bug-bounty",
       "fundingType": "bounty",
       "title": "ENS Bug Bounty",
@@ -2397,7 +2397,7 @@
       "updatedAt": "2026-08-14T20:36:43.437Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:enzyme-onyx-bug-bounty",
       "fundingType": "bounty",
       "title": "Enzyme Onyx Bug Bounty",
@@ -2487,7 +2487,7 @@
       "updatedAt": "2026-08-14T20:36:43.692Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethena-bug-bounty",
       "fundingType": "bounty",
       "title": "Ethena Bug Bounty",
@@ -2617,7 +2617,7 @@
       "updatedAt": "2026-08-14T20:36:43.555Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ether-fi-bug-bounty",
       "fundingType": "bounty",
       "title": "ether.fi Bug Bounty",
@@ -2767,7 +2767,7 @@
       "updatedAt": "2026-08-14T20:36:43.509Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethereum-foundation-bug-bounty-program",
       "fundingType": "bounty",
       "title": "Ethereum Foundation Bug Bounty Program",
@@ -2873,7 +2873,7 @@
       "updatedAt": "2026-08-14T20:36:43.471Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethereum-foundation-esp",
       "fundingType": "grant",
       "title": "Ecosystem Support Program (ESP)",
@@ -2961,7 +2961,7 @@
       "updatedAt": "2026-08-14T20:36:43.292Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethglobal-mumbai",
       "fundingType": "hackathon",
       "title": "ETHGlobal Mumbai",
@@ -3101,7 +3101,7 @@
       "updatedAt": "2026-08-14T20:36:43.410Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethglobal-tokyo-2026",
       "fundingType": "hackathon",
       "title": "ETHGlobal Tokyo 2026",
@@ -3229,7 +3229,7 @@
       "updatedAt": "2026-08-14T20:36:43.399Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ethonline-2026",
       "fundingType": "hackathon",
       "title": "ETHOnline 2026",
@@ -3415,7 +3415,7 @@
       "updatedAt": "2026-08-14T20:36:43.389Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:euler-bug-bounty",
       "fundingType": "bounty",
       "title": "Euler Bug Bounty",
@@ -3600,7 +3600,7 @@
       "updatedAt": "2026-08-14T20:36:43.575Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gearbox-bug-bounty",
       "fundingType": "bounty",
       "title": "Gearbox Bug Bounty",
@@ -3712,7 +3712,7 @@
       "updatedAt": "2026-08-14T20:36:43.546Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gmx-bug-bounty",
       "fundingType": "bounty",
       "title": "GMX Bug Bounty",
@@ -3828,7 +3828,7 @@
       "updatedAt": "2026-08-14T20:36:43.579Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:gnosis-chain-bug-bounty",
       "fundingType": "bounty",
       "title": "Gnosis Chain Bug Bounty",
@@ -3932,7 +3932,7 @@
       "updatedAt": "2026-08-14T20:36:43.598Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:instadapp-fluid-bug-bounty",
       "fundingType": "bounty",
       "title": "Instadapp (Fluid) Bug Bounty",
@@ -4046,7 +4046,7 @@
       "updatedAt": "2026-08-14T20:36:43.551Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:kelp-dao-bug-bounty",
       "fundingType": "bounty",
       "title": "Kelp DAO Bug Bounty",
@@ -4186,7 +4186,7 @@
       "updatedAt": "2026-08-14T20:36:43.564Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:layerzero-bug-bounty",
       "fundingType": "bounty",
       "title": "LayerZero Bug Bounty",
@@ -4294,7 +4294,7 @@
       "updatedAt": "2026-08-14T20:36:43.527Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:lido-bug-bounty",
       "fundingType": "bounty",
       "title": "Lido Bug Bounty",
@@ -4446,7 +4446,7 @@
       "updatedAt": "2026-08-14T20:36:43.414Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:lido-ecosystem-grants-organisation-lego",
       "fundingType": "grant",
       "title": "Lido Ecosystem Grants Organisation (LEGO)",
@@ -4545,7 +4545,7 @@
       "updatedAt": "2026-08-14T20:36:43.313Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:linea-bug-bounty",
       "fundingType": "bounty",
       "title": "Linea Bug Bounty",
@@ -4647,7 +4647,7 @@
       "updatedAt": "2026-08-14T20:36:43.567Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:mantle-ecofund",
       "fundingType": "grant",
       "title": "Mantle EcoFund",
@@ -4732,7 +4732,7 @@
       "updatedAt": "2026-08-14T20:36:43.616Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:maple-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Maple Finance Bug Bounty",
@@ -4824,7 +4824,7 @@
       "updatedAt": "2026-08-14T20:36:43.590Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:metamask-grants-program",
       "fundingType": "grant",
       "title": "MetaMask Grants Program",
@@ -4891,7 +4891,7 @@
       "updatedAt": "2026-08-14T20:36:43.328Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:metamask-validator-staking-bug-bounty",
       "fundingType": "bounty",
       "title": "MetaMask Validator Staking Bug Bounty",
@@ -4987,7 +4987,7 @@
       "updatedAt": "2026-08-14T20:36:43.656Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:midas-bug-bounty",
       "fundingType": "bounty",
       "title": "Midas Bug Bounty",
@@ -5148,7 +5148,7 @@
       "updatedAt": "2026-08-14T20:36:43.652Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:moonwell-bug-bounty",
       "fundingType": "bounty",
       "title": "Moonwell Bug Bounty",
@@ -5246,7 +5246,7 @@
       "updatedAt": "2026-08-14T20:36:43.669Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:morpho-bug-bounty",
       "fundingType": "bounty",
       "title": "Morpho Bug Bounty",
@@ -5425,7 +5425,7 @@
       "updatedAt": "2026-08-14T20:36:43.455Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:nado-bug-bounty",
       "fundingType": "bounty",
       "title": "Nado Bug Bounty",
@@ -5521,7 +5521,7 @@
       "updatedAt": "2026-08-14T20:36:43.682Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:nouns-dao-small-grants",
       "fundingType": "grant",
       "title": "Nouns DAO Small Grants",
@@ -5596,7 +5596,7 @@
       "updatedAt": "2026-08-14T20:36:43.323Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:olympus-bug-bounty",
       "fundingType": "bounty",
       "title": "Olympus Bug Bounty",
@@ -5689,7 +5689,7 @@
       "updatedAt": "2026-08-14T20:36:43.594Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ondo-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Ondo Finance Bug Bounty",
@@ -5784,7 +5784,7 @@
       "updatedAt": "2026-08-14T20:36:43.676Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:optimism-bug-bounty",
       "fundingType": "bounty",
       "title": "Optimism Bug Bounty",
@@ -5935,7 +5935,7 @@
       "updatedAt": "2026-08-14T20:36:43.421Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:origin-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "Origin Protocol Bug Bounty",
@@ -6039,7 +6039,7 @@
       "updatedAt": "2026-08-14T20:36:43.601Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:pendle-bug-bounty",
       "fundingType": "bounty",
       "title": "Pendle Bug Bounty",
@@ -6129,7 +6129,7 @@
       "updatedAt": "2026-08-14T20:36:43.460Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:polygon-bug-bounty",
       "fundingType": "bounty",
       "title": "Polygon Bug Bounty",
@@ -6262,7 +6262,7 @@
       "updatedAt": "2026-08-14T20:36:43.429Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:polymarket-builders-program",
       "fundingType": "grant",
       "title": "Polymarket Builders Program",
@@ -6343,7 +6343,7 @@
       "updatedAt": "2026-08-14T20:36:43.376Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:reserve-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "Reserve Protocol Bug Bounty",
@@ -6452,7 +6452,7 @@
       "updatedAt": "2026-08-14T20:36:43.586Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rfp-reboot-the-gitcoin-community-for-the-3-3-era",
       "fundingType": "rfp",
       "title": "RFP: Reboot the Gitcoin Community for the 3.3 Era",
@@ -6555,7 +6555,7 @@
       "updatedAt": "2026-08-14T20:36:43.285Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:road-to-devcon-8-india-ecosystem-program",
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — Ecosystem Program",
@@ -6671,7 +6671,7 @@
       "updatedAt": "2026-08-14T20:36:43.260Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:road-to-devcon-8-india-university-program",
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — University Program",
@@ -6789,7 +6789,7 @@
       "updatedAt": "2026-08-14T20:36:43.266Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-bug-bounty",
       "fundingType": "bounty",
       "title": "Rocket Pool Bug Bounty",
@@ -6895,7 +6895,7 @@
       "updatedAt": "2026-08-14T20:36:43.500Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-gmc-grants-round-40",
       "fundingType": "grant",
       "title": "Rocket Pool GMC Grants — Round 40",
@@ -6967,7 +6967,7 @@
       "updatedAt": "2026-08-14T20:36:43.609Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:rocket-pool-gmc-retrospective-awards-round-40",
       "fundingType": "grant",
       "title": "Rocket Pool GMC Retrospective Awards — Round 40",
@@ -7039,7 +7039,7 @@
       "updatedAt": "2026-08-14T20:36:43.613Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:royco-bug-bounty",
       "fundingType": "bounty",
       "title": "Royco Bug Bounty",
@@ -7121,7 +7121,7 @@
       "updatedAt": "2026-08-14T20:36:43.689Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:safe-ecosystem-foundation-grants",
       "fundingType": "grant",
       "title": "Safe Ecosystem Foundation Grants",
@@ -7207,7 +7207,7 @@
       "updatedAt": "2026-08-14T20:36:43.335Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:scroll-bug-bounty",
       "fundingType": "bounty",
       "title": "Scroll Bug Bounty",
@@ -7314,7 +7314,7 @@
       "updatedAt": "2026-08-14T20:36:43.649Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:sky-makerdao-bug-bounty",
       "fundingType": "bounty",
       "title": "Sky (MakerDAO) Bug Bounty",
@@ -7454,7 +7454,7 @@
       "updatedAt": "2026-08-14T20:36:43.433Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:spark-bug-bounty",
       "fundingType": "bounty",
       "title": "Spark Bug Bounty",
@@ -7579,7 +7579,7 @@
       "updatedAt": "2026-08-14T20:36:43.496Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ssv-grants-program",
       "fundingType": "grant",
       "title": "SSV Grants Program",
@@ -7664,7 +7664,7 @@
       "updatedAt": "2026-08-14T20:36:43.319Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:ssv-network-bug-bounty",
       "fundingType": "bounty",
       "title": "SSV Network Bug Bounty",
@@ -7774,7 +7774,7 @@
       "updatedAt": "2026-08-14T20:36:43.560Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:stakewise-bug-bounty",
       "fundingType": "bounty",
       "title": "StakeWise Bug Bounty",
@@ -7885,7 +7885,7 @@
       "updatedAt": "2026-08-14T20:36:43.504Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:stargate-bug-bounty",
       "fundingType": "bounty",
       "title": "Stargate Bug Bounty",
@@ -7986,12 +7986,12 @@
       "updatedAt": "2026-08-14T20:36:43.531Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-bug-bounty",
       "fundingType": "bounty",
       "title": "Starknet Bug Bounty (Blockchain/DLT)",
       "description": "Bug bounty for the Starknet validity-rollup's core stack — the Starknet OS written in Cairo, the sequencer, the L1 core contracts in Solidity and the Cairo common library — hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 1 July 2026 with a listed end date of 30 September 2026 — a bounded submission window rather than an open-ended one, which the deadline on this record carries — and $11,000 paid across 80 submissions from 36 hackers in its first weeks; its catalogue entry reports a last update on 10 August 2026. Critical findings pay from a $15,000 floor up to $250,000, computed as 10% of the funds directly affected — scaled by the ratio of funds at risk across all affected projects on the chain to Starknet's market cap, averaged between CoinMarketCap and CoinGecko at submission time. High findings — total network shutdown or an unintended chain split — pay a fixed $10,000, and medium findings, explicitly including STWO verifier soundness bugs, a fixed $2,500. Low findings are listed but carry no reward, which is why no low tier appears in this record's table.\n\nThe program is one of a family of three Starknet listings launched on HackenProof the same day — the sibling \"Starknet Web & SC\" program covers the StarkGate bridge contracts and starkgate.starknet.io, and \"Starknet Staking\" advertises up to $100,000. This record carries the flagship Blockchain/DLT program, whose $250,000 ceiling is the family's largest.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Starknet",
@@ -8074,7 +8074,7 @@
       "updatedAt": "2026-08-14T20:36:43.659Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-growth-grants",
       "fundingType": "grant",
       "title": "Starknet Growth Grants",
@@ -8157,7 +8157,7 @@
       "updatedAt": "2026-08-14T20:36:43.351Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-seed-grants",
       "fundingType": "grant",
       "title": "Starknet Seed Grants",
@@ -8235,7 +8235,7 @@
       "updatedAt": "2026-08-14T20:36:43.347Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:starknet-x-denarii-labs-accelerator",
       "fundingType": "accelerator",
       "title": "Starknet x Denarii Labs Accelerator",
@@ -8331,7 +8331,7 @@
       "updatedAt": "2026-08-14T20:36:43.356Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:strata-bug-bounty",
       "fundingType": "bounty",
       "title": "Strata Bug Bounty",
@@ -8427,7 +8427,7 @@
       "updatedAt": "2026-08-14T20:36:43.699Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:sushiswap-bug-bounty",
       "fundingType": "bounty",
       "title": "SushiSwap Bug Bounty",
@@ -8539,7 +8539,7 @@
       "updatedAt": "2026-08-14T20:36:43.523Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:symbiotic-bug-bounty",
       "fundingType": "bounty",
       "title": "Symbiotic Bug Bounty",
@@ -8722,7 +8722,7 @@
       "updatedAt": "2026-08-14T20:36:43.464Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:synthetix-bug-bounty",
       "fundingType": "bounty",
       "title": "Synthetix Bug Bounty",
@@ -8848,7 +8848,7 @@
       "updatedAt": "2026-08-14T20:36:43.482Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:taiko-grants-2025-grant-fund",
       "fundingType": "grant",
       "title": "Taiko Grants (2025 Grant Fund)",
@@ -8956,7 +8956,7 @@
       "updatedAt": "2026-08-14T20:36:43.367Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:the-graph-bug-bounty",
       "fundingType": "bounty",
       "title": "The Graph Bug Bounty",
@@ -9057,7 +9057,7 @@
       "updatedAt": "2026-08-14T20:36:43.479Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:the-graph-grants-program",
       "fundingType": "grant",
       "title": "The Graph Grants Program",
@@ -9132,7 +9132,7 @@
       "updatedAt": "2026-08-14T20:36:43.605Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:treehouse-bug-bounty",
       "fundingType": "bounty",
       "title": "Treehouse Bug Bounty",
@@ -9228,7 +9228,7 @@
       "updatedAt": "2026-08-14T20:36:43.663Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:unichain-grants",
       "fundingType": "grant",
       "title": "Unichain Grants",
@@ -9320,7 +9320,7 @@
       "updatedAt": "2026-08-14T20:36:43.331Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:uniswap-bug-bounty",
       "fundingType": "bounty",
       "title": "Uniswap Bug Bounty",
@@ -9563,7 +9563,7 @@
       "updatedAt": "2026-08-14T20:36:43.441Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:usual-bug-bounty",
       "fundingType": "bounty",
       "title": "Usual Protocol Bug Bounty",
@@ -9646,7 +9646,7 @@
       "updatedAt": "2026-08-14T20:36:43.645Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:veda-bug-bounty",
       "fundingType": "bounty",
       "title": "Veda Bug Bounty",
@@ -9726,7 +9726,7 @@
       "updatedAt": "2026-08-14T20:36:43.679Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:world-foundation-scale-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Scale Track Mini App Grant",
@@ -9788,7 +9788,7 @@
       "updatedAt": "2026-08-14T20:36:43.363Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:world-foundation-spark-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Spark Track Mini App Grant",
@@ -9850,7 +9850,7 @@
       "updatedAt": "2026-08-14T20:36:43.359Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:wormhole-bug-bounty",
       "fundingType": "bounty",
       "title": "Wormhole Bug Bounty",
@@ -9995,7 +9995,7 @@
       "updatedAt": "2026-08-14T20:36:43.537Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:yearn-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Yearn Finance Bug Bounty",
@@ -10101,7 +10101,7 @@
       "updatedAt": "2026-08-14T20:36:43.542Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "curated:zksync-era-bug-bounty",
       "fundingType": "bounty",
       "title": "ZKsync Era Bug Bounty",
@@ -10229,7 +10229,7 @@
       "updatedAt": "2026-08-14T20:36:43.571Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1013",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 1",
@@ -10271,7 +10271,7 @@
       "updatedAt": "2026-08-14T20:36:43.642Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1021",
       "fundingType": "grant",
       "title": "Localism Mini Grant Round 01 | Colombia",
@@ -10360,7 +10360,7 @@
       "updatedAt": "2026-08-14T20:36:42.934Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1039",
       "fundingType": "grant",
       "title": "ProPGF Batch 2 - Pods Track",
@@ -10409,7 +10409,7 @@
       "updatedAt": "2026-08-14T20:36:43.631Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1042",
       "fundingType": "grant",
       "title": "Optimism Season 9 — Audit Grants",
@@ -10509,7 +10509,7 @@
       "updatedAt": "2026-08-14T20:36:42.863Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1045",
       "fundingType": "grant",
       "title": "Optimism Season 9 — Growth Grants",
@@ -10610,7 +10610,7 @@
       "updatedAt": "2026-08-14T20:36:42.894Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1046",
       "fundingType": "grant",
       "title": "GEN Ukraine MicroGrant Program",
@@ -10657,7 +10657,7 @@
       "updatedAt": "2026-08-14T20:36:42.927Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1059",
       "fundingType": "hackathon",
       "title": "Build Agents for the Real World Hackathon V2",
@@ -10808,7 +10808,7 @@
       "updatedAt": "2026-08-14T20:36:42.907Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1094",
       "fundingType": "hackathon",
       "title": "ETHGlobal New York 2026",
@@ -11292,7 +11292,7 @@
       "updatedAt": "2026-08-14T20:36:43.011Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1225",
       "fundingType": "hackathon",
       "title": "NMIT HACKS 2026",
@@ -11456,7 +11456,7 @@
       "updatedAt": "2026-08-14T20:36:43.233Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1229",
       "fundingType": "hackathon",
       "title": "InnoFusion 3.0",
@@ -11671,7 +11671,7 @@
       "updatedAt": "2026-08-14T20:36:43.143Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1230",
       "fundingType": "hackathon",
       "title": "HackPrix Season 3",
@@ -11837,7 +11837,7 @@
       "updatedAt": "2026-08-14T20:36:43.076Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1246",
       "fundingType": "hackathon",
       "title": "HashKey Chain On-Chain Horizon Hackathon",
@@ -11959,7 +11959,7 @@
       "updatedAt": "2026-08-14T20:36:43.195Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1266",
       "fundingType": "hackathon",
       "title": "Cepheus 2.0",
@@ -12048,7 +12048,7 @@
       "updatedAt": "2026-08-14T20:36:43.185Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1275",
       "fundingType": "hackathon",
       "title": "INNOVATEX 1.O",
@@ -12117,7 +12117,7 @@
       "updatedAt": "2026-08-14T20:36:43.161Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1277",
       "fundingType": "hackathon",
       "title": "ETHGlobal Open Agents",
@@ -12297,7 +12297,7 @@
       "updatedAt": "2026-08-14T20:36:43.125Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1283",
       "fundingType": "hackathon",
       "title": "Hack&Chill3.0",
@@ -12377,7 +12377,7 @@
       "updatedAt": "2026-08-14T20:36:43.177Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1291",
       "fundingType": "accelerator",
       "title": "Web3 X Incubation Program — Batch 07",
@@ -12442,7 +12442,7 @@
       "updatedAt": "2026-08-14T20:36:43.199Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1298",
       "fundingType": "hackathon",
       "title": "Build with Framework 1.0",
@@ -12555,7 +12555,7 @@
       "updatedAt": "2026-08-14T20:36:43.180Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1299",
       "fundingType": "hackathon",
       "title": "Athernex",
@@ -12632,7 +12632,7 @@
       "updatedAt": "2026-08-14T20:36:43.164Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1329",
       "fundingType": "hackathon",
       "title": "Push to Prod Hackathon with Genspark & Claude",
@@ -12739,7 +12739,7 @@
       "updatedAt": "2026-08-14T20:36:43.223Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1343",
       "fundingType": "hackathon",
       "title": "Build Space",
@@ -12823,7 +12823,7 @@
       "updatedAt": "2026-08-14T20:36:43.206Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1355",
       "fundingType": "hackathon",
       "title": "InOut2k26",
@@ -12915,7 +12915,7 @@
       "updatedAt": "2026-08-14T20:36:43.211Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1360",
       "fundingType": "hackathon",
       "title": "Innovate-Iterate-Interrupt (III) 5.0",
@@ -12991,7 +12991,7 @@
       "updatedAt": "2026-08-14T20:36:43.227Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1361",
       "fundingType": "hackathon",
       "title": "BITBOX 6.0",
@@ -13101,7 +13101,7 @@
       "updatedAt": "2026-08-14T20:36:43.203Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1362",
       "fundingType": "hackathon",
       "title": "DAYZERO 2.0",
@@ -13179,7 +13179,7 @@
       "updatedAt": "2026-08-14T20:36:43.190Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1366",
       "fundingType": "grant",
       "title": "Regenesis Season 1 Grants",
@@ -13287,7 +13287,7 @@
       "updatedAt": "2026-08-14T20:36:43.245Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1375",
       "fundingType": "hackathon",
       "title": "Altaria",
@@ -13384,7 +13384,7 @@
       "updatedAt": "2026-08-14T20:36:43.137Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1382",
       "fundingType": "bounty",
       "title": "Confidential Onchain Finance Bounty",
@@ -13484,7 +13484,7 @@
       "updatedAt": "2026-08-14T20:36:43.105Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1390",
       "fundingType": "hackathon",
       "title": "Citadel Hackathon - Season 1",
@@ -13582,7 +13582,7 @@
       "updatedAt": "2026-08-14T20:36:43.173Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1395",
       "fundingType": "hackathon",
       "title": "10X Founders Demo Day: Inspira Labs <> Yellow Capital",
@@ -13673,7 +13673,7 @@
       "updatedAt": "2026-08-14T20:36:43.157Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1398",
       "fundingType": "hackathon",
       "title": "Arbitrum Open House — London",
@@ -13779,7 +13779,7 @@
       "updatedAt": "2026-08-14T20:36:43.150Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1412",
       "fundingType": "hackathon",
       "title": "Arbitrum Open House London: Online Buildathon",
@@ -13881,7 +13881,7 @@
       "updatedAt": "2026-08-14T20:36:43.024Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1414",
       "fundingType": "accelerator",
       "title": "Yellow Acceleration #2",
@@ -13941,7 +13941,7 @@
       "updatedAt": "2026-08-14T20:36:43.129Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1417",
       "fundingType": "grant",
       "title": "Q402 Grant Program",
@@ -14053,7 +14053,7 @@
       "updatedAt": "2026-08-14T20:36:43.170Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1423",
       "fundingType": "hackathon",
       "title": "The Turing Test Hackathon 2026 — Phase 2: AI Awakening",
@@ -14158,7 +14158,7 @@
       "updatedAt": "2026-08-14T20:36:42.982Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1429",
       "fundingType": "hackathon",
       "title": "HACKWAVE 2.0",
@@ -14256,7 +14256,7 @@
       "updatedAt": "2026-08-14T20:36:43.133Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1431",
       "fundingType": "hackathon",
       "title": "DeerHack 2026",
@@ -14373,7 +14373,7 @@
       "updatedAt": "2026-08-14T20:36:43.068Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1458",
       "fundingType": "grant",
       "title": "Prezenti Anchor Pool",
@@ -14510,7 +14510,7 @@
       "updatedAt": "2026-08-14T20:36:43.089Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1459",
       "fundingType": "grant",
       "title": "Prezenti Boost Pool S2",
@@ -14659,7 +14659,7 @@
       "updatedAt": "2026-08-14T20:36:43.094Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1462",
       "fundingType": "grant",
       "title": "Uniswap Foundation Security Fund (UFSF)",
@@ -14786,7 +14786,7 @@
       "updatedAt": "2026-08-14T20:36:43.114Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1463",
       "fundingType": "hackathon",
       "title": "Devlynix Buildathon 1.0",
@@ -14852,7 +14852,7 @@
       "updatedAt": "2026-08-14T20:36:43.109Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1467",
       "fundingType": "hackathon",
       "title": "AI x Web3 School",
@@ -14947,7 +14947,7 @@
       "updatedAt": "2026-08-14T20:36:43.084Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1468",
       "fundingType": "hackathon",
       "title": "HexaFalls 2",
@@ -15120,7 +15120,7 @@
       "updatedAt": "2026-08-14T20:36:43.031Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1478",
       "fundingType": "hackathon",
       "title": "ccuhacks",
@@ -15230,7 +15230,7 @@
       "updatedAt": "2026-08-14T20:36:43.061Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1479",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 3",
@@ -15279,7 +15279,7 @@
       "updatedAt": "2026-08-14T20:36:43.635Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1480",
       "fundingType": "hackathon",
       "title": "HACKER HOUSE GOA 2026",
@@ -15371,7 +15371,7 @@
       "updatedAt": "2026-08-14T20:36:43.064Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1482",
       "fundingType": "hackathon",
       "title": "Devlynix Buildathon 2.0",
@@ -15437,7 +15437,7 @@
       "updatedAt": "2026-08-14T20:36:43.016Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1483",
       "fundingType": "hackathon",
       "title": "HackNex Season 2",
@@ -15545,7 +15545,7 @@
       "updatedAt": "2026-08-14T20:36:43.052Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1487",
       "fundingType": "hackathon",
       "title": "SheBuilds Chennai Hack",
@@ -15628,7 +15628,7 @@
       "updatedAt": "2026-08-14T20:36:43.057Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1488",
       "fundingType": "hackathon",
       "title": "DSU DEVHACK 3.0",
@@ -15738,7 +15738,7 @@
       "updatedAt": "2026-08-14T20:36:43.046Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1489",
       "fundingType": "hackathon",
       "title": "Hack4Brahma 2.0",
@@ -15804,7 +15804,7 @@
       "updatedAt": "2026-08-14T20:36:43.042Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1490",
       "fundingType": "hackathon",
       "title": "Hack On Hills 8.0",
@@ -15903,7 +15903,7 @@
       "updatedAt": "2026-08-14T20:36:43.037Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1491",
       "fundingType": "hackathon",
       "title": "MicroCraft - ArcNight",
@@ -15980,7 +15980,7 @@
       "updatedAt": "2026-08-14T20:36:42.969Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1493",
       "fundingType": "hackathon",
       "title": "MicroCraft - Vibeathon",
@@ -16056,7 +16056,7 @@
       "updatedAt": "2026-08-14T20:36:42.962Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1494",
       "fundingType": "hackathon",
       "title": "FutureForge Hackathon 2026",
@@ -16136,7 +16136,7 @@
       "updatedAt": "2026-08-14T20:36:42.965Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:1496",
       "fundingType": "hackathon",
       "title": "FlutterFlow Champions League Hackathon",
@@ -16201,7 +16201,7 @@
       "updatedAt": "2026-08-14T20:36:42.958Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:600",
       "fundingType": "grant",
       "title": "Prezenti Mint Round",
@@ -16328,7 +16328,7 @@
       "updatedAt": "2026-08-14T20:36:43.099Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:958",
       "fundingType": "grant",
       "title": "Optimism Season 8 — Audit Grants",
@@ -16429,7 +16429,7 @@
       "updatedAt": "2026-08-14T20:36:42.938Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:959",
       "fundingType": "grant",
       "title": "Optimism Season 8 — Growth Grants",
@@ -16530,7 +16530,7 @@
       "updatedAt": "2026-08-14T20:36:42.943Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:961",
       "fundingType": "grant",
       "title": "Optimism Audit Service Providers (ASP)",
@@ -16621,7 +16621,7 @@
       "updatedAt": "2026-08-14T20:36:42.900Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:969",
       "fundingType": "grant",
       "title": "Scroll Community Grants",
@@ -16722,7 +16722,7 @@
       "updatedAt": "2026-08-14T20:36:42.947Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:981",
       "fundingType": "grant",
       "title": "Polygon Growth Partnership Program",
@@ -16832,7 +16832,7 @@
       "updatedAt": "2026-08-14T20:36:42.923Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:990",
       "fundingType": "grant",
       "title": "Local Meetups LATAM | Round 02",
@@ -16932,7 +16932,7 @@
       "updatedAt": "2026-08-14T20:36:42.954Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:991",
       "fundingType": "grant",
       "title": "Polygon Prediction Markets Program",
@@ -17034,7 +17034,7 @@
       "updatedAt": "2026-08-14T20:36:42.912Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:992",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 2",
@@ -17084,7 +17084,7 @@
       "updatedAt": "2026-08-14T20:36:43.638Z"
     },
     {
-      "specVersion": "1.0.0",
+      "specVersion": "1.0.1",
       "id": "fundingmap:996",
       "fundingType": "grant",
       "title": "Polygon Audit Support Program",
