@@ -1,4 +1,4 @@
-# RFP Hub — Postgres Data Model
+# RFPSear.ch — Postgres Data Model
 
 Storage model backing the public `/v1/` API.
 Target: **PostgreSQL 15+** with `pgvector` (semantic dedup) and `pg_trgm`. This is the

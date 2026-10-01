@@ -179,7 +179,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     "/",
     { schema: { operationId: "getServiceInfo", tags: ["meta"], summary: "Service info" } },
     async () => ({
-      name: "RFP Hub API",
+      name: "RFPSear.ch API",
       version: "v1",
       standard: SPEC_VERSION,
       docs: "/v1/docs",

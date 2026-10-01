@@ -1,7 +1,7 @@
 {
   "name": "@the-rfp-hub/mcp",
   "version": "0.1.4",
-  "description": "Model Context Protocol server for the RFP Hub — search and submit Ethereum-ecosystem funding opportunities from an MCP client.",
+  "description": "Model Context Protocol server for RFPSear.ch — search and submit Ethereum-ecosystem funding opportunities from an MCP client.",
   "license": "MIT",
   "type": "module",
   "mcpName": "io.github.The-RFP-Hub/rfp-hub",

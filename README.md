@@ -1,4 +1,4 @@
-# RFP Hub
+# RFPSear.ch
 
 [![CI](https://github.com/The-RFP-Hub/the-rfp-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/The-RFP-Hub/the-rfp-hub/actions/workflows/ci.yml)
 [![code: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](./LICENSE)
@@ -48,7 +48,7 @@ npx rfphub-validate opportunity.json
 | `packages/standard` | `@the-rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema, generated TS types, registries, conformance suite, migration table. Zero runtime deps. **SSoT.** |
 | `packages/validate` | `rfphub-validate` | MIT | `npx rfphub-validate` CLI + typed validation library, with an advisory warning tier over the registries. |
 | `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres), plus the authenticated write, review and administration surfaces. |
-| `packages/frontend` | — | MIT | RFP Hub frontend (Next.js) — the public directory and the publisher dashboard: submit, claim, review, keys, and per-entry analytics, one app and one deploy pipeline for both. See [`packages/frontend/README.md`](./packages/frontend/README.md). |
+| `packages/frontend` | — | MIT | RFPSear.ch frontend (Next.js) — the public directory and the publisher dashboard: submit, claim, review, keys, and per-entry analytics, one app and one deploy pipeline for both. See [`packages/frontend/README.md`](./packages/frontend/README.md). |
 | `packages/client` | `@the-rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
 | `packages/mcp` | `@the-rfp-hub/mcp` | MIT | Model Context Protocol server (stdio): search and fetch opportunities from any MCP client, plus an optional write behind an approval a person grants at their own terminal. See [`packages/mcp/README.md`](./packages/mcp/README.md) and [`adr/0012`](./adr/0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md). |
 | [`skills/funding-search`](./skills/funding-search/SKILL.md) | — | MIT | Agent Skill for searching funding opportunities — prefers the MCP server when installed, otherwise a bundled zero-dependency Node script. See [`skills/README.md`](./skills/README.md) for install channels (multi-agent installer, Claude Code plugin marketplace, or manual copy). |

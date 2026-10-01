@@ -128,7 +128,7 @@ async function waitUntilUp(url, timeoutMs, checkAborted) {
 }
 
 function looksLikeAppShell(html) {
-  return /<title>[^<]*RFP Hub[^<]*<\/title>/i.test(html) || /RFP Hub/i.test(html);
+  return /<title>[^<]*RFPSear.ch[^<]*<\/title>/i.test(html) || /RFPSear.ch/i.test(html);
 }
 
 /** Status and server-rendered shell only. `allow404` is per-route; `/` and a filtered `/` never get it. */

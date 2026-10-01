@@ -1,4 +1,4 @@
-# Deploying the RFP Hub
+# Deploying RFPSear.ch
 
 Top-down: what runs where, what has to exist in a cloud account **before** the first deploy, which
 variables are required, how the first deploy is sequenced, how a release is cut, and how it is

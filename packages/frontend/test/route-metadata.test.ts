@@ -83,8 +83,8 @@ describe("route metadata", () => {
     const source =
       readFileSync(join(appRoot, "layout.tsx"), "utf8") +
       readFileSync(join(process.cwd(), "src", "lib", "root-metadata.ts"), "utf8");
-    expect(source).toContain('default: "RFP Hub: an open index of Ethereum funding"');
-    expect(source).toContain('template: "%s | RFP Hub"');
+    expect(source).toContain('default: "RFPSear.ch: an open index of Ethereum funding"');
+    expect(source).toContain('template: "%s | RFPSear.ch"');
   });
 
   it("gives every current page route its own server metadata boundary", () => {
@@ -119,7 +119,7 @@ describe("route metadata", () => {
       expect(source, `${route} needs server-owned metadata`).toMatch(
         /export (?:const metadata|async function generateMetadata)/,
       );
-      expect(source).not.toContain('title: "RFP Hub: an open index of Ethereum funding"');
+      expect(source).not.toContain('title: "RFPSear.ch: an open index of Ethereum funding"');
     }
   });
 
@@ -127,7 +127,7 @@ describe("route metadata", () => {
     await expect(
       listingMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
     ).resolves.toEqual({
-      title: { default: "acme:round-4", template: "%s | RFP Hub" },
+      title: { default: "acme:round-4", template: "%s | RFPSear.ch" },
     });
     await expect(
       opportunityMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
@@ -151,11 +151,11 @@ describe("route metadata", () => {
       organizationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
     ).resolves.toEqual({ title: "Organization acme-foundation" });
     expect(organizationsMetadata).toEqual({
-      title: { default: "Organizations", template: "%s | RFP Hub" },
+      title: { default: "Organizations", template: "%s | RFPSear.ch" },
       robots: NOINDEX_ROBOTS,
     });
     expect(listingsMetadata).toEqual({
-      title: { default: "Your listings", template: "%s | RFP Hub" },
+      title: { default: "Your listings", template: "%s | RFPSear.ch" },
       robots: NOINDEX_ROBOTS,
     });
   });

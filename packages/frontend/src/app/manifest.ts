@@ -15,8 +15,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "RFP Hub",
-    short_name: "RFP Hub",
+    name: "RFPSear.ch",
+    short_name: "RFPSear.ch",
     description: "An open index of funding opportunities under one standard.",
     start_url: "/",
     display: "standalone",

@@ -1,7 +1,7 @@
 # ============================================================================
 # PERSISTENT DEV DATABASE — DO NOT `down -v` / RECREATE FROM AUTOMATION.
 #
-# This is the long-lived local Postgres for the RFP Hub /v1/ API (M2): named
+# This is the long-lived local Postgres for the RFPSear.ch /v1/ API (M2): named
 # volume (rfphub_pgdata), `restart: unless-stopped`, pinned port 5432 and
 # container name rfphub-postgres. It holds real seeded dev data — running
 # `docker compose down -v` here DESTROYS it.

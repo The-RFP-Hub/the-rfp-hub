@@ -70,9 +70,9 @@ export interface FeedDocumentOptions extends FeedBaseOptions {
 /** The list endpoint — the feed's human/JSON counterpart, linked as its `alternate`. */
 const COLLECTION_PATH = "/v1/opportunities";
 
-export const FEED_TITLE = "RFP Hub — funding opportunities";
-export const FEED_DESCRIPTION = `The most recently published Ethereum-ecosystem funding opportunities from the RFP Hub, newest first. Each entry is an RFP Hub Standard v${SPEC_VERSION} record; the full object is one request away at its link.`;
-const GENERATOR = "RFP Hub API";
+export const FEED_TITLE = "RFPSear.ch — funding opportunities";
+export const FEED_DESCRIPTION = `The most recently published Ethereum-ecosystem funding opportunities from RFPSear.ch, newest first. Each entry is an RFP Hub Standard v${SPEC_VERSION} record; the full object is one request away at its link.`;
+const GENERATOR = "RFPSear.ch API";
 
 /** Is `PUBLIC_BASE_URL` an absolute origin, rather than the relative `/` default? */
 function isAbsoluteBase(publicBaseUrl: string): boolean {

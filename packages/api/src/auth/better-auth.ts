@@ -252,7 +252,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
             .send({
               to: email,
               subject: subjectFor(type),
-              text: `Your RFP Hub code is ${otp}. It expires in ${OTP_EXPIRES_IN / 60} minutes.\n\nIf you did not ask for it, nothing has happened to your account and you can ignore this message.`,
+              text: `Your RFPSear.ch code is ${otp}. It expires in ${OTP_EXPIRES_IN / 60} minutes.\n\nIf you did not ask for it, nothing has happened to your account and you can ignore this message.`,
             })
             .then((result) => {
               if (result.status === "sent") return;
@@ -293,11 +293,11 @@ export function createAuth(options: CreateAuthOptions = {}) {
 function subjectFor(type: "sign-in" | "email-verification" | "forget-password" | "change-email") {
   switch (type) {
     case "email-verification":
-      return "Confirm your RFP Hub email address";
+      return "Confirm your RFPSear.ch email address";
     case "change-email":
-      return "Confirm your new RFP Hub email address";
+      return "Confirm your new RFPSear.ch email address";
     default:
-      return "Your RFP Hub sign-in code";
+      return "Your RFPSear.ch sign-in code";
   }
 }
 

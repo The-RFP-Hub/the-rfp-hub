@@ -103,7 +103,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
       "Duplicates is not a top-level destination any more",
     ).toHaveCount(0);
     await page.goto(`${stack.urls.frontend}/dashboard`);
-    await expect(page).toHaveTitle("Dashboard | RFP Hub");
+    await expect(page).toHaveTitle("Dashboard | RFPSear.ch");
     await page.goto(`${stack.urls.frontend}/listings`);
     await expect(
       page.getByRole("link", { name: /duplicate/i }).first(),

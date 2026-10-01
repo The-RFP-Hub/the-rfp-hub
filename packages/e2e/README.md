@@ -1,6 +1,6 @@
 # @the-rfp-hub/e2e
 
-End-to-end suite for the RFP Hub. This package is an external **runner**, not a bare Playwright
+End-to-end suite for RFPSear.ch. This package is an external **runner**, not a bare Playwright
 config: `src/run.ts` owns every out-of-process resource for the run — a disposable Postgres, the
 API (running on a restricted database role), the frontend, a fixture web server and a temporary
 identity provider session — brings them up, drives Playwright as a child process, and tears

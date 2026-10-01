@@ -35,9 +35,9 @@ const POLL_INTERVAL_MS = 100;
 /** The digits a code is made of. `OTP_LENGTH` in `packages/api/src/auth/better-auth.ts`. */
 const OTP_PATTERN = /\b(\d{6})\b/;
 const OTP_SUBJECTS: ReadonlySet<string> = new Set([
-  "Your RFP Hub sign-in code",
-  "Confirm your RFP Hub email address",
-  "Confirm your new RFP Hub email address",
+  "Your RFPSear.ch sign-in code",
+  "Confirm your RFPSear.ch email address",
+  "Confirm your new RFPSear.ch email address",
 ]);
 
 /**

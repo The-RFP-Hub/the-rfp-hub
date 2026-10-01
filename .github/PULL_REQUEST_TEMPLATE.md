@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to the RFP Hub! -->
+<!-- Thanks for contributing to RFPSear.ch! -->
 
 ## Summary
 

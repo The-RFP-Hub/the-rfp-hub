@@ -35,7 +35,7 @@ import {
   runJob,
 } from "../../src/modules/services/jobs/runner.js";
 
-const USAGE = `RFP Hub scheduled jobs
+const USAGE = `RFPSear.ch scheduled jobs
 
   node packages/api/dist/jobs.js all [options]          the whole nightly chain, in order
   node packages/api/dist/jobs.js <job> [options]        one job

@@ -12,7 +12,7 @@ export default function TermsPage() {
     <section>
       <h1>Terms of Use</h1>
       <p className="lede">
-        RFP Hub is an open index of Ethereum funding, provided as-is. These terms say what you agree
+        RFPSear.ch is an open index of Ethereum funding, provided as-is. These terms say what you agree
         to when you use it and what you license when you publish through it.
       </p>
       <p className="muted footnote">Effective 24&nbsp;August&nbsp;2026.</p>

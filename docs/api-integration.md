@@ -1,4 +1,4 @@
-# Integrating with the RFP Hub API
+# Integrating with the RFPSear.ch API
 
 For a developer building against the public API: read it in five minutes, write to it in twenty,
 and know the handful of contracts that would otherwise cost you an afternoon.

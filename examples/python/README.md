@@ -1,11 +1,11 @@
 # Python example
 
-A stdlib-only client for the RFP Hub public `/v1/` API — `urllib.request` + `json`, nothing to
+A stdlib-only client for the RFPSear.ch public `/v1/` API — `urllib.request` + `json`, nothing to
 install. No `requirements.txt`; works on any Python 3.9+.
 
 ## Prerequisites
 
-A running RFP Hub API. Bring one up locally (Postgres + migrate + seed) — see
+A running RFPSear.ch API. Bring one up locally (Postgres + migrate + seed) — see
 [`packages/api/README.md`](../../packages/api/README.md) — or point at a hosted instance via
 `RFPHUB_API_BASE` (default `http://localhost:3001`).
 

@@ -17,8 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
         }
       : {}),
     title: {
-      default: "RFP Hub: an open index of Ethereum funding",
-      template: "%s | RFP Hub",
+      default: "RFPSear.ch: an open index of Ethereum funding",
+      template: "%s | RFPSear.ch",
     },
     description:
       "An open index of funding opportunities under one standard. Read it without an account. Publishers sign in to manage their own listings.",

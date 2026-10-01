@@ -2,7 +2,7 @@
   "name": "@the-rfp-hub/api",
   "version": "0.2.0",
   "private": true,
-  "description": "RFP Hub public /v1/ REST API (Fastify + Postgres) serving the RFP Hub Standard.",
+  "description": "RFPSear.ch public /v1/ REST API (Fastify + Postgres) serving the RFP Hub Standard.",
   "license": "MIT",
   "type": "module",
   "engines": {

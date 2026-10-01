@@ -1,5 +1,5 @@
 /**
- * RFP Hub `/v1/` API — Drizzle schema.
+ * RFPSear.ch `/v1/` API — Drizzle schema.
  *
  * This is the IMPLEMENTED slice of the full design in `packages/api/docs/data-model.md`, which
  * remains the canonical design target. M2 implemented the read layer (`organizations`,

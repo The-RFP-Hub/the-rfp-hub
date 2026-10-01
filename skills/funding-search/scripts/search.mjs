@@ -30,7 +30,7 @@ import {
 
 const HELP = `funding-search — search.mjs
 
-Search open Ethereum-ecosystem funding opportunities via the RFP Hub public API.
+Search open Ethereum-ecosystem funding opportunities via the RFPSear.ch public API.
 
   node search.mjs [options]
 

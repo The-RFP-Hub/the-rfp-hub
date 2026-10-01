@@ -82,7 +82,7 @@ describe("phase 0 — a credential inside the document", () => {
   it("runs BEFORE schema validation, so an invalid document with a key still refuses for the key", async () => {
     const { ctx } = context();
     const error = await rejection(run({ document: { junk: FAKE_KEY } }, ctx));
-    expect(error.message).toContain("shaped like an RFP Hub API key");
+    expect(error.message).toContain("shaped like an RFPSear.ch API key");
   });
 
   it("lets a clean document through", () => {

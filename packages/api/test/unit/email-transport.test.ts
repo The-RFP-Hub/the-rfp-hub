@@ -41,8 +41,8 @@ function mailgunConfig(overrides: Partial<EmailConfig> = {}): EmailConfig {
 
 const MESSAGE = {
   to: "person@example.org",
-  subject: "Your RFP Hub sign-in code",
-  text: "Your RFP Hub code is 123456. It expires in 5 minutes.",
+  subject: "Your RFPSear.ch sign-in code",
+  text: "Your RFPSear.ch code is 123456. It expires in 5 minutes.",
 };
 
 interface SeenRequest {

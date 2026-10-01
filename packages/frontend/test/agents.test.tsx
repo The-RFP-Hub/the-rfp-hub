@@ -57,7 +57,7 @@ describe("llms.txt", () => {
   it("follows the llms.txt shape: a title, a summary quote, then sections of links", () => {
     const text = llmsTxt(origins);
     const lines = text.split("\n");
-    expect(lines[0]).toBe("# RFP Hub");
+    expect(lines[0]).toBe("# RFPSear.ch");
     expect(lines[2]?.startsWith("> ")).toBe(true);
     expect(text).toMatch(/^## Search the index$/m);
     expect(text).not.toContain("undefined");

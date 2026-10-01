@@ -41,7 +41,7 @@ export function fixtureDocument(run) {
     summary:
       "Created by scripts/accept-writes.mjs to verify the real MCP 3-phase submission interlock.",
     description:
-      "Created by the RFP Hub write-acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
+      "Created by the RFPSear.ch write-acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
     status: "open",
     operatingOrganizations: [{ name: "compliance", slug: "compliance" }],
     ecosystems: ["Ethereum"],

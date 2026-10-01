@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for the RFP Hub /v1/ API (packages/api).
+# Multi-stage Dockerfile for the RFPSear.ch /v1/ API (packages/api).
 #
 # Stage 1: install the full workspace and build every package —
 #   `@the-rfp-hub/standard` and `rfphub-validate` are workspace deps of the

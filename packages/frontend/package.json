@@ -2,7 +2,7 @@
   "name": "@the-rfp-hub/frontend",
   "version": "0.2.0",
   "private": true,
-  "description": "RFP Hub client — the public opportunity directory, and the publisher workbench for submitting, maintaining and reviewing entries.",
+  "description": "RFPSear.ch client — the public opportunity directory, and the publisher workbench for submitting, maintaining and reviewing entries.",
   "license": "MIT",
   "type": "module",
   "scripts": {

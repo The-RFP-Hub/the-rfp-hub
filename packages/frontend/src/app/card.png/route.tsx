@@ -54,7 +54,7 @@ export async function GET() {
       }}
     >
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ fontSize: 28, color: SECONDARY, letterSpacing: 1 }}>RFP Hub</div>
+        <div style={{ fontSize: 28, color: SECONDARY, letterSpacing: 1 }}>RFPSear.ch</div>
         <div
           style={{
             display: "flex",

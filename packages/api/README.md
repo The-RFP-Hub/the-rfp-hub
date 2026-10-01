@@ -1,6 +1,6 @@
 # @the-rfp-hub/api
 
-The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
+The public **`/v1/` read API** for RFPSear.ch — an unauthenticated Fastify + Postgres service that
 serves [RFP Hub Standard v1.0.1](../standard) objects, backed by a curated 142-entry dataset
 committed to this repository, and repeatable open-data exports (CC0). This is milestone **M2**.
 

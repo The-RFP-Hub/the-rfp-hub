@@ -12,7 +12,7 @@ export default function PrivacyPage() {
     <section>
       <h1>Privacy</h1>
       <p className="lede">
-        RFP Hub is an open index of Ethereum funding. You need no account to read it, but like any
+        RFPSear.ch is an open index of Ethereum funding. You need no account to read it, but like any
         web service it processes request metadata, described below. This page says what the Hub
         stores, what leaves its servers, what is public forever, and how to leave.
       </p>

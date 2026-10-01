@@ -1,4 +1,4 @@
-# Contributing to the RFP Hub
+# Contributing to RFPSear.ch
 
 Thanks for helping build an open, neutral standard and aggregation layer for Ethereum-ecosystem
 funding opportunities. Contributions of all kinds are welcome — schema proposals, validation

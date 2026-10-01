@@ -350,7 +350,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
     if (res.status >= 500) {
       throw new RequestError(
         "server_error",
-        `The RFP Hub API returned a server error (${res.status}). Try again shortly.`,
+        `The RFPSear.ch API returned a server error (${res.status}). Try again shortly.`,
         { status: res.status },
       );
     }
@@ -375,7 +375,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
     } catch {
       throw new RequestError(
         "malformed_response",
-        `The RFP Hub API returned a response that was not valid JSON (status ${res.status}).`,
+        `The RFPSear.ch API returned a response that was not valid JSON (status ${res.status}).`,
         { status: res.status },
       );
     }
@@ -393,7 +393,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
     if (body === null || typeof body !== "object" || Array.isArray(body)) {
       throw new RequestError(
         "malformed_response",
-        `The RFP Hub API returned JSON that is not an object (status ${res.status}).`,
+        `The RFPSear.ch API returned JSON that is not an object (status ${res.status}).`,
         { status: res.status },
       );
     }

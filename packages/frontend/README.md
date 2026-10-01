@@ -1,4 +1,4 @@
-# RFP Hub frontend — the directory and the workbench
+# RFPSear.ch frontend — the directory and the workbench
 
 This package is the project's **reference frontend** and the **operational workbench** at once —
 one app, one deploy pipeline, both roles. There is no separate marketing site and no separate admin
@@ -6,7 +6,7 @@ tool: the same Next.js build that serves the public directory to an anonymous vi
 the signed-in publisher, reviewer and administrator surfaces, gated by nothing more than the session
 `GET /v1/me` returns.
 
-A browser client for the RFP Hub `/v1/` API, and two surfaces rather than one:
+A browser client for RFPSear.ch `/v1/` API, and two surfaces rather than one:
 
 * **The directory** — every published opportunity, browsable, searchable and readable by anybody,
   with **no account and no sign-in**. It is the front door (`/`), because the people the data is for

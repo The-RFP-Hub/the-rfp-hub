@@ -56,7 +56,7 @@ export function composeDuplicateNotificationEmail(
       "",
       "Automated similarity is a signal for comparison, not proof that two listings are the same.",
       "",
-      `Open RFP Hub: ${destination}`,
+      `Open RFPSear.ch: ${destination}`,
     ].join("\n"),
   };
 }

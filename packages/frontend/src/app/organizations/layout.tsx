@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export const metadata: Metadata = {
   title: {
     default: "Organizations",
-    template: "%s | RFP Hub",
+    template: "%s | RFPSear.ch",
   },
   robots: NOINDEX_ROBOTS,
 };

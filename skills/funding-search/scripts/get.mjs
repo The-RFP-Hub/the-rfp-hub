@@ -23,7 +23,7 @@ import {
 
 const HELP = `funding-search — get.mjs
 
-Fetch one funding opportunity by id via the RFP Hub public API.
+Fetch one funding opportunity by id via the RFPSear.ch public API.
 
   node get.mjs <id> [--format json|table]
 

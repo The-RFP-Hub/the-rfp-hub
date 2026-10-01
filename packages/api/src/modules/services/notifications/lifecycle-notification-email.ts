@@ -28,22 +28,22 @@ export function composeLifecycleNotificationEmail(
     case "welcome":
       return {
         to: recipientEmail,
-        subject: "Welcome to RFP Hub",
+        subject: "Welcome to RFPSear.ch",
         text: [
-          "Welcome to RFP Hub.",
+          "Welcome to RFPSear.ch.",
           "",
           "You can browse funding opportunities without an account, and use your signed-in account to publish and maintain listings when you are a verified publisher.",
           "",
-          `Open RFP Hub: ${destination}`,
+          `Open RFPSear.ch: ${destination}`,
         ].join("\n"),
       };
     case "publisher_verified": {
       const organization = organizationPayload(notification.payload);
       return {
         to: recipientEmail,
-        subject: `${organization.name} is a verified publisher on RFP Hub`,
+        subject: `${organization.name} is a verified publisher on RFPSear.ch`,
         text: [
-          `Your publisher organization, ${organization.name} (${organization.slug}), is verified on RFP Hub.`,
+          `Your publisher organization, ${organization.name} (${organization.slug}), is verified on RFPSear.ch.`,
           "",
           "New listings in this namespace can be published without review, subject to the Hub's publishing rules.",
           "",
