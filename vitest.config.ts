@@ -19,8 +19,15 @@ import { configDefaults, defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
+    // `.claude/` holds local agent worktrees, whole copies of this repository.
     // `packages/e2e` is Playwright, run only through `pnpm e2e`: its `*.spec.ts` files match
     // vitest's default include and would otherwise be collected and run here too.
-    exclude: [...configDefaults.exclude, "**/.next/**", "packages/frontend/**", "packages/e2e/**"],
+    exclude: [
+      ...configDefaults.exclude,
+      "**/.next/**",
+      "**/.claude/**",
+      "packages/frontend/**",
+      "packages/e2e/**",
+    ],
   },
 });
