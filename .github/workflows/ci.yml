@@ -493,11 +493,14 @@ jobs:
         run: |
           echo "mode=${MODE_INPUT:-packed}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and pack rfphub-validate from this checkout (packed mode)
+      # Both, because the packed validate pins the checkout's Standard version exactly, which a
+      # release PR has not published yet.
+      - name: Build and pack rfphub-validate and the Standard from this checkout (packed mode)
         if: steps.mode.outputs.mode == 'packed'
         run: |
           pnpm --filter rfphub-validate build
           mkdir -p "$RUNNER_TEMP/rfphub-pack"
+          pnpm --filter @the-rfp-hub/standard pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
           pnpm --filter rfphub-validate pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
 
       # `--browser` is required here: the HTTP checks alone pass on a build that never reaches the API.
@@ -516,6 +519,10 @@ jobs:
           specs=()
           if [ -n "$STANDARD_SPEC_INPUT" ]; then
             specs+=(--standard-spec "$STANDARD_SPEC_INPUT")
+          elif [ "$MODE" = "packed" ]; then
+            standard="$(ls "$RUNNER_TEMP"/rfphub-pack/the-rfp-hub-standard-*.tgz)"
+            specs+=(--standard-spec "$standard")
+            echo "packed mode: --standard-spec $standard"
           fi
           if [ "$MODE" = "packed" ]; then
             tarball="$(ls "$RUNNER_TEMP"/rfphub-pack/rfphub-validate-*.tgz)"
