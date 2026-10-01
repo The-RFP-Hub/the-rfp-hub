@@ -1,6 +1,5 @@
 "use client";
 
-import { OrgMark } from "@/components/OrgMark";
 import { UntrustedText } from "@/components/UntrustedText";
 import { formatShortDate, nextFixedDeadline } from "@/lib/format";
 import { cardAward, daysUntil } from "@/lib/landing";
@@ -44,16 +43,6 @@ export function OpportunityCard({ item, large }: { item: OpportunitySummary; lar
         <UntrustedText value={item.title} />
       </span>
       <span className="opportunity-card-org muted">
-        {operator ? (
-          <OrgMark
-            slug={operator.slug}
-            name={operator.name}
-            // Whether this operator is verified is not carried on `OpportunitySummary` — only the
-            // initials mark can be shown here until that changes.
-            verified={false}
-            className="org-mark-small"
-          />
-        ) : null}
         <UntrustedText value={operator?.name} />
       </span>
       {large && item.summary?.trim() ? (

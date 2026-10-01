@@ -153,10 +153,14 @@ export function OpportunityView({
             <OrgMark slug={operator.slug} name={operator.name} verified={claimed} />
           ) : null}
           <div>
+            {/* The status reads first, above the title: it decides whether the rest is worth reading. */}
+            <p className="opportunity-status">
+              <StatusBadge status={entry.status} />
+            </p>
             <h1>
               <UntrustedText value={entry.title} />
             </h1>
-            {/* One line, one voice: type, who runs it, where, and the status as the one badge. */}
+            {/* One line, one voice: type, who runs it, and where. */}
             <p className="opportunity-meta muted">
               <span>
                 {typeLabel}
@@ -173,7 +177,6 @@ export function OpportunityView({
                   </>
                 ) : null}
               </span>
-              <StatusBadge status={entry.status} />
             </p>
           </div>
         </div>
@@ -558,7 +561,10 @@ function Organizations({ entry }: { entry: Opportunity }) {
           <dt>Backs it</dt>
           <dd>
             {sponsors.length === 0 ? (
-              <span className="muted">none named</span>
+              <span className="muted">
+                <span aria-hidden="true">-</span>
+                <span className="visually-hidden">none named</span>
+              </span>
             ) : (
               <ul className="plain">
                 {sponsors.map((org) => (

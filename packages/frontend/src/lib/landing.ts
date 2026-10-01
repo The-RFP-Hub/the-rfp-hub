@@ -6,14 +6,11 @@ import { nextFixedDeadline } from "./format";
  * the directory reads, and everything shown above the fold is derived here so a unit test can pin
  * what "$143M in maximum awards listed" actually sums.
  */
-import type { FundingType, OpportunitySummary } from "./types";
+import type { OpportunitySummary } from "./types";
 
 export const CLOSING_SOON_DAYS = 30;
 export const CLOSING_SOON_LIMIT = 6;
 export const FEATURED_LIMIT = 3;
-
-/** The four tiles. `accelerator` and `vc_fund` are counted under "other" and linked from the copy. */
-export const TILE_TYPES: readonly FundingType[] = ["grant", "hackathon", "bounty", "rfp"];
 
 export interface LandingSummary {
   open: number;

@@ -233,7 +233,10 @@ describe("the public directory list", () => {
     // objection to a hidden default, and the reason this assertion exists next to the one above.
     const status = screen.getByLabelText("Status") as HTMLSelectElement;
     expect(status.value).toBe("open");
-    expect(screen.getByRole("link", { name: "Show closed and upcoming too" })).toBeTruthy();
+    expect(
+      (screen.getByRole("checkbox", { name: "Include closed & upcoming" }) as HTMLInputElement)
+        .checked,
+    ).toBe(false);
   });
 
   it("pairs filter icons with text labels instead of replacing their accessible names", async () => {
@@ -786,10 +789,10 @@ describe("the directory's filters", () => {
     mount(client, <DirectoryList />);
     await screen.findByText("Acme Foundation");
 
-    // A link, not a button: it can be middle-clicked, bookmarked and sent to somebody, and the
-    // back button out of it works for free.
-    const toggle = screen.getByRole("link", { name: "Show closed and upcoming too" });
-    expect(toggle.getAttribute("href")).toBe("/directory?status=any");
+    // A checkbox whose state is an address: ticking it pushes a URL that can be bookmarked and
+    // sent to somebody, and the back button out of it works for free.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Include closed & upcoming" }));
+    expect(navigation.push).toHaveBeenLastCalledWith("/directory?status=any");
   });
 
   it("follows the address bar when it changes underneath — the back button", async () => {
