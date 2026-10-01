@@ -149,9 +149,9 @@ function Keys() {
     <section>
       <h1>API keys</h1>
       <p className="muted footnote">
-        API keys let integrations submit listings on your behalf. The RFPSear.ch MCP searches without a
-        key; give it a <code>write</code> key only when you want it to submit. A key cannot manage
-        your account, review a submission or grant a role.
+        API keys let integrations submit listings on your behalf. The RFPSear.ch MCP searches
+        without a key; give it a <code>write</code> key only when you want it to submit. A key
+        cannot manage your account, review a submission or grant a role.
       </p>
 
       {secret ? (
