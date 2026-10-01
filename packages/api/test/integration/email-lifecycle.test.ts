@@ -357,7 +357,9 @@ describeWithDb("M5 lifecycle email events", () => {
   });
 
   it("uses a rolling created/sent cooldown across UTC boundaries and allows the exact interval", async () => {
-    const boundary = new Date("2026-09-30T23:59:59.000Z");
+    // One second before the next UTC midnight, so the fixtures (created at the real "now") are
+    // never newer than the simulated clock.
+    const boundary = new Date(Math.ceil((Date.now() + 1) / 86_400_000) * 86_400_000 - 1000);
     const organization = await seedOrganization({
       slug: ORGS.cooldown,
       name: "M5 Cooldown",
@@ -413,7 +415,7 @@ describeWithDb("M5 lifecycle email events", () => {
       .set({ emailDispatchedAt: boundary })
       .where(eq(notifications.id, firstId));
     const acrossBoundary = await runForFixture({
-      now: new Date("2026-10-01T00:00:00.000Z"),
+      now: new Date(boundary.getTime() + 1000),
     });
     expect(acrossBoundary.processed).toBe(0);
 

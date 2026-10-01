@@ -14,7 +14,7 @@ import {
 import { canonicalSiteOrigin, requestOrigin } from "@/lib/site-origin";
 
 /** Pinned like every example in the MCP README; `test/agents.test.tsx` keeps it on the released version. */
-export const MCP_VERSION = "0.1.3";
+export const MCP_VERSION = "0.1.4";
 export const MCP_PACKAGE = `@the-rfp-hub/mcp@${MCP_VERSION}`;
 export const MCP_COMMAND = `npx -y ${MCP_PACKAGE}`;
 
