@@ -2119,8 +2119,7 @@ pre.code-block {
     margin-left: 0;
   }
 
-  /* The session note stands in for Log in while it cannot be offered, so it takes the same slot. */
-  .shell-header[data-authenticated="false"] .shell-login,
+  /* The brief "restoring session…" note sits top right, out of the links' row. */
   .shell-header[data-authenticated="false"] .shell-session-note {
     position: absolute;
     inset-block-start: var(--space-3);

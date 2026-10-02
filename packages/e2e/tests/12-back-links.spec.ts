@@ -38,7 +38,8 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const context = await browser.newContext({ userAgent: DESKTOP_UA, storageState: undefined });
     try {
       const page = await context.newPage();
-      await page.goto(stack.urls.frontend);
+      // The header no longer carries a Log in button; the new-listing gate does.
+      await page.goto(`${stack.urls.frontend}/listings/new`);
 
       const opener = page.getByRole("button", { name: "Log in" }).first();
       await opener.focus();

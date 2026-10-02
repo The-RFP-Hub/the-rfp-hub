@@ -122,7 +122,9 @@ describe("the notification navigation badge", () => {
     const notifications = vi.fn(async () => inbox(4));
     renderChrome(notifications);
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Submit a program →" })).toBeTruthy(),
+    );
     expect(notifications).not.toHaveBeenCalled();
     expect(screen.queryByRole("link", { name: /Notifications/ })).toBeNull();
   });

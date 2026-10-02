@@ -11,8 +11,8 @@
  * pass renders the signed-out shell truthfully because on the server nobody IS signed in. So this
  * is an ordinary import, and the "Loading…" placeholder the dynamic import needed is gone with it.
  *
- * WHY THE PANEL LIVES HERE. `SessionState.login()` is a `() => void` called from the header, from
- * the gate on every private page and from the directory's publisher card. Keeping its signature is
+ * WHY THE PANEL LIVES HERE. `SessionState.login()` is a `() => void` called from the gate on every
+ * private page and from the directory's publisher card (the header uses `loginTo()`). Keeping its signature is
  * what made this migration invisible to those consumers, so the panel has to be openable from
  * anywhere without a route change and without threading a prop through the tree — which is a
  * context, provided once, at the root.
@@ -40,10 +40,58 @@ import { readSessionToken } from "./auth-client";
  * named rather than hidden — outside `<AppProviders>` there is no panel to open, so `login()` does
  * nothing, and nothing in the shipped app renders outside it.
  */
-const SignInContext = createContext<() => void>(() => {});
+const SignInContext = createContext<(options?: SignInOptions) => void>(() => {});
 
+/**
+ * `next` is where a completed sign-in should land when the panel was opened on the way somewhere —
+ * the header's "Submit a program" opens it while it navigates to the new-listing form. An email
+ * sign-in closes the panel on the page already showing, so it needs nothing more; Google's sign-in
+ * leaves the site and comes back through `/auth/complete`, so the destination is parked in
+ * `sessionStorage` for that page to take. Opening the panel without a `next`, or dismissing it,
+ * clears whatever was parked: a stale intent must never redirect a later, unrelated sign-in.
+ */
+export interface SignInOptions {
+  next?: string;
+}
+
+/** Open the panel. Safe to hand straight to `onClick`: the click event is never read as options. */
 export function useSignInOpener(): () => void {
-  return useContext(SignInContext);
+  const open = useContext(SignInContext);
+  return useCallback(() => open(), [open]);
+}
+
+/** Open the panel and, once signed in, land on `next`. */
+export function useSignInOpenerTo(): (next: string) => void {
+  const open = useContext(SignInContext);
+  return useCallback((next: string) => open({ next }), [open]);
+}
+
+const SIGN_IN_DESTINATION_KEY = "rfphub:sign-in-next";
+
+/** Only a path on this site: one leading slash, never `//host` or a scheme. */
+function isInternalPath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\");
+}
+
+function parkSignInDestination(next: string | undefined) {
+  try {
+    if (next && isInternalPath(next)) window.sessionStorage.setItem(SIGN_IN_DESTINATION_KEY, next);
+    else window.sessionStorage.removeItem(SIGN_IN_DESTINATION_KEY);
+  } catch {
+    // Storage blocked: the email sign-in still lands on the right page; Google falls back to the
+    // default destination. Nothing here may stop the panel from opening.
+  }
+}
+
+/** The parked destination, removed as it is read so it is honoured at most once. */
+export function takeSignInDestination(): string | null {
+  try {
+    const next = window.sessionStorage.getItem(SIGN_IN_DESTINATION_KEY);
+    window.sessionStorage.removeItem(SIGN_IN_DESTINATION_KEY);
+    return next && isInternalPath(next) ? next : null;
+  } catch {
+    return null;
+  }
 }
 
 export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; children: ReactNode }) {
@@ -59,7 +107,8 @@ export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; childre
     createApiClient({ baseUrl: apiBaseUrl, getToken: async () => readSessionToken() }),
   );
 
-  const openSignIn = useCallback(() => {
+  const openSignIn = useCallback((options?: SignInOptions) => {
+    parkSignInDestination(typeof options?.next === "string" ? options.next : undefined);
     const active = document.activeElement;
     opener.current = active instanceof HTMLElement ? active : null;
     openerDisclosure.current = opener.current?.closest("details") ?? null;
@@ -67,6 +116,9 @@ export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; childre
   }, []);
 
   const closeSignIn = useCallback((reason: "dismiss" | "signed-in") => {
+    // The panel closed on this page, so a parked destination has done its job (signed in, already
+    // here) or lost its reason (dismissed). Only Google's round trip leaves it for `/auth/complete`.
+    takeSignInDestination();
     restoreAfter.current = reason;
     setOpen(false);
   }, []);

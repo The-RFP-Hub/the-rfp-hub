@@ -1,4 +1,4 @@
-import { useSignInOpener } from "@/lib/auth-root";
+import { takeSignInDestination, useSignInOpener, useSignInOpenerTo } from "@/lib/auth-root";
 import { AuthRoot } from "@/lib/auth-root";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, useEffect, useState } from "react";
@@ -206,5 +206,79 @@ describe("the sign-in dialog", () => {
     const reopened = await screen.findByRole("dialog");
     expect(reopened.hasAttribute("open")).toBe(true);
     expect(showModal).toHaveBeenCalledTimes(2);
+  });
+});
+
+function SubmitOpener() {
+  const openSignInTo = useSignInOpenerTo();
+  return (
+    <button type="button" onClick={() => openSignInTo("/listings/new")}>
+      Submit a program
+    </button>
+  );
+}
+
+describe("a sign-in opened on the way somewhere", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("parks the destination for Google's round trip, and drops it when the panel is dismissed", async () => {
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <main id="main-content" tabIndex={-1}>
+          <SubmitOpener />
+        </main>
+      </AuthRoot>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit a program" }));
+    const dialog = await screen.findByRole("dialog");
+    // While the panel is open, a Google sign-in would leave the site; the destination must survive.
+    expect(window.sessionStorage.getItem("rfphub:sign-in-next")).toBe("/listings/new");
+
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // A dismissed panel must not redirect some later, unrelated sign-in.
+    expect(window.sessionStorage.getItem("rfphub:sign-in-next")).toBeNull();
+  });
+
+  it("drops it after an email sign-in, which already closed the panel on the right page", async () => {
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <main id="main-content" tabIndex={-1}>
+          <SubmitOpener />
+        </main>
+      </AuthRoot>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit a program" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Complete sign-in" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(window.sessionStorage.getItem("rfphub:sign-in-next")).toBeNull();
+  });
+
+  it("is honoured at most once, and never as a path off this site", () => {
+    window.sessionStorage.setItem("rfphub:sign-in-next", "/listings/new");
+    expect(takeSignInDestination()).toBe("/listings/new");
+    expect(takeSignInDestination()).toBeNull();
+
+    for (const hostile of ["//evil.example", "https://evil.example", "/\\evil.example"]) {
+      window.sessionStorage.setItem("rfphub:sign-in-next", hostile);
+      expect(takeSignInDestination()).toBeNull();
+    }
+  });
+
+  it("opens with no destination from the plain opener, clearing a stale one", async () => {
+    window.sessionStorage.setItem("rfphub:sign-in-next", "/listings/new");
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <main id="main-content" tabIndex={-1}>
+          <Opener />
+        </main>
+      </AuthRoot>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    await screen.findByRole("dialog");
+    expect(window.sessionStorage.getItem("rfphub:sign-in-next")).toBeNull();
   });
 });

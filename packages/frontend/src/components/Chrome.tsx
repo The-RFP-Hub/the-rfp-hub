@@ -397,15 +397,19 @@ export function Chrome({ children }: { children: ReactNode }) {
                 <DecorativeIcon icon={ChevronDownIcon} className="shell-menu-caret" />
               </button>
             </>
-          ) : (
-            <button type="button" className="shell-login" onClick={session.login}>
-              <IconLabel icon={ArrowRightOnRectangleIcon}>Log in</IconLabel>
-            </button>
-          )}
+          ) : null}
 
+          {/* The header's one way in for a publisher, signed in or not. Signed out, it also opens
+              the sign-in panel on the way to the form, so the form is where the sign-in lands; the
+              form's own gate is still there for anyone who dismisses the panel. */}
           <GuardedLink
-            href={session.authenticated ? "/listings/new" : `${HOW_IT_WORKS}#publish`}
+            href="/listings/new"
             className="shell-submit"
+            onNavigate={() => {
+              if (session.ready && !session.authenticated && !session.error) {
+                session.loginTo("/listings/new");
+              }
+            }}
           >
             Submit a program →
           </GuardedLink>

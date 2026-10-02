@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { useCallback } from "react";
 import { useApi } from "./api-context";
 import { authClient, clearSessionToken, refreshSession } from "./auth-client";
-import { AuthRoot, useSignInOpener } from "./auth-root";
+import { AuthRoot, useSignInOpener, useSignInOpenerTo } from "./auth-root";
 import { readConfig } from "./config";
 import { clearAllOpportunityDrafts } from "./opportunity-draft";
 import { type Resource, useResource } from "./resource";
@@ -43,6 +43,8 @@ export interface SessionState {
    */
   error: Error | null;
   login: () => void;
+  /** Open the sign-in panel and, once signed in, land on `next` (see `SignInOptions`). */
+  loginTo: (next: string) => void;
   logout: () => Promise<void>;
   /** The API's answer about this account — a state with loading and failure branches, not a value. */
   me: Resource<Me>;
@@ -52,6 +54,7 @@ export interface SessionState {
 export function useSession(): SessionState {
   const query = authClient.useSession();
   const openSignIn = useSignInOpener();
+  const openSignInTo = useSignInOpenerTo();
   const api = useApi();
 
   const loadMe = useCallback(() => api.me.get(), [api]);
@@ -97,6 +100,7 @@ export function useSession(): SessionState {
     // `error.message`, so it is turned into a real one here rather than at four call sites.
     error: query.error ? new Error(describeSessionFailure(query.error)) : null,
     login: openSignIn,
+    loginTo: openSignInTo,
     logout,
     me: state,
     reloadMe: reload,
