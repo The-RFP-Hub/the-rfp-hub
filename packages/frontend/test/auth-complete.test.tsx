@@ -42,7 +42,11 @@ vi.mock("@/lib/auth-client", async () => {
   };
 });
 
-vi.mock("@/lib/auth-root", () => ({ useSignInOpener: () => openSignIn }));
+const takeSignInDestination = vi.fn<() => string | null>(() => null);
+vi.mock("@/lib/auth-root", () => ({
+  useSignInOpener: () => openSignIn,
+  takeSignInDestination: () => takeSignInDestination(),
+}));
 
 /**
  * `useRouter` returns a NEW object on every call, deliberately.
@@ -99,6 +103,17 @@ describe("completing the handoff", () => {
     expect(refreshSession.mock.invocationCallOrder[0]).toBeLessThan(
       replace.mock.invocationCallOrder[0] as number,
     );
+  });
+
+  it("lands on a destination parked before Google took over, instead of the dashboard", async () => {
+    // The header's "Submit a program" parks the new-listing form before opening the panel.
+    takeSignInDestination.mockReturnValueOnce("/listings/new");
+    arriveWithToken();
+
+    render(<AuthCompletePage />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/listings/new"));
+    expect(replace).not.toHaveBeenCalledWith("/dashboard");
   });
 
   it("scrubs the token out of the URL before anything can await", async () => {

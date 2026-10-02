@@ -25,12 +25,16 @@
 import { ErrorState } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { authClient, describeTransportFailure, refreshSession } from "@/lib/auth-client";
-import { useSignInOpener } from "@/lib/auth-root";
+import { takeSignInDestination, useSignInOpener } from "@/lib/auth-root";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-/** Where a completed sign-in lands. The publisher's own surface, which is why they signed in. */
+/**
+ * Where a completed sign-in lands: the publisher's own surface, which is why they signed in — unless
+ * the panel was opened on the way somewhere (the header's "Submit a program"), in which case that
+ * destination was parked before Google took over and is honoured once.
+ */
 const DESTINATION = "/dashboard";
 
 export default function AuthCompletePage() {
@@ -124,7 +128,7 @@ export default function AuthCompletePage() {
       refreshSession();
       // `replace`, not `push`: the entry this page occupies is the one that held the token, and it
       // must not be somewhere the back button returns to.
-      router.replace(DESTINATION);
+      router.replace(takeSignInDestination() ?? DESTINATION);
     })();
     // No cleanup that abandons the request. A one-time token is spent the moment the server sees
     // it, so a "cancelled" redemption is not cancelled in any sense that matters — it is a spent
