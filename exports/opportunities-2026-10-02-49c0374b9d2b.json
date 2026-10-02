@@ -1,9 +1,464 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-01T10:16:22.059Z",
-  "count": 160,
+  "generatedAt": "2026-10-02T09:53:57.057Z",
+  "count": 169,
   "opportunities": [
+    {
+      "specVersion": "1.0.1",
+      "id": "arbitrum-foundation:open-house-singapore-2026",
+      "fundingType": "hackathon",
+      "title": "Arbitrum Open House — Singapore",
+      "description": "Arbitrum Open House — Singapore is the third city in the Arbitrum Foundation's 2026 Open House series, after New York City and London, run in collaboration with Robinhood Chain and hosted on HackQuest. It has two legs.\n\n**First, the \"Arbitrum Open House Singapore: Online Buildathon\"** — a 3-week online build sprint (tech stack Solidity and Rust) open worldwide, running registration 2026-07-29 through submission close 2026-10-04, with results announced 2026-10-12. As of 2026-09-21 the HackQuest listing shows it live and open (registration and submission both open), with 880 registered participants and 48 projects already submitted. Any project entering must be deployed on an Arbitrum chain (Arbitrum Sepolia, Arbitrum One, Robinhood Chain, or others). The Buildathon carries a published prize pool of 115,000 USDC across three tracks: an Overall Prize (40,000 / 20,000 / 10,000 for 1st–3rd), a Promising Products Track (7,000 / 5,000 / 3,000 for 1st–3rd, with extra consideration for projects integrating Paxos' USDG stablecoin), and a Grants pot (30,000, discretionary and milestone-based). At least one of the three Promising Products Track prizes is reserved for a project building on Robinhood Chain, and at least one for a project on Arbitrum; all prizes are subject to development-tied milestones.\n\n**Second, \"Founder House Singapore\"** — a dedicated, application-only, three-day in-person program on 23–25 October 2026 in Singapore, for founders and teams who already have an existing product, prototype or early-stage business building on Arbitrum One or Robinhood Chain (both solo founders and teams may apply; applications are reviewed on a rolling basis via Luma and participation is limited and curated). The Arbitrum Foundation's own announcement (\"Founder House Singapore: Apply Now to Launch Products on Arbitrum One & Robinhood Chain\", 2026-09-17) describes a 3-day agenda — Day 1 product mentorship, Day 2 go-to-market and distribution, Day 3 a Demo Day pitching to the Arbitrum Foundation, Offchain Labs and Robinhood Chain — and states winning teams share \"up to $300K USDG in prizes and grants\" plus an invitation to Arbitrum's eight-week Mentorship Program run jointly with Robinhood Chain. The published Founder House prize breakdown is: General Category 120,000 (60,000 / 40,000 / 20,000 for 1st–3rd, with at least one of the top three reserved for a Robinhood Chain project), a Robinhood Chain Founder-in-Residence award of 60,000, a Robinhood Chain Innovation Award of 30,000, a Best Promising Products award of 20,000 shared among the top three (at least one building on Robinhood Chain), and an Additional Grants pot of 70,000 for teams showing strong potential and ecosystem alignment; for most tracks a portion is paid upfront with the remainder tied to milestones.\n\n**Combined budget.** The Buildathon's 115,000 and the Founder House's 300,000 are both independently published figures and sum to the Arbitrum Foundation's own headline total: \"Builder's Block #023: $415k in Prizes at Open House Singapore\" (2026-08-13) and \"Builder's Block #025\" (2026-09-09) both lead with \"$415k in Prizes + Grants\" for Open House Singapore. Because the Buildathon's prizes are denominated in USDC and the Founder House's in USDG — both dollar-pegged stablecoins — amounts here are recorded in nominal USD; see the report for this normalisation.\n\nOpen House previously ran in New York City (30,000 USD Buildathon prize pool, 514 participants) and London (115,000 USDC Buildathon plus 300,000 in Founder House prizes, also summing to a published $415K), both now closed and recorded as their own opportunities in this corpus (fundingmap:1412 and fundingmap:1398 respectively).\n\n`postedAt` is 2026-08-13, the date of the Arbitrum Foundation's Builder's Block #023, which is the earliest dedicated public announcement of the Singapore edition and its Buildathon-applications-open moment that this record's author verified directly; an earlier, more general \"Open House will expand to London and Singapore\" teaser may exist (as it did for London), but was not separately re-verified for this record.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "The Arbitrum Foundation",
+          "slug": "arbitrum-foundation",
+          "orgType": "foundation",
+          "website": "https://arbitrum.foundation",
+          "ecosystems": [
+            "Arbitrum",
+            "Ethereum"
+          ],
+          "description": "The Arbitrum Foundation stewards the Arbitrum ecosystem and administers its grant and builder programs. It chairs the Arbitrum Audit Committee and disburses audit subsidies directly to approved auditors.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/arbitrum",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/arbitrum",
+              "platform": "discord"
+            },
+            {
+              "url": "https://farcaster.xyz/arbitrum",
+              "platform": "farcaster"
+            },
+            {
+              "url": "https://forum.arbitrum.foundation/",
+              "platform": "forum"
+            },
+            {
+              "url": "https://blog.arbitrum.foundation",
+              "platform": "blog"
+            }
+          ]
+        },
+        {
+          "name": "HackQuest",
+          "slug": "hackquest",
+          "orgType": "company",
+          "website": "https://www.hackquest.io/",
+          "description": "Builder platform hosting the Open House online buildathons."
+        }
+      ],
+      "source": {
+        "publisher": "arbitrum-foundation",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:54.399Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-10-01T12:40:55.399Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": true,
+        "prizes": [
+          {
+            "track": "Buildathon: Overall Prize (1st)",
+            "amount": 40000
+          },
+          {
+            "track": "Buildathon: Overall Prize (2nd)",
+            "amount": 20000
+          },
+          {
+            "track": "Buildathon: Overall Prize (3rd)",
+            "amount": 10000
+          },
+          {
+            "track": "Buildathon: Promising Products Track (1st)",
+            "amount": 7000
+          },
+          {
+            "track": "Buildathon: Promising Products Track (2nd)",
+            "amount": 5000
+          },
+          {
+            "track": "Buildathon: Promising Products Track (3rd)",
+            "amount": 3000
+          },
+          {
+            "track": "Buildathon: Grants",
+            "amount": 30000
+          },
+          {
+            "track": "Founder House: General Category (1st)",
+            "amount": 60000
+          },
+          {
+            "track": "Founder House: General Category (2nd)",
+            "amount": 40000
+          },
+          {
+            "track": "Founder House: General Category (3rd)",
+            "amount": 20000
+          },
+          {
+            "track": "Founder House: Robinhood Chain Founder-in-Residence",
+            "amount": 60000
+          },
+          {
+            "track": "Founder House: Robinhood Chain Innovation Award",
+            "amount": 30000
+          },
+          {
+            "track": "Founder House: Best Promising Products (shared, top 3)",
+            "amount": 20000
+          },
+          {
+            "track": "Founder House: Additional Grants",
+            "amount": 70000
+          }
+        ],
+        "tracks": [
+          "Buildathon: Overall Prize",
+          "Buildathon: Promising Products Track",
+          "Buildathon: Grants",
+          "Founder House: General Category",
+          "Founder House: Robinhood Chain Founder-in-Residence",
+          "Founder House: Robinhood Chain Innovation Award",
+          "Founder House: Best Promising Products",
+          "Founder House: Additional Grants"
+        ],
+        "location": "Singapore (IRL Founder House, 23–25 October 2026); Online Buildathon fully online."
+      },
+      "summary": "Arbitrum's third 2026 Open House city: a 3-week online Buildathon (Sept 14–Oct 4, 115,000 USDC in prizes, open and live as of 2026-09-21) feeding an application-only, 3-day IRL Founder House in Singapore on 23–25 October 2026 with up to $300K USDG in prizes and grants — a published combined $415K, run with Robinhood Chain.",
+      "sponsoringOrganizations": [
+        {
+          "name": "Robinhood Chain",
+          "slug": "robinhood-chain",
+          "orgType": "company",
+          "website": "https://docs.robinhood.com/chain/",
+          "description": "Robinhood's permissionless, Ethereum-compatible Layer-2 blockchain, co-sponsoring Open House Singapore's Buildathon and Founder House prize pools and reserving dedicated award tracks for projects built on it.",
+          "socialLinks": []
+        }
+      ],
+      "ecosystems": [
+        "Arbitrum",
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "Stablecoins",
+        "Tokenization",
+        "DeFi",
+        "AI",
+        "Privacy",
+        "Payments",
+        "Developer Tooling"
+      ],
+      "eligibility": "Online Buildathon: open to any registered participant worldwide; the declared tech stack is Solidity and Rust, and the finished project must be deployed on an Arbitrum chain (Arbitrum Sepolia, Arbitrum One, Robinhood Chain, or others). Founder House: application-only, for founders and teams with an existing product, prototype or active early-stage business already building on Arbitrum One or Robinhood Chain; both solo founders and teams may apply. The Foundation states it is especially looking for teams building in tokenization (stocks, commodities, RWAs), AI agents (trading, payments, portfolio management), DeFi (perps, DEXs, lending), privacy (payments, trading, infrastructure tooling), payments (on/off-ramps, payroll, cross-border) and consumer/social trading, with bonus consideration for apps built in Rust, C or C++. Founders may apply to the Buildathon, Founder House, or both; Founder House selection is based on product quality, execution potential and ecosystem alignment, and participation is limited and highly curated.",
+      "additionalReferences": "Buildathon listing (live prize, registration and submission data): https://arbitrum-singapore.hackquest.io/buildathons/Arbitrum-Open-House-Singapore-Online-Buildathon | Open House Singapore landing page: https://arbitrum-singapore.hackquest.io/ | Founder House application (Luma): https://luma.com/openhouse-singapore | Founder House announcement, \"Founder House Singapore: Apply Now to Launch Products on Arbitrum One & Robinhood Chain\" (2026-09-17): https://blog.arbitrum.foundation/founder-house-singapore-apply-now-to-launch-products-on-arbitrum-one-robinhood-chain/ | Announcement with the $415k headline, \"Builder's Block #023: $415k in Prizes at Open House Singapore\" (2026-08-13): https://blog.arbitrum.foundation/builders-block-023-415k-in-prizes-at-open-house-singapore-apply-now/",
+      "applicationUrl": "https://arbitrum-singapore.hackquest.io/buildathons/Arbitrum-Open-House-Singapore-Online-Buildathon",
+      "website": "https://arbitrum-singapore.hackquest.io/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/arbitrum",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "budget": 415000
+      },
+      "opensAt": "2026-07-29T17:01:00.000Z",
+      "deadlines": [
+        {
+          "date": "2026-10-02T17:01:00.000Z",
+          "label": "registration",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-10-04T15:59:00.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-10-12T06:00:00.000Z",
+          "label": "results announced",
+          "deadlineType": "fixed"
+        },
+        {
+          "label": "Founder House application",
+          "deadlineType": "rolling"
+        },
+        {
+          "date": "2026-10-23T01:30:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-10-25T11:30:00.000Z",
+          "label": "event end",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-08-13T00:00:00.000Z",
+      "createdAt": "2026-10-01T12:40:54.397Z",
+      "updatedAt": "2026-10-01T12:40:54.399Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "blueshift-foundation:filecoin-kernel-fy27",
+      "fundingType": "grant",
+      "title": "Filecoin Kernel FY27",
+      "description": "Kernel is one of three funding objectives under Filecoin Public Goods Funding (FilPGF, filpgf.io), which its own footer states is 'administered by the Blueshift Foundation' — not the Filecoin Foundation — and runs on Karma's funding infrastructure (contact: info@karmahq.xyz). The other two objectives are Revenue Development (funds 'Filecoin Onchain Cloud and Fil One,' turning storage capacity into paid, on-chain usage) and R&D (early work that graduates into the other two). As of 2026-09-21, FilPGF's homepage reports '$9.96M' committed to date across '49' total projects spread over its three objectives.\n\nKernel, in the program's own words, 'funds the functions Filecoin depends on to keep producing blocks, proving storage, and staying observable. It is treated as a near-fixed cost rather than a growth bet: the goal is not more features, it is that nothing essential quietly stops being maintained.' Work is catalogued as discrete 'functions,' independent of which repo currently implements them, each placed into a tier — Irreplaceable ('Must fund — non-negotiable'), Essential ('Fund for redundancy — 2+ implementations') or Important ('Fund maintenance, not features') — that sets its funding posture. Concretely this covers maintenance of functions the network cannot operate without, a second implementation where relying on one is a systemic risk, monitoring, testnets and incident response that keep the network observable, and required security/upgrade work; it explicitly does not fund new features or product growth (routed to Revenue Development) or exploratory, unproven work (routed to R&D), nor any function whose maintainers won't report health metrics.\n\nKernel replaces the batch/milestone model used by the closed ProPGF rounds (Batches 1-3, already catalogued elsewhere in this corpus) with 'an annual term with audits rather than milestones, because keeping something working is a continuous obligation and not a deliverable.' Each term carries two audits — mid-term and close-out — that check 'agreed resilience metrics rather than a feature list,' each metric backed by 'a threshold, a reading cadence and a public endpoint anyone can call.' The current FY26 term (begun January 2026) funds 14 teams across 14 grants; its mid-term audit cleared in April 2026 and its close-out audit is due October 2026.\n\nFor FY27, FilPGF's own published timeline is: 'FY27 intake opens October 2026,' 'Applications close in November, awards are published in December, and the new term begins in January. Existing grantees re-apply on the same cycle.' As of this verification (2026-09-21), the page's 'Apply' call-to-action still resolves to the Karma listing for the closed 'Filecoin ProPGF Batch 3' program (deadline already passed) rather than a live FY27 intake form, so no working FY27 application link could be confirmed yet — consistent with intake not opening until October 2026.",
+      "status": "upcoming",
+      "operatingOrganizations": [
+        {
+          "name": "Blueshift Foundation",
+          "slug": "blueshift-foundation",
+          "orgType": "foundation",
+          "website": "https://www.filpgf.io",
+          "ecosystems": [
+            "Filecoin"
+          ],
+          "description": "The Blueshift Foundation administers Filecoin Public Goods Funding (FilPGF, filpgf.io), the multi-program public-goods funding operation for the Filecoin network. FilPGF's own footer states: 'Filecoin Public Goods Funding · administered by the Blueshift Foundation.' The platform runs on Karma's funding infrastructure. As of 2026-09-21 no independent Blueshift Foundation website could be found (blueshift.foundation and blueshiftfoundation.org do not resolve to it); filpgf.io is its only confirmed public web presence, and Filecoin's own project socials are used here for lack of Blueshift-specific ones.",
+          "socialLinks": [
+            {
+              "url": "https://twitter.com/Filecoin",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/yeQ2hcd2TD",
+              "platform": "discord"
+            },
+            {
+              "url": "https://github.com/filecoin-project",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "blueshift-foundation",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:55.859Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": null
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "programModel": "maintenance",
+        "milestoneBased": false,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Filecoin Kernel funds near-fixed-cost, essential network maintenance (redundancy, observability, security) rather than new features, through annual terms checked by mid-term and close-out audits instead of milestones. FY27 intake opens October 2026, closes November 2026, and the new term starts January 2027, per FilPGF's own timeline; the program is administered by the Blueshift Foundation, not the Filecoin Foundation.",
+      "ecosystems": [
+        "Filecoin"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Infrastructure",
+        "Security",
+        "Public Goods"
+      ],
+      "eligibility": "Teams maintaining a function the Filecoin network depends on, able to commit to reporting agreed health/resilience metrics on a public endpoint; existing Kernel grantees re-apply on the same annual cycle. Only near-fixed-cost maintenance qualifies — new features and exploratory work are directed to FilPGF's separate Revenue Development and R&D objectives instead.",
+      "additionalReferences": "FilPGF homepage (objectives overview, $9.96M committed / 49 projects): https://www.filpgf.io/ | Kernel program page (objective, timeline, tiers, inventory): https://www.filpgf.io/kernel/",
+      "website": "https://www.filpgf.io/kernel/",
+      "createdAt": "2026-10-01T12:40:55.857Z",
+      "updatedAt": "2026-10-01T12:40:55.859Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "colosseum:crypto-worlds-fair",
+      "fundingType": "hackathon",
+      "title": "Colosseum Crypto World's Fair",
+      "description": "Crypto World's Fair is an online hackathon run by Colosseum — the organisation behind the Solana-ecosystem Colosseum accelerator and venture fund, and previously known for its Solana-only Breakout hackathons — bringing together, in its own words, \"builders and founders across all crypto ecosystems to launch breakout startups.\" It is Colosseum's first competition open to builders across every blockchain ecosystem rather than Solana alone; per Colosseum's announcement, the organisers state their \"accelerator and venture fund will continue focusing on investing in Solana founders,\" while the hackathon itself is deliberately multichain. Registration runs September 14 through October 12, 2026, with submissions due by the same October 12 deadline.\n\nThe event carries $840,000 in total prizes plus $2.5 million in seed funding available through the accompanying accelerator pathway. General awards, open to all submissions regardless of ecosystem, are: a $30,000 Grand Prize; $300,000 shared across the next 20 best projects ($15,000 per project); a $5,000 Public Good Prize; and a $5,000 University Prize.\n\nOn top of the general awards, eight ecosystem tracks each carry a dedicated, independently sponsored prize pool, confirmed live on Colosseum's site: Solana ($100,000; 10 projects × $10,000, presented by Solana), Tempo ($100,000; 10 × $10,000, presented by Tempo), Zcash ($100,000; 10 × $10,000, presented by Zcash), and Hyperliquid ($100,000; 10 × $10,000, presented by Hydromancer) each carry the larger pool; Ethereum L1 ($25,000; 5 × $5,000), Base ($25,000; 5 × $5,000), Arbitrum ($25,000; 5 × $5,000) and Robinhood Chain ($25,000; 5 × $5,000) each carry the smaller pool, with the Ethereum, Base, Arbitrum and Robinhood Chain tracks all presented by Ethlabs (Arbitrum and Base additionally co-presented by their own foundations). Track prizes are awarded in addition to, not instead of, the general awards above, so a single project can in principle win both a track prize and a general award.\n\nAll Hackathon winners are interviewed and considered for Colosseum's accelerator programme, which offers $250,000 in pre-seed funding, mentorship, network access, and a 12-week in-person residency at Colosseum's San Francisco office. Judging is led by Colosseum's own founding team (Clay Robbins, Matty Taylor, Nate Levine) plus named track judges drawn from ecosystem partners (including representatives tied to Phantom, Base, Ethlabs, Espresso Systems, Arcium, Anza, Realms, MetaDAO and Drift, among others). Live workshops stream on Colosseum's Discord, including a Tempo-specific workshop (Sep 16) and an Ethereum Foundation session (Sep 22, details announced separately).\n\nModelling note: this is a Solana-ecosystem organiser running a genuinely multichain hackathon, not an Ethereum-native program — but four of its eight tracks (Ethereum L1, Base, Arbitrum, Robinhood Chain) are real, separately funded Ethereum-and-L2 tracks worth $100,000 in aggregate, which is why this entry is in scope for the Hub despite the organiser's Solana roots.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Colosseum",
+          "slug": "colosseum",
+          "orgType": "company",
+          "website": "https://colosseum.com",
+          "ecosystems": [
+            "Solana"
+          ],
+          "description": "Colosseum combines global crypto hackathons, a founder accelerator, and a venture fund to help ambitious startups launch and grow. Historically built around Solana's ecosystem (its Solana \"Breakout\" hackathons and its Solana-focused accelerator/venture fund), Colosseum states its accelerator and venture fund will keep focusing on investing in Solana founders even as its hackathons, starting with Crypto World's Fair, open up to all blockchain ecosystems. Founded by Clay Robbins, Matty Taylor and Nate Levine.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/colosseum",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/QK6d4F7h5q",
+              "platform": "discord"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "colosseum",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:55.181Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-10-01T12:40:55.470Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": true,
+        "prizes": [
+          {
+            "track": "Solana",
+            "amount": 100000
+          },
+          {
+            "track": "Tempo",
+            "amount": 100000
+          },
+          {
+            "track": "Zcash",
+            "amount": 100000
+          },
+          {
+            "track": "Hyperliquid",
+            "amount": 100000
+          },
+          {
+            "track": "Ethereum L1",
+            "amount": 25000
+          },
+          {
+            "track": "Base",
+            "amount": 25000
+          },
+          {
+            "track": "Arbitrum",
+            "amount": 25000
+          },
+          {
+            "track": "Robinhood Chain",
+            "amount": 25000
+          },
+          {
+            "amount": 30000
+          },
+          {
+            "amount": 300000
+          },
+          {
+            "amount": 5000
+          },
+          {
+            "amount": 5000
+          }
+        ],
+        "tracks": [
+          "Solana",
+          "Ethereum L1",
+          "Base",
+          "Arbitrum",
+          "Tempo",
+          "Zcash",
+          "Hyperliquid",
+          "Robinhood Chain"
+        ],
+        "location": null
+      },
+      "summary": "Colosseum's first multichain, fully online hackathon (registration Sep 14–Oct 12, 2026; $840,000 in prizes + $2.5M accelerator seed funding). Eight ecosystem tracks each carry dedicated prize pools: Solana, Tempo, Zcash and Hyperliquid at $100,000 each; Ethereum L1, Base, Arbitrum and Robinhood Chain at $25,000 each.",
+      "sponsoringOrganizations": [
+        {
+          "name": "The Arbitrum Foundation",
+          "slug": "arbitrum-foundation",
+          "orgType": "foundation",
+          "website": "https://arbitrum.foundation",
+          "ecosystems": [
+            "Arbitrum",
+            "Ethereum"
+          ],
+          "description": "The Arbitrum Foundation stewards the Arbitrum ecosystem and administers its grant and builder programs, including ArbiFuel, the Arbitrum Audit Program and the Trailblazer grant programs.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/arbitrum",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/arbitrum",
+              "platform": "discord"
+            },
+            {
+              "url": "https://farcaster.xyz/arbitrum",
+              "platform": "farcaster"
+            },
+            {
+              "url": "https://forum.arbitrum.foundation/",
+              "platform": "forum"
+            },
+            {
+              "url": "https://blog.arbitrum.foundation",
+              "platform": "blog"
+            }
+          ]
+        },
+        {
+          "name": "Base",
+          "slug": "base",
+          "orgType": "protocol",
+          "website": "https://www.base.org/",
+          "ecosystems": [
+            "Base",
+            "Ethereum"
+          ],
+          "description": "Ethereum L2 incubated by Coinbase; the Ecosystem Fund is its strategic investment arm."
+        }
+      ],
+      "ecosystems": [
+        "Solana",
+        "Ethereum",
+        "Base",
+        "Arbitrum",
+        "Tempo",
+        "Zcash",
+        "Hyperliquid",
+        "Robinhood Chain"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "Multichain"
+      ],
+      "eligibility": "Open to builders and founders across all crypto ecosystems; no geographic restriction stated. Participants choose an ecosystem track to compete for its dedicated prize pool, in addition to being eligible for the cross-track general awards.",
+      "additionalReferences": "Event page: https://colosseum.com/worldsfair | Announcement blog post: https://blog.colosseum.com/expanding-the-arena/ | Accelerator: https://colosseum.com/accelerator",
+      "applicationUrl": "https://colosseum.com/arena/hackathon/register?entry=worldsfair",
+      "website": "https://colosseum.com/worldsfair",
+      "fundingInfo": {
+        "currency": "USD",
+        "budget": 840000
+      },
+      "deadlines": [
+        {
+          "date": "2026-09-14T00:00:00.000Z",
+          "label": "registration",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-10-12T23:59:59.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-09-14T00:00:00.000Z",
+      "createdAt": "2026-10-01T12:40:55.179Z",
+      "updatedAt": "2026-10-01T12:40:55.181Z"
+    },
     {
       "specVersion": "1.0.1",
       "id": "curated:0x-bug-bounty",
@@ -4651,8 +5106,8 @@
       "id": "curated:mantle-ecofund",
       "fundingType": "grant",
       "title": "Mantle EcoFund",
-      "description": "The Mantle EcoFund is Mantle's ecosystem investment vehicle for early-stage projects seeking a long-term partnership with Mantle Network. It was established by Mantle governance proposal MIP-24, posted to the Mantle forum on 26 February 2023, which 'authorized the establishment of a US$100 million Mantle EcoFund capitalised by the Mantle Treasury'; capital is drawn down in tranches through governance-approved capital calls denominated in USDC (a first call of US$10 million, then a second call of US$30 million authorised by MIP-29 in February 2024, which also expanded the fund's investment mandate). Mantle's own site currently describes the EcoFund as having 'a $200M catalyzed capital pool… accessing top-tier deal flow through 20 leading VCs like Polychain and Dragonfly' — that larger figure is the catalysed pool including co-investor capital, not the DAO-authorised fund size. Mirana Ventures plays a strategic role supporting the fund.\n\nThis is investment and partnership support rather than a fixed grant cheque. Investment criteria, in Mantle's words, look for projects that are early stage; are seeking a long-term partnership with Mantle; can attract capital from venture firms and allocators; and synergize with other Mantle Ecosystem partners.\n\nSupport provided is split into two tiers. Exclusively for EcoFund portfolio companies: the EcoFund 'EF' tag, and deal-structuring and fundraising support. Prioritized for them (and also provided to top-performing applications on Mantle generally): Mantle co-promotion on media, social and events; enhanced delegated voting; listing recommendations to partnered exchanges; liquidity support via the Economics Committee program; and direct access and regular catch-ups with the Mantle Growth team.\n\nIntake is by email rather than a public form: the EcoFund page's 'Contact Us' resolves to ecofund@mantle.xyz, with the suggested subject line 'Join Mantle EcoFund as a Strategic Venture Partner'. The page lists 40+ portfolio companies across DeFi, gaming, Bitcoin infrastructure, RWA and AI, many tagged 'Live'. No closing date is published. Historic selectivity disclosed in governance: between 1 September 2023 and 15 January 2024 the EcoFund team reviewed 252 projects, took 58 (23%) into deeper due diligence, and invested in 10 (3.9%).",
-      "status": "open",
+      "description": "The Mantle EcoFund is Mantle's ecosystem investment vehicle for early-stage projects seeking a long-term partnership with Mantle Network. It was established by Mantle governance proposal MIP-24, posted to the Mantle forum on 26 February 2023, which 'authorized the establishment of a US$100 million Mantle EcoFund capitalised by the Mantle Treasury'; capital is drawn down in tranches through governance-approved capital calls denominated in USDC (a first call of US$10 million, then a second call of US$30 million authorised by MIP-29 in February 2024, which also expanded the fund's investment mandate). Mantle's own site currently describes the EcoFund as having 'a $200M catalyzed capital pool… accessing top-tier deal flow through 20 leading VCs like Polychain and Dragonfly' — that larger figure is the catalysed pool including co-investor capital, not the DAO-authorised fund size. Mirana Ventures plays a strategic role supporting the fund.\n\nThis is investment and partnership support rather than a fixed grant cheque. Investment criteria, in Mantle's words, look for projects that are early stage; are seeking a long-term partnership with Mantle; can attract capital from venture firms and allocators; and synergize with other Mantle Ecosystem partners.\n\nSupport provided is split into two tiers. Exclusively for EcoFund portfolio companies: the EcoFund 'EF' tag, and deal-structuring and fundraising support. Prioritized for them (and also provided to top-performing applications on Mantle generally): Mantle co-promotion on media, social and events; enhanced delegated voting; listing recommendations to partnered exchanges; liquidity support via the Economics Committee program; and direct access and regular catch-ups with the Mantle Growth team.\n\nIntake is by email rather than a public form: the EcoFund page's 'Contact Us' resolves to ecofund@mantle.xyz, with the suggested subject line 'Join Mantle EcoFund as a Strategic Venture Partner'. The page lists 40+ portfolio companies across DeFi, gaming, Bitcoin infrastructure, RWA and AI, many tagged 'Live'. No closing date is published. Historic selectivity disclosed in governance: between 1 September 2023 and 15 January 2024 the EcoFund team reviewed 252 projects, took 58 (23%) into deeper due diligence, and invested in 10 (3.9%).\n\nAs of 1 October 2026 the EcoFund page has been removed: mantle.xyz/ecofund redirects to Mantle's homepage, and Mantle no longer publishes an intake for the fund. The entry is closed for that reason.",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Mantle",
@@ -4692,9 +5147,11 @@
         }
       ],
       "source": {
+        "publisher": "curated",
+        "submittedAt": "2026-10-01T13:49:07.242Z",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-09-26T01:07:44.581Z"
+        "verifiedAt": "2026-10-01T13:49:07.373Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -4729,7 +5186,7 @@
       ],
       "postedAt": "2023-02-26T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-08-14T20:36:43.616Z"
+      "updatedAt": "2026-10-01T13:49:07.242Z"
     },
     {
       "specVersion": "1.0.1",
@@ -10448,6 +10905,7 @@
       ],
       "source": {
         "publisher": "optimism",
+        "submittedAt": "2026-10-01T13:49:06.152Z",
         "ingestedVia": "import",
         "originalId": "1042",
         "verifiedAgainstSource": false,
@@ -10473,7 +10931,6 @@
       "eligibility": "Per the Season 9 Governance Fund Missions post: incentive programs in Season 9 were available to any chain in the Superchain contributing revenue back to the Collective (any chain in the Superchain Index). Projects were eligible if they had deployed their own contracts on eligible OP Chains. Additional criteria could be set by the Developer Advisory Board.",
       "prerequisites": "Audit-grant review in Season 8/9 cycles prioritised projects that are open source and Superchain-aligned, demonstrate clear ecosystem impact, actively co-fund their own audit, maintain a realistic OP-to-audit-scope ratio, and are underfunded relative to the requested audit cost. Applications went through an AI-assisted triage pass (audit scope sizing, cost efficiency, repository completeness) before human review.",
       "additionalReferences": "Season 9 Governance Fund Missions: https://gov.optimism.io/t/season-9-governance-fund-missions/10526 | Guide to Season 9: https://gov.optimism.io/t/guide-to-season-9/10529 | Season 9 Final Report: https://gov.optimism.io/t/season-9-final-report/10685 | DAB Season 8/9 Communication Thread: https://gov.optimism.io/t/seasons-8-9-developer-advisory-board-communication-thread/10214 | DAB Internal Operating Procedures: https://gov.optimism.io/t/internal-operating-procedures-iop-for-developer-advisory-board-season-8/10213 | DAB Dissolution Proposal: https://gov.optimism.io/t/council-dissolution-proposal-dissolve-the-developer-advisory-board/10734",
-      "applicationUrl": "https://www.opgrants.io",
       "socialLinks": [
         {
           "url": "https://gov.optimism.io/",
@@ -10506,7 +10963,7 @@
       ],
       "postedAt": "2026-01-07T21:30:19.000Z",
       "createdAt": "2026-02-03T17:46:02.000Z",
-      "updatedAt": "2026-08-14T20:36:42.863Z"
+      "updatedAt": "2026-10-01T13:49:06.152Z"
     },
     {
       "specVersion": "1.0.1",
@@ -16367,6 +16824,7 @@
       ],
       "source": {
         "publisher": "optimism",
+        "submittedAt": "2026-10-01T13:49:03.837Z",
         "ingestedVia": "import",
         "originalId": "958",
         "verifiedAgainstSource": false,
@@ -16392,7 +16850,6 @@
       "eligibility": "Per the Season 8 Governance Fund Missions post: incentive programs and the chain delegation program were available to chains on a fully-standard, governance-approved release of the OP Stack that had opted into the Security Council (or were on track to) — the green and yellow chains in the Superchain Index. Projects were eligible if they had deployed their own contracts on eligible OP Chains.",
       "prerequisites": "The Board prioritised projects that are open source and Superchain-aligned, demonstrate clear ecosystem impact, actively co-fund their own audit, maintain a realistic OP-to-audit-scope ratio, and are underfunded relative to the requested audit cost. Applications passed an AI-assisted triage on audit scope sizing, cost efficiency and repository completeness before human review, with a target initial response within 14 days (max).",
       "additionalReferences": "S8 Governance Fund Missions: https://gov.optimism.io/t/s8-governance-fund-missions/10004 | Cycle 41 results: https://gov.optimism.io/t/cycle-41-results-season-8-audit-grants/10285 | Cycle 42 results: https://gov.optimism.io/t/cycle-42-results-season-8-audit-grants/10315 | Cycle 43 results: https://gov.optimism.io/t/cycle-43-results-season-8-audit-grants/10373 | Cycle 44 results: https://gov.optimism.io/t/cycle-44-results-season-8-audit-grants/10414 | Cycle 45 results: https://gov.optimism.io/t/cycle-45-results-season-8-audit-grants/10508 | S8 Grants Council Impact Analysis: https://gov.optimism.io/t/s8-grants-council-impact-analysis/10584",
-      "applicationUrl": "https://www.opgrants.io",
       "socialLinks": [
         {
           "url": "https://gov.optimism.io/",
@@ -16426,7 +16883,7 @@
       ],
       "postedAt": "2025-06-11T22:30:03.000Z",
       "createdAt": "2025-08-19T16:16:40.000Z",
-      "updatedAt": "2026-08-14T20:36:42.938Z"
+      "updatedAt": "2026-10-01T13:49:03.837Z"
     },
     {
       "specVersion": "1.0.1",
@@ -16468,6 +16925,7 @@
       ],
       "source": {
         "publisher": "optimism",
+        "submittedAt": "2026-10-01T13:49:04.999Z",
         "ingestedVia": "import",
         "originalId": "959",
         "verifiedAgainstSource": false,
@@ -16494,7 +16952,6 @@
       "eligibility": "Per the Season 8 Governance Fund Missions post: incentive programs and the chain delegation program were available to chains on a fully-standard, governance-approved release of the OP Stack that had opted into the Security Council (or were on track to) — the green and yellow chains in the Superchain Index. Projects were eligible if they had deployed their own contracts on eligible OP Chains. Additional criteria could be determined by the Grants Council.",
       "prerequisites": "A proposal had to show how the grant would move Season 8's success metrics: interop-ready TVL within the Interop set, and ETH-per-month transaction fees from transactions interacting with the L2ToL2CrossDomainMessenger contract. Selection was against the Grants Council's own public rubric, published on the forum before the first round of selection; impact was evaluated by OP Labs or Open Source Observer at the end of the Season.",
       "additionalReferences": "S8 Governance Fund Missions: https://gov.optimism.io/t/s8-governance-fund-missions/10004 | S8 Grants Council Impact Analysis: https://gov.optimism.io/t/s8-grants-council-impact-analysis/10584 | Internal Operating Procedures for the Grants Council Season 8: https://gov.optimism.io/t/internal-operating-procedures-iop-for-the-grants-council-season-8/10207 | Grants Council Dissolution Proposal: https://gov.optimism.io/t/council-dissolution-proposal-dissolve-the-grants-council/10732",
-      "applicationUrl": "https://www.opgrants.io",
       "socialLinks": [
         {
           "url": "https://gov.optimism.io/",
@@ -16527,7 +16984,7 @@
       ],
       "postedAt": "2025-06-11T22:30:03.000Z",
       "createdAt": "2025-08-19T16:15:52.000Z",
-      "updatedAt": "2026-08-14T20:36:42.943Z"
+      "updatedAt": "2026-10-01T13:49:04.999Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17202,6 +17659,509 @@
       "postedAt": "2025-09-30T15:52:18.000Z",
       "createdAt": "2025-11-12T19:45:46.000Z",
       "updatedAt": "2026-08-14T20:36:42.918Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "prezenti:ai-builder-sponsorships-trial",
+      "fundingType": "grant",
+      "title": "Prezenti AI Builder Sponsorships (Trial)",
+      "description": "Prezenti — Celo's community-run direct grants programme — is running a four-month trial sponsoring five individual builders' access to premium AI coding tools, funded from $7,000 Prezenti already holds rather than a new treasury request. In Prezenti's own framing: \"Prezenti backs builders on evidence of what they have actually shipped — not on where they studied, who they know, or how many stars a repository has.\"\n\nEach of the five selected builders can receive up to $1,400 across four months, composed of Claude Max 20x access (up to $200/month), ChatGPT Pro 5x access (up to $100/month) and a $200 flexible allowance for the term, reimbursed monthly against receipts. Prezenti says it will first help eligible finalists apply for vendor-funded open-source access; any free subscription obtained this way, or any unused amount, reduces programme spending and returns to Prezenti's Strategic Reserve instead of increasing an individual's allowance.\n\nThe programme targets \"individual builders with strong public evidence of shipping original technical work, especially people for whom the cost of top-tier AI coding tools is a genuine access barrier.\" Prior Celo history is welcome but not required; a credible four-month plan must include a Celo mainnet deployment, integration, or material ecosystem contribution. Candidates can apply directly, or be sourced proactively by Prezenti through public GitHub activity and Celo regional scouts.\n\nSelection runs through Prezenti's published, open-source \"talent-engine\" scoring tool (github.com/prezenti/talent-engine), which grades the previous six months of public GitHub activity on a 100-point rubric: shipped original work (40), sustained cadence (20), external validation (10), collaboration and review (5), blockchain ecosystem footprint (10), and emerging agent-protocol signal (15). Stars, followers, credentials, raw commit counts, referrals and the proposed build plan itself earn no technical points. The score produces an evidence-linked shortlist; Prezenti stewards make the final call after verifying the work, the access barrier, authenticity, conflicts, the four-month plan and Celo fit. Every applicant — successful or not — receives their score plus specific feedback.\n\nSelected builders commit to: monthly receipts and one public build update per month; a review (with a 7-day cure period) if 30 days pass with no qualifying activity; a verifiable Celo mainnet deployment, integration or material contribution by the month-two checkpoint as a condition of continued months three and four; a public, good-faith 2% give-back pledge on the sponsored product's Celo revenue and on any grant, prize or retro-funding income the sponsored work later wins (capped at $14,000, expiring 36 months after the term); and a public Celo EAS attestation naming their GitHub handle. No equity is taken; Prezenti asks only for a 14-day right of first offer if the project later raises a round. Prezenti separately and publicly commits to routing half of what it receives under the give-back onward to the Celo Community Fund. Places fill on a rolling basis as builders are selected.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Prezenti",
+          "slug": "prezenti",
+          "orgType": "program",
+          "website": "https://www.prezenti.xyz/",
+          "contacts": [
+            {
+              "name": "Maya Brown",
+              "role": "COO | Director"
+            },
+            {
+              "name": "Wade Abel",
+              "role": "CTO | Director"
+            },
+            {
+              "name": "Aaron Boyd",
+              "role": "Strategic Advisor | Director"
+            }
+          ],
+          "ecosystems": [
+            "Celo"
+          ],
+          "description": "Celo's community-run direct grants programme, funded from the Celo Community Fund treasury through Celo governance proposals rather than by the foundation. It has run seven governance-approved funding cycles since 2022 and reports $2M granted across 575+ applications and 120+ signed grant contracts. Season 2 (25 Feb – 30 Jun 2026) had $346,400 total capacity across the Boost, Anchor and Frontier pools, funding 19 of 75 applications. Directors and 2/3 multisig signers: Wade Abel (founder, CTO), Maya Brown (founder, COO), Aaron Boyd (founder, strategic advisor). Master multisig 0xa5c9389a0ce1bfe24ff883e761ff313225c77d44.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/prezenti_grants",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/YCgGjFaP7f",
+              "platform": "discord"
+            },
+            {
+              "url": "https://forum.celo.org/u/Prezenti.grants",
+              "platform": "forum"
+            },
+            {
+              "url": "https://farcaster.xyz/prezenti.eth",
+              "platform": "farcaster"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "prezenti",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:56.519Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-10-01T12:40:56.870Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": false,
+        "programModel": "incentives",
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Trial programme: Prezenti sponsors five builders' AI coding tools (Claude Max 20x, ChatGPT Pro 5x, $200 flexible allowance) at up to $1,400 each over four months, $7,000 total, selected via an open-source GitHub-activity scoring rubric. Closes when the fifth builder is chosen, or 2026-12-29, whichever comes first.",
+      "ecosystems": [
+        "Celo"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "AI",
+        "Developer Tooling"
+      ],
+      "eligibility": "Open to individual builders anywhere with strong public evidence of shipping original technical work — especially those for whom the cost of top-tier AI coding tools is a genuine access barrier. Prior Celo experience is welcome but not required; applicants need a credible four-month plan that includes a Celo mainnet deployment, integration, or material ecosystem contribution.",
+      "prerequisites": "Assessed on six months of public GitHub activity via Prezenti's open-source talent-engine rubric (shipped original work, sustained cadence, external validation, collaboration, blockchain footprint, agent-protocol signal). The build plan itself is not scored. Applicants should be prepared to name their GitHub handle for a public Celo EAS pledge if selected.",
+      "additionalReferences": "Forum announcement: https://forum.celo.org/t/prezenti-ai-builder-sponsorships-trial-five-builders-four-months-7-000/13744 | Scoring engine source and rubric: https://github.com/prezenti/talent-engine | Related, separate programme: Prezenti Frontier Pool https://frontier.prezenti.xyz/",
+      "applicationUrl": "https://sponsorships.prezenti.xyz/",
+      "website": "https://sponsorships.prezenti.xyz/",
+      "fundingInfo": {
+        "currency": "USD",
+        "budget": 7000,
+        "maxAward": 1400
+      },
+      "deadlines": [
+        {
+          "date": "2026-12-29T23:59:00.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-08-19T19:02:00.000Z",
+      "createdAt": "2026-10-01T12:40:56.517Z",
+      "updatedAt": "2026-10-01T12:40:56.519Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "prezenti:frontier-pool-season-3",
+      "fundingType": "grant",
+      "title": "Prezenti Frontier Pool (Season 3)",
+      "description": "The Frontier Pool is one of three funding paths in Season 3 of Prezenti, Celo's community-run direct grants programme, and is dedicated specifically to \"AI and agent economy infrastructure deployed on Celo\" — distinct from the Anchor Pool's focus on scaling already-proven, high-transaction Celo products, and from the referral-only Boost Pool. Season 3's application window runs August 12 through December 29, 2026.\n\nPrezenti is interested in projects strengthening Celo's position as infrastructure for the emerging agent economy, specifically: agent identity and discovery (on-chain registries, reputation systems, discovery protocols that help agents find, assess and verify one another); agent-to-agent transaction infrastructure (payment channels, escrow systems, micropayment rails, settlement mechanisms for autonomous operation); AI-native developer tooling (SDKs, frameworks, middleware and operational tooling for building, deploying and managing agents on Celo); verification and trust infrastructure (systems for verifying agent outputs, enforcing accountability, proving actions occurred as claimed); and interoperability infrastructure (bridges, adapters and protocol translators connecting Celo-based agents with other networks and off-chain AI systems). In Prezenti's own words: \"We are not prescribing a particular technology stack. We are looking for teams that understand the problem space deeply and are building infrastructure that other agents, developers or projects would depend on. A standalone application does not become infrastructure simply by being described as 'agentic.'\"\n\nFrontier applicants must show: a working deployment on Celo mainnet; verifiable on-chain activity associated with the deployed infrastructure; a credible technical architecture; a clear activation path for the first 10 to 100 agents or users; a realistic, evidenced distribution strategy; a meaningful contribution to Celo's capabilities as an AI/agent platform; public technical documentation or open-source code wherever possible; ERC-8004 registration for agent projects (waived for projects that are clearly AI infrastructure rather than an agent); and use of, or a committed integration with, Self Protocol's Agent ID for sybil-resistant agent identity. The application form itself (hosted at frontier.prezenti.xyz) requires product/team details, website, X handle, KarmaGAP profile, GitHub, a project description, a distribution/activation plan, disclosure of prior Celo-ecosystem relationships, and — for grant delivery — KYC information (lead applicant name, email, country of company registration) and a Celo L2 payout address.\n\nNo grant amount, award range or programme budget is published for the Frontier Pool specifically (unlike the Anchor Pool, which states $25,000–$50,000 per award); this appears to be a deliberate omission on Prezenti's part rather than a gap in our research, so no funding figure is recorded here.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Prezenti",
+          "slug": "prezenti",
+          "orgType": "program",
+          "website": "https://www.prezenti.xyz/",
+          "contacts": [
+            {
+              "name": "Maya Brown",
+              "role": "COO | Director"
+            },
+            {
+              "name": "Wade Abel",
+              "role": "CTO | Director"
+            },
+            {
+              "name": "Aaron Boyd",
+              "role": "Strategic Advisor | Director"
+            }
+          ],
+          "ecosystems": [
+            "Celo"
+          ],
+          "description": "Celo's community-run direct grants programme, funded from the Celo Community Fund treasury through Celo governance proposals rather than by the foundation. It has run seven governance-approved funding cycles since 2022 and reports $2M granted across 575+ applications and 120+ signed grant contracts. Season 2 (25 Feb – 30 Jun 2026) had $346,400 total capacity across the Boost, Anchor and Frontier pools, funding 19 of 75 applications. Directors and 2/3 multisig signers: Wade Abel (founder, CTO), Maya Brown (founder, COO), Aaron Boyd (founder, strategic advisor). Master multisig 0xa5c9389a0ce1bfe24ff883e761ff313225c77d44.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/prezenti_grants",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.gg/YCgGjFaP7f",
+              "platform": "discord"
+            },
+            {
+              "url": "https://forum.celo.org/u/Prezenti.grants",
+              "platform": "forum"
+            },
+            {
+              "url": "https://farcaster.xyz/prezenti.eth",
+              "platform": "farcaster"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "prezenti",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:57.242Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-10-01T12:40:57.910Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "programModel": "grant",
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Celo's Prezenti grants programme, Season 3 (Aug 12–Dec 29, 2026): a dedicated funding path for AI and agent-economy infrastructure deployed on Celo, requiring ERC-8004 registration and Self Protocol Agent ID. Distinct from the Anchor Pool's general-traction focus. No award amounts published.",
+      "ecosystems": [
+        "Celo"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "AI",
+        "Infrastructure",
+        "Developer Tooling"
+      ],
+      "eligibility": "Open to teams building AI/agent-economy infrastructure with a working deployment on Celo mainnet and verifiable on-chain activity. Standalone end-user applications are not eligible — the project must serve as infrastructure other builders or agents would depend on. Agent projects must register under the ERC-8004 identity standard and use, or commit to integrate, Self Protocol's Agent ID; this requirement is waived only for projects that are clearly AI infrastructure rather than an agent. Prezenti is a Canadian entity and grant delivery must comply with Canadian legal and compliance requirements, including KYC on the lead applicant.",
+      "prerequisites": "Applicants must be able to demonstrate a credible technical architecture, public technical documentation or open-source code wherever possible, a clear activation path for the first 10–100 agents or users, and a distribution strategy backed by evidence from this project or prior work. The application also asks which Celo-ecosystem parties (Celo Foundation, Celo Core, Celo DevRel, Proof of Ship, CeloPG, Celo Camp, any Celo validator team, a previous Prezenti grant, or a Celo Regional DAO) the team has formally engaged with before.",
+      "additionalReferences": "Season 3 announcement (Frontier, Anchor, Boost): https://forum.celo.org/t/prezenti-season-3-is-open-frontier-anchor-and-boost-grants-for-celo/13714 | Frontier Pool introduced in Season 2: https://forum.celo.org/t/prezenti-season-2-update-introducing-the-frontier-pool-ai-agent-economy-infrastructure/13277 | AI Builder Sponsorships (related, separate programme): https://sponsorships.prezenti.xyz/ | Companion open pool, Prezenti Anchor Pool: https://anchor.prezenti.xyz/",
+      "applicationUrl": "https://frontier.prezenti.xyz/",
+      "website": "https://www.prezenti.xyz/grants",
+      "deadlines": [
+        {
+          "date": "2026-12-29T23:59:00.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-08-12T19:13:00.000Z",
+      "createdAt": "2026-10-01T12:40:57.240Z",
+      "updatedAt": "2026-10-01T12:40:57.242Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "rocket-pool-gmc:grants-round-41",
+      "fundingType": "grant",
+      "title": "Rocket Pool GMC Grants — Round 41",
+      "description": "Round 41 of the Rocket Pool Grants Management Committee (GMC) grants track. Grants are for applicants who wish to **carry out the work themselves** — as distinct from bounties, which are open-ended goals that could be met by anyone, including parties other than the proposer.\n\n**Round 41 schedule (from the call for applications):**\n- Application Period: **September 7 - October 7, 2026**\n- Scoring Deadline: **October 20, 2026**\n- Final Voting Amendments, Discussion and Finalization: **October 21 - October 24, 2026**\n- Award Announcement: **October 25, 2026**\n\n**Submission mechanics:** applications are posted as **replies in the round's own forum thread** on the Rocket Pool DAO Discourse, using the published grant application template. \"Only those grant applications that are posted in this thread and timestamped by October 7, 2026 at 23:59 (11:59 PM) UTC will be considered. Any grants posted after that deadline will be carried over to the next award period.\" Questions and discussion of submitted applications go in a separate community discussion thread, not the application thread.\n\n**GMC goals.** Grants, bounties and retrospective awards should make it easier and/or more attractive to do one or more of the following: become a node operator; operate a node, mint rETH; hold or use rETH; improve the quality of life for the protocol and its community.\n\n**Grants scoring rubric.** When evaluating grant applications the GMC considers: (1) if the application is successful, to what extent does it further the GMC goals; (2) to what extent can the application be feasibly carried out by the person(s) proposed to complete it; (3) if the application is successful, how large is the benefit to the protocol relative to the size of the proposed costs.\n\n**Award sizing.** The GMC publishes no per-grant cap. Applicants state their own ask, and the application template asks it **in US dollars**: \"How much USD $ and over what period of time is the applicant requesting?\" Payment is made from the committee's RPL treasury — the August 2026 treasury report notes that month's payments were made at an RPL price of $1.40, and puts the treasury's USD value at approximately $48,012.35 at report time; the committee separately executes RPL-to-USDC swaps to settle awards. The GMC can only send grants directly to a recipient address and cannot accept invoices.\n\n**Microgrants.** Following a GMC vote, a microgrant framework was introduced (announced May 2026) in response to treasury constraints. Microgrants use the existing GMC grant system with no process changes and no separate application type — contributors submit standard applications and the GMC may choose to award a microgrant. Microgrants \"will typically fall into one of the following ranges: 10 RPL, 50 RPL, 100 RPL\". They can be used for both new submissions and retrospective recognition, are intended as partial recognition given current constraints, may be revisited if treasury conditions improve, and there is no limit on how many a contributor can receive.\n\nBecause the applicant's ask is denominated in USD while microgrant tiers are quoted natively in RPL, and neither constitutes a published program-wide award range, no minAward/maxAward or currency is asserted on this record.\n\nRound 41 is confirmed open as of 2026-09-21: it is the current call for applications in the Grants / Bounties category on the Rocket Pool DAO Discourse, posted 2026-09-08, application window September 7 – October 7, 2026, and no later round has superseded it.\n\nThe governing RPIP sets no per-grant cap and no per-round pool either; its only budget statement points upstream, to the share of the protocol-level budget set aside for grants and bounties together. Nothing at this record's level has ever been published as a number, which is why it carries no `fundingInfo`.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Rocket Pool Grants Management Committee (GMC)",
+          "slug": "rocket-pool-gmc",
+          "orgType": "program",
+          "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+          "ecosystems": [
+            "Ethereum",
+            "Rocket Pool"
+          ],
+          "description": "The Rocket Pool DAO committee that runs the protocol's grants, bounties and retrospective awards tracks in monthly rounds on the Rocket Pool DAO Discourse forum. Under RPIP-81 the committee receives 16,265.35 RPL every 28 days, replacing the previous allocation of 5,809.34 RPL, and publishes monthly treasury reports. Awards are requested in USD and settled from the RPL treasury.",
+          "socialLinks": [
+            {
+              "url": "https://dao.rocketpool.net/",
+              "platform": "forum"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "rocket-pool-gmc",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:57.885Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-10-01T12:40:58.685Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "programModel": "grant",
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Monthly RPL-funded grants for community work that grows Rocket Pool node operation and rETH usage; Round 41 closes October 7, 2026.",
+      "ecosystems": [
+        "Ethereum",
+        "Rocket Pool"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Staking",
+        "Community"
+      ],
+      "eligibility": "Grants are intended to be applied for by those who wish to carry out the work themselves. The work must further the GMC goals: making it easier and/or more attractive to become a node operator; to operate a node and mint rETH; to hold or use rETH; or to improve the quality of life for the protocol and its community. Applicants must disclose conflicts of interest, including membership of the GMC or any GMC member who would benefit directly financially from the grant. The GMC can only send grants directly to a recipient address and cannot accept invoices.",
+      "prerequisites": "Post a reply in the round's application thread using the published template, covering: **Name of Grant**; what work is being proposed; any related work it builds off; whether results will be entirely open source (MIT, GPL, Apache, CC BY or similar) and, if not, which parts and under what license. **Benefit** — a table of benefits to potential rETH holders, rETH holders, potential node operators, node operators, the community and RPL holders, plus which other non-RPL protocols, DAOs, projects or individuals would benefit. **Work** — who is doing the work and their background and experience; the breakdown of proposed work in milestones and/or deadlines; how the work is being tested and whether testing is in the schedule; how it will be maintained after delivery. **Costs** — the acceptance criteria; the proposed payment schedule, stating how much USD $ and over what period is requested; who will directly receive the payment (required — the GMC can only send to a recipient address and cannot accept invoices); how the GMC will verify delivery matches the proposed cadence; what alternatives were considered to save costs; and whether you have already been compensated by the protocol for this work. **Conflict of Interest** — disclose any conflicts, including GMC membership or a GMC member benefiting financially.",
+      "additionalReferences": "Round 41 community discussion thread (for questions about submitted applications): https://dao.rocketpool.net/t/round-41-gmc-community-discussion-of-submitted-applications-read/4044 — Round 41 call for bounty applications: https://dao.rocketpool.net/t/round-41-gmc-call-for-bounty-applications-deadline-is-october-7/4045 — Round 41 call for retrospective applications: https://dao.rocketpool.net/t/round-41-gmc-call-for-retrospective-applications-deadline-is-october-7/4046 — GMC August 2026 treasury report: https://dao.rocketpool.net/t/gmc-2026-08-01-2026-08-31-treasury-report/4041 — Introducing Microgrants: https://dao.rocketpool.net/t/introducing-microgrants/3939 — Grants / Bounties category index: https://dao.rocketpool.net/c/grant-bounties/13",
+      "applicationUrl": "https://dao.rocketpool.net/t/round-41-gmc-call-for-grant-applications-deadline-is-october-7/4043",
+      "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+      "socialLinks": [
+        {
+          "url": "https://dao.rocketpool.net/",
+          "platform": "forum"
+        }
+      ],
+      "deadlines": [
+        {
+          "date": "2026-10-07T23:59:00.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-09-08T00:11:46.000Z",
+      "createdAt": "2026-10-01T12:40:57.883Z",
+      "updatedAt": "2026-10-01T12:40:57.885Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "rocket-pool-gmc:retrospective-awards-round-41",
+      "fundingType": "grant",
+      "title": "Rocket Pool GMC Retrospective Awards — Round 41",
+      "description": "Round 41 of the Rocket Pool Grants Management Committee (GMC) **retrospective awards** track — recognition for work that has already been completed, as opposed to the grants track, which funds work an applicant proposes to carry out. The round covers Rocket Pool's **September 7, 2026 - October 7, 2026 retrospective awards**.\n\n**Round 41 schedule (identical to the grants track):**\n- Application Period: **September 7 - October 7, 2026**\n- Scoring Deadline: **October 20, 2026**\n- Final Voting Amendments, Discussion and Finalization: **October 21 - October 24, 2026**\n- Award Announcement: **October 25, 2026**\n\n**Submission mechanics:** applications are posted as **replies in the round's own retrospective-applications forum thread** on the Rocket Pool DAO Discourse, using the published retrospective award template. \"Only those retrospective award applications that are posted in this thread and timestamped by October 7, 2026 at 23:59 (11:59 PM) UTC will be considered. Any retrospective award applications posted after that deadline will be carried over to the next award period.\" Questions and discussion of submitted applications go in a separate community discussion thread.\n\n**GMC goals.** Grants, bounties and retrospective awards should make it easier and/or more attractive to do one or more of the following: become a node operator; operate a node, mint rETH; hold or use rETH; improve the quality of life for the protocol and its community.\n\n**Retrospective award rubric — a single criterion:** \"To what extent did the proposed and completed project further the GMC goals?\" With the note: if the project is ongoing, the retrospective award is given for work completed prior to the current award period, and any future awards for the same project are expected to compete in the Grants category as a separate application. This is a narrower rubric than the three-part grants rubric, which also weighs feasibility and cost-benefit — feasibility is moot for work already delivered.\n\n**Award sizing.** No per-award cap is published. The template asks the applicant to state the ask **in US dollars**: \"How much USD $ is the applicant requesting be awarded to the recipient?\" Awards are settled from the committee's RPL treasury, which receives 16,265.35 RPL every 28 days under RPIP-81, shared across the grants, bounty and retrospective tracks. The August 2026 treasury report notes that month's payments were made at an RPL price of $1.40, with the treasury's USD value at approximately $48,012.35 at report time. The microgrant framework introduced in May 2026 applies to this track too — microgrants \"can be used for both new submissions and retrospective recognition\" and typically fall into 10 RPL, 50 RPL or 100 RPL tiers. Because the ask is denominated in USD while microgrant tiers are quoted natively in RPL, and neither is a published program-wide award range, no minAward/maxAward or currency is asserted on this record.\n\nRound 41 is confirmed open as of 2026-09-21: it is the current call for retrospective applications in the Grants / Bounties category on the Rocket Pool DAO Discourse, posted 2026-09-08.\n\n**No ceiling governs this track.** As recorded on the Round 40 retrospective entry, RPIP-26 (vote passed 2023-08-18) removed the 50% retrospective-award cap that RPIP-15/RPIP-18 had set; RPIP-15, RPIP-18 and RPIP-26 are all now marked obsolete, and the document currently in force, RPIP-40 (Status: Final, vote passed 2024-03-28), restates the removal and sets no retrospective cap of its own. The only relative ceiling RPIP-40 cites is at committee level — \"RPIP-10 sets aside 30% of the pDAO budget for Grants and Bounties\" — sizing the whole GMC treasury shared by the grants, bounty and retrospective tracks, not this track specifically. The round's own total awarded amount is never published in advance. This record therefore carries no `fundingInfo` — nothing published sizes this track.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Rocket Pool Grants Management Committee (GMC)",
+          "slug": "rocket-pool-gmc",
+          "orgType": "program",
+          "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+          "ecosystems": [
+            "Ethereum",
+            "Rocket Pool"
+          ],
+          "description": "The Rocket Pool DAO committee that runs the protocol's grants, bounties and retrospective awards tracks in monthly rounds on the Rocket Pool DAO Discourse forum. Under RPIP-81 the committee receives 16,265.35 RPL every 28 days, replacing the previous allocation of 5,809.34 RPL, and publishes monthly treasury reports. Awards are requested in USD and settled from the RPL treasury.",
+          "socialLinks": [
+            {
+              "url": "https://dao.rocketpool.net/",
+              "platform": "forum"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "rocket-pool-gmc",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:58.596Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-10-01T12:40:59.118Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "programModel": "grant",
+        "milestoneBased": false,
+        "fundingMechanisms": [
+          "retroactive"
+        ]
+      },
+      "summary": "Retroactive Rocket Pool awards for already-completed community work in the September 7 - October 7, 2026 window.",
+      "ecosystems": [
+        "Ethereum",
+        "Rocket Pool"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Staking",
+        "Retroactive Funding"
+      ],
+      "eligibility": "Retrospective awards recognise work already completed that furthered the GMC goals: making it easier and/or more attractive to become a node operator; to operate a node and mint rETH; to hold or use rETH; or to improve the quality of life for the protocol and its community. If a project is ongoing, the retrospective award covers work completed prior to the current award period, and future work on the same project is expected to compete in the Grants category as a separate application. Applicants must disclose conflicts of interest, including if they are a GMC member or have nominated a GMC member for the award.",
+      "prerequisites": "Post a reply in the round's retrospective-applications thread using the published template, covering: **Name of Retrospective Award**; who the proposed recipient is; what specific project or work the award is in recognition of, detailing what it entailed and the duration over which it took place; and whether the subjects of the award are entirely open source (MIT, GPL, Apache, CC BY or similar) and, if not, which parts are not, why, and under what license they will be published. **Benefit** — a table describing how the completed work helped potential rETH holders, rETH holders, potential node operators, node operators, the community and RPL holders. **Costs** — how much USD $ the applicant is requesting be awarded to the recipient. **Conflict of Interest** — disclose any conflicts, including GMC membership or having nominated a GMC member for this award.",
+      "additionalReferences": "Round 41 community discussion thread (for questions about submitted applications): https://dao.rocketpool.net/t/round-41-gmc-community-discussion-of-submitted-applications-read/4044 — Round 41 call for grant applications: https://dao.rocketpool.net/t/round-41-gmc-call-for-grant-applications-deadline-is-october-7/4043 — Round 41 call for bounty applications: https://dao.rocketpool.net/t/round-41-gmc-call-for-bounty-applications-deadline-is-october-7/4045 — GMC August 2026 treasury report: https://dao.rocketpool.net/t/gmc-2026-08-01-2026-08-31-treasury-report/4041 — Introducing Microgrants: https://dao.rocketpool.net/t/introducing-microgrants/3939 — most recent published results (Round 39): https://dao.rocketpool.net/t/round-39-july-7-august-7-grants-bounties-retrospective-awards-results/4037 — RPIP-40, the GMC document currently in force (Status: Final): https://rpips.rocketpool.net/RPIPs/RPIP-40 — RPIP-26, which removed the 50% retrospective award cap (now itself obsolete): https://rpips.rocketpool.net/RPIPs/RPIP-26 — RPIP-15, obsolete, which is where that cap came from: https://rpips.rocketpool.net/RPIPs/RPIP-15",
+      "applicationUrl": "https://dao.rocketpool.net/t/round-41-gmc-call-for-retrospective-applications-deadline-is-october-7/4046",
+      "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+      "socialLinks": [
+        {
+          "url": "https://dao.rocketpool.net/",
+          "platform": "forum"
+        }
+      ],
+      "deadlines": [
+        {
+          "date": "2026-10-07T23:59:00.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-09-08T00:23:55.000Z",
+      "createdAt": "2026-10-01T12:40:58.595Z",
+      "updatedAt": "2026-10-01T12:40:58.596Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "thedao-security-fund:ethsecurity-initiatives-round-two",
+      "fundingType": "grant",
+      "title": "TheDAO Security Fund — ETHSecurity Initiatives (Round Two)",
+      "description": "TheDAO Security Fund ('TheDAO is Back,' operated under TheDAO LLC) is, per its own homepage, built around '74,245 ETH / $100.00 Million... For Ethereum Security,' assembled in January 2026 from unclaimed ETH tied to the original 2016 TheDAO. Its official Round Two announcement — published on the fund's own Paragraph account (@thedao.fund) and authored by curator Griff Green of Giveth — states the fund has '69,000 ETH staked, earning ~5 ETH a day' whose yield supports Ethereum security work. The fund is steered by named curators including Vitalik Buterin (Ethereum Foundation), Taylor Monahan, Jordi Baylina (ZisK), pcaversaccio (SEAL 911), Alex Van de Sande (ENS), Griff Green (Giveth) and Pol Lanski (Dappnode).\n\nRound One (closed) was 'a quadratic funding round on Giveth with a 500 ETH matching pool,' run April 23 - May 14, 2026. Per the fund's own retrospective in the Round Two post: 'more than 20 ecosystem funders and 3,934 donors' put 'over $1.6M into diverse Ethereum security projects,' funding '1,000 ETH to 135 security projects in total.'\n\nRound Two — ETHSecurity Initiatives — opened September 15, 2026 and runs through the end of January 2027. Instead of a single open call, it works as a live, crowdsourced Ethereum-security 'to-do list': anyone can propose an 'initiative' at initiatives.thedao.fund, either an RFP (a scoped budget and draft milestones, no team chosen yet) or a Grant (a named team already positioned to deliver). On launch day the fund's own post listed ten initiatives already on the board, each with its own stated budget: an end-to-end formally verified Vyper compiler ($600,000, Grant: Vyper Foundation), a decentralized privacy-preserving EDR ($300,000, Grant: Auditware), provider-independent client-verified ENS resolution ($150,000, RFP), a production-ready local-first Safe UI ($120,000, RFP), a 'Directory of Value' registry ($185,000, RFP), an OpSec Ratings Coalition ($150,000, RFP), community fuzzing tooling ($150,000, RFP), EVM exploit alerts from thatsRekt ($45,000, Grant), automated EIP compliance checks from PRSpec ($20,000, Grant), and continued Echidna fuzzer development through 2027 ($48,000, Grant) — summing to roughly $1.77M across those ten line items (our own total of the fund's own per-initiative figures, not a number copied from any news outlet), with, in the fund's words, 'room for a hundred more.'\n\nFunding for each initiative comes from three channels: direct donations to the initiative's multisig; company pledges (collected only once an initiative is fully funded, with the backer's logo promoted alongside it); and, for initiatives still short of their target by mid-November 2026, a vote by roughly 200 ETHSecurity Badge holders to allocate treasury funds toward the top-ranked ones — initiatives that don't make that final cut close at the end of January 2027 without ever collecting pledged funds. Every initiative must dedicate 'at least a third of its budget' to a measurable adoption milestone (named users, real integrations, TVL protected, or production use). Milestone payouts are 'managed by Giveth' and released only after sign-off from 'an independent technical reviewer with no ties to the team, named in the grant agreement before work begins,' with the first milestone payable up to 50% in advance.\n\nThree ways to participate, per the fund's own post: Propose an initiative (approval takes 'a few days'); Fund/pledge toward one; or Build by bidding into a 30-day proposal window once an RFP is fully funded.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "TheDAO Security Fund",
+          "slug": "thedao-security-fund",
+          "orgType": "dao",
+          "website": "https://thedao.fund",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "TheDAO Security Fund ('TheDAO is Back') is a fund dedicated to improving Ethereum security, operated under TheDAO LLC ('© 2025-2026 TheDAO LLC. All rights reserved.'). Its homepage states it holds '74,245 ETH / $100.00 Million... For Ethereum Security,' assembled from unclaimed ETH tied to the original 2016 TheDAO; its own Round Two announcement separately describes '69,000 ETH staked, earning ~5 ETH a day' as the yield-generating portion supporting security funding. It is steered by named curators: Vitalik Buterin (Ethereum Foundation), Taylor Monahan (Independent), Jordi Baylina (ZisK), pcaversaccio (SEAL 911), Alex Van de Sande (ENS), Griff Green (Giveth) and Pol Lanski (Dappnode).",
+          "socialLinks": [
+            {
+              "url": "https://x.com/thedaofund",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://t.me/ETHSecurityBadges_bot",
+              "platform": "telegram"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "thedao-security-fund",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:59.250Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-10-01T12:40:59.523Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "programModel": "initiative-board",
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive",
+          "matching"
+        ]
+      },
+      "summary": "TheDAO Security Fund's second round, ETHSecurity Initiatives, runs September 15, 2026 to end of January 2027 as an open, crowdsourced board of Ethereum-security RFPs and grants. Ten initiatives worth roughly $1.77M (summed from the fund's own figures) were live on day one, funded via donations, company pledges, and a mid-November allocation vote by ~200 ETHSecurity Badge holders, with Giveth managing milestone-gated payouts.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Public Goods"
+      ],
+      "eligibility": "Open to anyone: proposers can submit a new RFP- or grant-style initiative at initiatives.thedao.fund; qualified teams can bid into a 30-day window once an RFP is fully funded; companies or individuals can fund or pledge toward any listed initiative.",
+      "prerequisites": "Every initiative must commit at least one-third of its budget to a measurable adoption milestone. Grant proposals must name the delivering team and definitive milestones; RFP proposals need a defined scope, budget and draft milestones before a funded team-selection window opens.",
+      "additionalReferences": "Fund homepage: https://thedao.fund | Funding Rounds: https://thedao.fund/funding-rounds | Official Round Two announcement (Paragraph, @thedao.fund): https://paragraph.com/@thedao.fund/round-two-starts-today-ethsecurity-initiatives | Initiatives board: https://initiatives.thedao.fund | Transparency page: https://thedao.fund/transparency | ETHSecurity Badges: https://thedao.fund/ethsecurity-badges",
+      "applicationUrl": "https://initiatives.thedao.fund/submit",
+      "website": "https://thedao.fund/funding-rounds",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "label": "initiative proposal",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-09-15T00:00:00.000Z",
+      "createdAt": "2026-10-01T12:40:59.248Z",
+      "updatedAt": "2026-10-01T12:40:59.250Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "whitechain:builders-program",
+      "fundingType": "grant",
+      "title": "Whitechain Builders Program",
+      "description": "Whitechain is the Exchange-Powered Ethereum L2 built on the OP Stack, natively powered by WBT and backed by WGROUP's WhiteBIT exchange ecosystem. The Whitechain Builders Program is the chain's flagship funding vehicle for teams that want to launch, migrate to, or expand onto Whitechain. The program page states the numbers directly: \"$300K — Maximum allocation per Builders Team\" and \"2W — Two weeks SLA for application decision,\" and separately, in the how-it-works section, \"We aim to respond within 14 business days.\"\n\nIt is one program split into three tracks that share a process but differ in terms: (1) Builders Program (New Build), for teams moving \"from testnet to mainnet,\" funded \"up to $300k per eligible team,\" milestone-based, with \"tranches and support released as milestones are verified\"; (2) Strategic Ecosystem Deals, for established protocols doing a full migration to Whitechain; and (3) Chain Expansion Support, for multichain teams adding Whitechain as an additional deployment.\n\nApplications run through three steps — Apply, Review (a cross-functional pass by ecosystem, technical, product, growth and compliance teams), and Build & Grow (milestone-gated tranches) — submitted via the \"Apply to the Builders Program\" button on the program page, with DevRel pre-application consultations available on Telegram (@Whitechaindevs). The program favors \"teams that ship\" — delivery track record over pitch quality — user retention over launch-day metrics, and \"verifiable metrics\" that must be traceable on-chain.\n\nBeyond capital, accepted teams can receive subsidized Hacken audit coverage, DevRel onboarding and deployment support, joint marketing and AMAs with the WhiteBIT/Whitechain audience (10M+ users), and partner introductions — though the page notes these support components are \"individually assembled and not guaranteed; each requires separate review.\" The program is \"unavailable to residents, nationals, or entities located in sanctioned or restricted jurisdictions.\" Whitechain itself is in public testnet (Whitechain Sepolia, Chain ID 1874) as of this verification, with mainnet targeted for Q4 2026.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Whitechain",
+          "slug": "whitechain",
+          "orgType": "company",
+          "website": "https://whitechain.io",
+          "ecosystems": [
+            "Whitechain",
+            "Ethereum"
+          ],
+          "description": "Whitechain is the Exchange-Powered Ethereum L2 built on the OP Stack, natively powered by WBT and backed by WGROUP's WhiteBIT exchange ecosystem. It connects builders to WhiteBIT's 10M+ user base through a native DEX, token-launch platform, cross-chain bridge and on-chain identity products (WB Soul).",
+          "socialLinks": [
+            {
+              "url": "https://twitter.com/whitechain_io",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.com/invite/7DRU8xEDTG",
+              "platform": "discord"
+            },
+            {
+              "url": "https://t.me/whitechain_io",
+              "platform": "telegram"
+            },
+            {
+              "url": "https://github.com/whitechain-labs",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "whitechain",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-01T12:40:59.895Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-10-01T12:41:00.917Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "programModel": "incentives",
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Rolling grants of up to $300,000 per team to build, migrate to, or expand onto Whitechain, the OP Stack Ethereum L2 behind WhiteBIT. Applications get a stated 14-business-day (two-week) SLA and milestone-gated tranches, plus subsidized Hacken audits and WhiteBIT distribution support.",
+      "ecosystems": [
+        "Whitechain",
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Infrastructure",
+        "Grants"
+      ],
+      "eligibility": "Open to early-stage teams building simplified onboarding/UX apps, wallet providers, stablecoin products, and payment-related applications (New Build track); to established protocols doing a full migration (Strategic Ecosystem Deals); and to multichain teams adding Whitechain as an additional deployment (Chain Expansion Support). Unavailable to residents, nationals, or entities located in sanctioned or restricted jurisdictions.",
+      "prerequisites": "Applicants submit project details, Whitechain-specific plans and funding needs; submissions go through a cross-functional review (ecosystem, technical, product, growth and compliance teams) targeting a 14-business-day response, and tranches release only as milestones are verified against contract terms.",
+      "additionalReferences": "Developer guide: https://whitechain.io/blog/start-building-on-whitechain | Docs: https://docs.whitechain.io | Bridge (testnet): https://bridge.testnet.whitechain.io",
+      "applicationUrl": "https://whitechain.io/builders",
+      "website": "https://whitechain.io/builders",
+      "socialLinks": [
+        {
+          "url": "https://whitechain.io/blog/start-building-on-whitechain",
+          "platform": "blog"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 300000
+      },
+      "deadlines": [
+        {
+          "label": "application",
+          "deadlineType": "rolling"
+        }
+      ],
+      "createdAt": "2026-10-01T12:40:59.894Z",
+      "updatedAt": "2026-10-01T12:40:59.895Z"
     }
   ]
 }
