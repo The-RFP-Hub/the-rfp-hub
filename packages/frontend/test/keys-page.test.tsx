@@ -108,7 +108,7 @@ describe("the key page's action hierarchy", () => {
   it("makes the MCP path explicit and prepares the least-powerful submission key", async () => {
     mount();
 
-    expect(await screen.findByRole("heading", { name: "Connect the RFP Hub MCP" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Connect the RFPSear.ch MCP" })).toBeTruthy();
     expect(screen.getByText(/Search and fetch work anonymously/)).toBeTruthy();
     expect(screen.getByText(/model-provider agnostic/).textContent).toContain("stdio");
     for (const provider of ["Codex", "Claude", "Cursor", "VS Code"]) {
@@ -128,7 +128,7 @@ describe("the key page's action hierarchy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Prepare an MCP key" }));
     const label = screen.getByLabelText("Label") as HTMLInputElement;
-    expect(label.value).toBe("RFP Hub MCP");
+    expect(label.value).toBe("RFPSear.ch MCP");
     expect(document.activeElement).toBe(label);
     expect((screen.getByRole("checkbox", { name: /read/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("checkbox", { name: /write/ }) as HTMLInputElement).checked).toBe(
@@ -141,7 +141,7 @@ describe("the key page's action hierarchy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mint" }));
     await waitFor(() =>
-      expect(create).toHaveBeenCalledWith({ name: "RFP Hub MCP", scopes: ["read", "write"] }),
+      expect(create).toHaveBeenCalledWith({ name: "RFPSear.ch MCP", scopes: ["read", "write"] }),
     );
   });
 });

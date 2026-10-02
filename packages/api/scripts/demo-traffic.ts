@@ -45,7 +45,7 @@ interface Options {
   help: boolean;
 }
 
-const USAGE = `RFP Hub demo traffic generator
+const USAGE = `RFPSear.ch demo traffic generator
 
   tsx scripts/demo-traffic.ts --base-url <url> [--namespace <slug> | --id <public-id> ...]
 

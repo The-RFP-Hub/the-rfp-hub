@@ -21,6 +21,6 @@ impact.
 
 ## Scope
 
-This policy covers the packages in this repository and the public RFP Hub API. The dataset is
+This policy covers the packages in this repository and the public RFPSear.ch API. The dataset is
 public (CC0) by design; please report only genuine security issues, not the public availability
 of the open data.

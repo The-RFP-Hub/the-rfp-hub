@@ -1,6 +1,6 @@
 # Licensing
 
-The RFP Hub is open source. Per the project's commitment and the EF RFP — *"code, schemas, and
+RFPSear.ch is open source. Per the project's commitment and the EF RFP — *"code, schemas, and
 datasets published in public repositories under a permissive license (MIT, Apache 2.0, or CC0
 for data)"* — different artifacts carry different permissive licenses:
 

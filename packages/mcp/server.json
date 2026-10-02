@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.The-RFP-Hub/rfp-hub",
-  "title": "RFP Hub",
+  "title": "RFPSear.ch",
   "description": "Search Ethereum-ecosystem funding opportunities; submit one behind a human approval step.",
   "version": "0.1.4",
   "websiteUrl": "https://github.com/The-RFP-Hub/the-rfp-hub/tree/main/packages/mcp",
@@ -20,13 +20,13 @@
       "environmentVariables": [
         {
           "name": "RFPHUB_API_BASE",
-          "description": "Base URL of the RFP Hub API. Defaults to https://api.rfpsear.ch. The origin of this URL is bound into every write approval.",
+          "description": "Base URL of the RFPSear.ch API. Defaults to https://api.rfpsear.ch. The origin of this URL is bound into every write approval.",
           "isRequired": false,
           "isSecret": false
         },
         {
           "name": "RFPHUB_API_KEY",
-          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. The key must carry the write scope and must not carry publish; the server checks that before its first submission, so a submission waits for a reviewer's decision.",
+          "description": "RFPSear.ch API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. The key must carry the write scope and must not carry publish; the server checks that before its first submission, so a submission waits for a reviewer's decision.",
           "isRequired": false,
           "isSecret": true
         }

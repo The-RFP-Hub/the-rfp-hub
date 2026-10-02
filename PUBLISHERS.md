@@ -1,6 +1,6 @@
 # Becoming a verified publisher
 
-Anyone may submit a funding opportunity to the RFP Hub. A **verified publisher** is different: your
+Anyone may submit a funding opportunity to RFPSear.ch. A **verified publisher** is different: your
 submissions go live immediately, under your own namespace, attributed to your organization, and you
 can keep them current through the API without waiting for a human.
 

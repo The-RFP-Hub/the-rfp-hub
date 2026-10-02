@@ -104,7 +104,7 @@ test.describe("M3-8 the organization's own page", () => {
     );
 
     await page.goto(`${stack.urls.frontend}/organizations/${encodeURIComponent(slug)}`);
-    await expect(page).toHaveTitle(`Organization ${slug} | RFP Hub`);
+    await expect(page).toHaveTitle(`Organization ${slug} | RFPSear.ch`);
 
     // ANY membership is enough to SEE this page; verification is what adds the decision controls.
     // This actor has both, and the page says which of the two it is being shown.

@@ -1,4 +1,4 @@
-"""Stdlib-only client for the RFP Hub public /v1/ API.
+"""Stdlib-only client for the RFPSear.ch public /v1/ API.
 
 No third-party dependencies: uses only `urllib.request` and `json` from the standard library.
 Base URL is read from the RFPHUB_API_BASE environment variable (default http://localhost:3001).
@@ -39,7 +39,7 @@ def _get_json(path: str) -> Any:
         raise RuntimeError(f"{err.code} {err.reason} from {path} -- {detail}") from err
     except urllib.error.URLError as err:
         raise RuntimeError(
-            f"Could not reach the RFP Hub API at {url}. Is it running? "
+            f"Could not reach the RFPSear.ch API at {url}. Is it running? "
             "See ../../packages/api/README.md to start it locally (Postgres + migrate + seed)."
         ) from err
 

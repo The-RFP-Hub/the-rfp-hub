@@ -824,7 +824,7 @@ describe("the public opportunity page", () => {
     authSession.error = null;
     navigation.params = new URLSearchParams();
     navigation.replace.mockClear();
-    document.title = "acme:round-4 | RFP Hub";
+    document.title = "acme:round-4 | RFPSear.ch";
   });
 
   it("canonicalizes a merged public id and preserves return-navigation query parameters", async () => {
@@ -885,7 +885,7 @@ describe("the public opportunity page", () => {
 
     await screen.findByText(HOSTILE_TITLE);
     expect(find).toHaveBeenCalledWith("acme:round-4");
-    await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`));
+    await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFPSear.ch`));
   });
 
   it("renders the record's public fields", async () => {

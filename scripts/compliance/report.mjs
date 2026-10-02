@@ -132,7 +132,7 @@ export class Report {
   headerLines() {
     const m = this.meta;
     const row = (label, value) => `  ${label.padEnd(17)}${value}`;
-    const out = [m.title ?? "RFP Hub — deployment compliance check"];
+    const out = [m.title ?? "RFPSear.ch — deployment compliance check"];
     if (m.milestone) {
       out.push(
         row("Milestone", `${m.milestone.toUpperCase()} — contract criteria mapped to checks`),

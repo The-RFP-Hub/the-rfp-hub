@@ -2,15 +2,15 @@
   "$schema": "https://code.claude.com/schemas/marketplace.json",
   "name": "rfp-hub",
   "owner": {
-    "name": "The RFP Hub",
+    "name": "RFPSear.ch",
     "url": "https://rfpsear.ch"
   },
-  "description": "Agent skills for the RFP Hub — a public directory of Ethereum-ecosystem funding opportunities.",
+  "description": "Agent skills for RFPSear.ch — a public directory of Ethereum-ecosystem funding opportunities.",
   "plugins": [
     {
       "name": "rfp-hub",
-      "displayName": "RFP Hub funding search",
-      "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFP Hub public API.",
+      "displayName": "RFPSear.ch funding search",
+      "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFPSear.ch public API.",
       "source": "./skills/funding-search",
       "license": "MIT",
       "homepage": "https://rfpsear.ch",

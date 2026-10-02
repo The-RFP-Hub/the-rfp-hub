@@ -2393,7 +2393,7 @@ pre.code-block {
 
 /* At the narrowest supported width the utility row yields one redundant account icon, while the
  * bell and both text labels remain unambiguous and every target remains 44px. Signed in it still
- * did not fit — wordmark, bell and "Menu" asked ~300px of the 288 available, wrapping "RFP Hub"
+ * did not fit — wordmark, bell and "Menu" asked ~300px of the 288 available, wrapping "RFPSear.ch"
  * onto a second row — so the wordmark steps down a size and two gaps tighten to buy that back. */
 @media (max-width: 22rem) {
   .shell-menu-user {

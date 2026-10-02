@@ -293,7 +293,7 @@ export function rejectEmbeddedCredential(document: unknown): void {
   if (hits.length === 0) return;
   throw new ToolError(
     "invalid_input",
-    `The document contains a string shaped like an RFP Hub API key, so nothing was sent. The API stores the text it is given, which means a key in a document would be persisted before anything could redact it. Remove it and revoke that key. Locations: ${hits.join(", ")}`,
+    `The document contains a string shaped like an RFPSear.ch API key, so nothing was sent. The API stores the text it is given, which means a key in a document would be persisted before anything could redact it. Remove it and revoke that key. Locations: ${hits.join(", ")}`,
     { locations: hits },
   );
 }

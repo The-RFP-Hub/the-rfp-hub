@@ -54,7 +54,7 @@ client to "clean" afterwards.
 
 The scripts send `X-Source: skill:funding-search`, a fresh `X-Invocation-Id` UUID per
 invocation, and `X-Skill-Version` (the frontmatter's `metadata.version`) on every request, so the
-RFP Hub can tell skill-driven traffic apart from a human browsing the site. The scripts set them;
+RFPSear.ch can tell skill-driven traffic apart from a human browsing the site. The scripts set them;
 no agent has to remember to.
 
 They work from curl and Node and **not from a browser**: the API's public CORS policy allows only

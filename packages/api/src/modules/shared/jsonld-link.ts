@@ -14,7 +14,7 @@
  *
  * WHERE IT MUST NOT GO. The same rule that makes this work makes it dangerous on the wrong
  * response. `application/schema+json` carries the `+json` suffix, so a `Link` header on the
- * canonical schema route would instruct processors to read a JSON Schema document as an RFP Hub
+ * canonical schema route would instruct processors to read a JSON Schema document as an RFPSear.ch
  * opportunity. The header therefore goes on `application/json` 200 responses only — never on
  * the canonical-document routes, and never on an error body, whose `{error, message}` keys are
  * not terms in the context.

@@ -26,7 +26,7 @@ export function AgentsGuide(origins: AgentOrigins) {
     <section className="agents-page">
       <h1>Agents</h1>
       <p className="lede">
-        An AI agent can read RFP Hub the same way a person can, with no account and no key. Paste
+        An AI agent can read RFPSear.ch the same way a person can, with no account and no key. Paste
         the prompt below into any agent to start, or connect one of the tools further down.
       </p>
 
@@ -47,7 +47,7 @@ export function AgentsGuide(origins: AgentOrigins) {
         <p className="prose">
           The{" "}
           <a href={MCP_README} target="_blank" rel="noopener noreferrer">
-            RFP Hub MCP server
+            RFPSear.ch MCP server
           </a>{" "}
           gives an MCP client two read tools, <code>search_opportunities</code> and{" "}
           <code>fetch_opportunity</code>. It runs locally over <code>stdio</code> with{" "}

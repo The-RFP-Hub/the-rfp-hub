@@ -35,7 +35,7 @@ import { acceptanceReport } from "./compliance/report.mjs";
 import { reviewerCredential, reviewerRefusal } from "./compliance/reviewer-preflight.mjs";
 import { STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
-const USAGE = `RFP Hub — write acceptance (staging only)
+const USAGE = `RFPSear.ch — write acceptance (staging only)
 
   node scripts/accept-writes.mjs --milestone m3 --api <url> --namespace <slug> \\
     (--session-token <t> | --api-key <k>) --admin-token <t>          (pnpm accept:writes)
@@ -182,7 +182,7 @@ async function main() {
   // shared a fixture id and the second one "found" the first one's entry.
   const state = { run: submission ? runToken() : runStamp(), fixtureIds: [] };
   const report = acceptanceReport({
-    title: "RFP Hub — write acceptance",
+    title: "RFPSear.ch — write acceptance",
     milestone: opts.milestone,
     selection: selectionLine(opts, selection.autoIncluded),
     contractIds: contractIds(WRITE_CRITERIA, opts.milestone),

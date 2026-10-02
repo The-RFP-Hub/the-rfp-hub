@@ -1,6 +1,6 @@
 # TypeScript example
 
-A zero-dependency Node client for the RFP Hub public `/v1/` API: plain global `fetch`, no HTTP
+A zero-dependency Node client for the RFPSear.ch public `/v1/` API: plain global `fetch`, no HTTP
 library and no runtime TypeScript loader — `npm start` is a bare `node index.ts`, which Node
 22.18+ runs by stripping the types. `@the-rfp-hub/standard` is used only as a **type**, to show
 that the detail endpoint returns a real `Opportunity` from the standard's generated types; it is
@@ -9,7 +9,7 @@ client: it is installed from the npm registry the way any consumer would install
 
 ## Prerequisites
 
-Node **22.18+** (for `node index.ts`) and a running RFP Hub API. Bring one up locally (Postgres +
+Node **22.18+** (for `node index.ts`) and a running RFPSear.ch API. Bring one up locally (Postgres +
 migrate + seed) — see [`packages/api/README.md`](../../packages/api/README.md) — or point at a
 hosted instance via `RFPHUB_API_BASE` (default `http://localhost:3001`).
 

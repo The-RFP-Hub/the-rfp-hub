@@ -162,7 +162,7 @@ export default function HowItWorksPage() {
       <p className="eyebrow">How it works</p>
       <h1>Who&rsquo;s funding what on Ethereum, and where to apply.</h1>
       <p className="lede">
-        RFP Hub lists grants, hackathons, bounties and RFPs from any organization building on
+        RFPSear.ch lists grants, hackathons, bounties and RFPs from any organization building on
         Ethereum. No applications are reviewed here. Every listing points to the program&rsquo;s own
         site.
       </p>
@@ -194,7 +194,7 @@ export default function HowItWorksPage() {
             </li>
             <li className="is-exit">
               <strong>Apply on the program&rsquo;s site</strong>
-              <small>this is where RFP Hub hands off</small>
+              <small>this is where RFPSear.ch hands off</small>
             </li>
           </ol>
           <p className="act-after">

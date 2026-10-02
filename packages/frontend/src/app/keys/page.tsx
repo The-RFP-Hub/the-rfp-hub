@@ -140,7 +140,7 @@ function Keys() {
   };
 
   const prepareMcpKey = () => {
-    setName((current) => current || "RFP Hub MCP");
+    setName((current) => current || "RFPSear.ch MCP");
     setScopes(["read", "write"]);
     document.getElementById("key-name")?.focus();
   };
@@ -149,9 +149,9 @@ function Keys() {
     <section>
       <h1>API keys</h1>
       <p className="muted footnote">
-        API keys let integrations submit listings on your behalf. The RFP Hub MCP searches without a
-        key; give it a <code>write</code> key only when you want it to submit. A key cannot manage
-        your account, review a submission or grant a role.
+        API keys let integrations submit listings on your behalf. The RFPSear.ch MCP searches
+        without a key; give it a <code>write</code> key only when you want it to submit. A key
+        cannot manage your account, review a submission or grant a role.
       </p>
 
       {secret ? (
@@ -192,7 +192,7 @@ function Keys() {
       ) : null}
 
       <section className="card card-strong" aria-labelledby="mcp-setup-heading">
-        <h2 id="mcp-setup-heading">Connect the RFP Hub MCP</h2>
+        <h2 id="mcp-setup-heading">Connect the RFPSear.ch MCP</h2>
         <p className="prose">
           This page is the first step only when an AI client should submit. Search and fetch work
           anonymously, without an account or key. The server is model-provider agnostic: any MCP

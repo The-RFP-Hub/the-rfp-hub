@@ -28,7 +28,7 @@ export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md
 
 export const MCP_README = `${REPOSITORY}/blob/main/packages/mcp/README.md`;
 
-/** Client-specific install and private-environment setup for the RFP Hub MCP server. */
+/** Client-specific install and private-environment setup for the RFPSear.ch MCP server. */
 export const MCP_GUIDE = `${MCP_README}#submit-from-an-agent`;
 
 export const SKILLS_GUIDE = `${REPOSITORY}/blob/main/skills/README.md`;

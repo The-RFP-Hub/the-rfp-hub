@@ -1,10 +1,10 @@
 {
   "name": "rfp-hub",
-  "displayName": "RFP Hub funding search",
-  "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFP Hub public API.",
+  "displayName": "RFPSear.ch funding search",
+  "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFPSear.ch public API.",
   "version": "0.1.0",
   "author": {
-    "name": "The RFP Hub",
+    "name": "RFPSear.ch",
     "url": "https://rfpsear.ch"
   },
   "license": "MIT",

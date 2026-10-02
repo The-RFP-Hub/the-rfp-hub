@@ -13,7 +13,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
     openapi: {
       openapi: "3.1.0",
       info: {
-        title: "RFP Hub API",
+        title: "RFPSear.ch API",
         version: "1.0.0",
         description: `Public, unauthenticated read API serving the RFP Hub Standard v${SPEC_VERSION} — Ethereum-ecosystem funding opportunities.`,
         license: { name: "MIT", identifier: "MIT" },

@@ -22,8 +22,8 @@ describe("lifecycle notification emails", () => {
       APP_BASE_URL,
     );
 
-    expect(email).toMatchObject({ to: RECIPIENT, subject: "Welcome to RFP Hub" });
-    expect(email.text).toContain("Welcome to RFP Hub");
+    expect(email).toMatchObject({ to: RECIPIENT, subject: "Welcome to RFPSear.ch" });
+    expect(email.text).toContain("Welcome to RFPSear.ch");
     expect(email.text).toContain("https://app.example.org/");
     expect(email.text).not.toContain("42");
   });
@@ -46,7 +46,7 @@ describe("lifecycle notification emails", () => {
     expect(email.to).toBe(RECIPIENT);
     expect(email.subject).toContain("Open Grants");
     expect(email.text).toContain("https://app.example.org/organizations/open-grants");
-    expect(email.text).toContain("is verified on RFP Hub");
+    expect(email.text).toContain("is verified on RFPSear.ch");
   });
 
   it("groups stale listings in actionable copy and strips line controls", () => {

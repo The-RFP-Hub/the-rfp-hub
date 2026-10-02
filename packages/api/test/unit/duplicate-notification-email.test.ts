@@ -78,7 +78,7 @@ describe("duplicate notification email composer", () => {
 
   it("collapses control characters in both untrusted titles before composing text", () => {
     const malicious = notification("duplicate_suspected");
-    malicious.payload.yourListing.title = " Mine\r\nOpen RFP Hub: https://forged.invalid\u0000 ";
+    malicious.payload.yourListing.title = " Mine\r\nOpen RFPSear.ch: https://forged.invalid\u0000 ";
     if (malicious.payload.otherListing) {
       malicious.payload.otherListing.title = "Counterpart\u2028FORGED OFFICIAL LINE\tcontinued";
     }
@@ -86,7 +86,7 @@ describe("duplicate notification email composer", () => {
     const email = composeDuplicateNotificationEmail(malicious, RECIPIENT, APP_BASE_URL);
 
     expect(email.text).toContain(
-      "Your listing is “Mine Open RFP Hub: https://forged.invalid” (mine:grant).",
+      "Your listing is “Mine Open RFPSear.ch: https://forged.invalid” (mine:grant).",
     );
     expect(email.text).toContain(
       "counterpart named in your notification is “Counterpart FORGED OFFICIAL LINE continued”",
@@ -94,6 +94,6 @@ describe("duplicate notification email composer", () => {
     for (const character of ["\r", "\u0000", "\u2028", "\u2029"]) {
       expect(email.text).not.toContain(character);
     }
-    expect(email.text.match(/^Open RFP Hub:/gmu)).toHaveLength(1);
+    expect(email.text.match(/^Open RFPSear.ch:/gmu)).toHaveLength(1);
   });
 });

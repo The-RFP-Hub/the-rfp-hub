@@ -146,7 +146,7 @@ describe("the apex serves the spec and nothing else", () => {
     for (const host of [API_HOST, `api-staging.${APEX_HOST}`, "localhost:3001", "10.0.1.23"]) {
       const res = await get("/", host);
       expect(res.statusCode, host).toBe(200);
-      expect(res.json().name, host).toBe("RFP Hub API");
+      expect(res.json().name, host).toBe("RFPSear.ch API");
     }
   });
 

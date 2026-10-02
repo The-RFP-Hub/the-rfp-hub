@@ -343,7 +343,7 @@ export function Chrome({ children }: { children: ReactNode }) {
         data-authenticated={session.authenticated ? "true" : "false"}
       >
         <GuardedLink href="/" className="brand">
-          <span className="brand-text">RFP Hub</span>
+          <span className="brand-text">RFPSear.ch</span>
         </GuardedLink>
 
         <nav className="shell-nav" aria-label="Sections">
@@ -482,8 +482,8 @@ export function Chrome({ children }: { children: ReactNode }) {
 
       <footer className="shell-footer">
         <div className="shell-footer-links">
-          <GuardedLink href="/" className="shell-footer-brand" aria-label="RFP Hub home">
-            RFP Hub
+          <GuardedLink href="/" className="shell-footer-brand" aria-label="RFPSear.ch home">
+            RFPSear.ch
           </GuardedLink>
           <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
           <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>

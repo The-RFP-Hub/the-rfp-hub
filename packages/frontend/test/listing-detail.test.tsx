@@ -140,7 +140,7 @@ const mount = (node: React.ReactNode, api: ApiClient = client()) =>
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
   listingQuery.current = "";
-  document.title = "acme:old | RFP Hub";
+  document.title = "acme:old | RFPSear.ch";
 });
 
 describe("merged listing detail and edit routes", () => {
@@ -166,7 +166,7 @@ describe("merged listing detail and edit routes", () => {
     expect(screen.getByText("Public visibility")).toBeTruthy();
     // The title is set in an effect after the data lands: under a loaded runner it can trail the
     // badge by a tick, so wait for it rather than assert the instant.
-    await waitFor(() => expect(document.title).toBe("Old Round | RFP Hub"));
+    await waitFor(() => expect(document.title).toBe("Old Round | RFPSear.ch"));
     const edit = screen.getByRole("link", { name: "Edit" });
     expect(edit.className).toContain("button");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();

@@ -34,7 +34,7 @@ import {
 import { Report } from "./compliance/report.mjs";
 import { loadStandardValidator } from "./compliance/schema.mjs";
 
-const USAGE = `RFP Hub — read-only deployment compliance check
+const USAGE = `RFPSear.ch — read-only deployment compliance check
 
   node scripts/check-deployment.mjs [options]                     (pnpm check:deployment)
 
@@ -153,7 +153,7 @@ async function main() {
   }
 
   const report = new Report({
-    title: "RFP Hub — deployment compliance check",
+    title: "RFPSear.ch — deployment compliance check",
     milestone: opts.milestone,
     selection: selectionLine(opts, selection.autoIncluded),
     scopeLabel: describeScope(opts),

@@ -364,7 +364,7 @@ jobs:
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: 'Production RFP Hub API deployed'
+          title: 'Production RFPSear.ch API deployed'
           description: 'Image: ${{ needs.build_image.outputs.image }}'
 
   # The FAILURE notification lives in its own job, holding only DISCORD_WEBHOOK. It used to be an
@@ -389,4 +389,4 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: failure
-          title: 'Production RFP Hub API deploy failed'
+          title: 'Production RFPSear.ch API deploy failed'

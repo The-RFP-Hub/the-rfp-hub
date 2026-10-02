@@ -13,7 +13,7 @@ export async function generateMetadata({
   return {
     title: {
       default: id,
-      template: "%s | RFP Hub",
+      template: "%s | RFPSear.ch",
     },
   };
 }

@@ -420,7 +420,7 @@ export class ApiClient {
       if (deadline.expired()) throw this.timedOut(operation);
       throw new ToolError(
         "exec_failed",
-        `Could not reach the RFP Hub API at ${this.config.apiOrigin} for ${operation}. Check RFPHUB_API_BASE and network access.`,
+        `Could not reach the RFPSear.ch API at ${this.config.apiOrigin} for ${operation}. Check RFPHUB_API_BASE and network access.`,
         { cause: cause instanceof Error ? cause.message : String(cause) },
       );
     }

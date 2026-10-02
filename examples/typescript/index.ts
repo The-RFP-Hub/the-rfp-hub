@@ -1,5 +1,5 @@
 /**
- * Zero-dependency TypeScript client for the RFP Hub public /v1/ API.
+ * Zero-dependency TypeScript client for the RFPSear.ch public /v1/ API.
  *
  * Uses only Node's built-in `fetch` — no HTTP library. The `@the-rfp-hub/standard` import below is
  * type-only (erased at run time): it demonstrates that the detail endpoint returns a real
@@ -91,7 +91,7 @@ async function getJson<T>(path: string): Promise<T> {
     res = await fetch(`${BASE_URL}${path}`);
   } catch (cause) {
     throw new Error(
-      `Could not reach the RFP Hub API at ${BASE_URL}${path}. Is it running? ` +
+      `Could not reach the RFPSear.ch API at ${BASE_URL}${path}. Is it running? ` +
         "See ../../packages/api/README.md to start it locally (Postgres + migrate + seed).",
       { cause },
     );

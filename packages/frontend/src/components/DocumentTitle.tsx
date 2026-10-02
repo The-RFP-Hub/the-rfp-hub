@@ -7,7 +7,7 @@ export function DocumentTitle({ title, fallback }: { title?: string | null; fall
   const resolved = title?.trim() || fallback;
 
   useEffect(() => {
-    document.title = `${resolved} | RFP Hub`;
+    document.title = `${resolved} | RFPSear.ch`;
   }, [resolved]);
 
   return null;

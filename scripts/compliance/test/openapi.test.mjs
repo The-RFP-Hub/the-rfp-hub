@@ -46,7 +46,7 @@ const UNAUTHORIZED = {
 const ATOM = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <id>https://example.org/v1/feeds/opportunities.atom</id>
-  <title>RFP Hub — recent opportunities</title>
+  <title>RFPSear.ch — recent opportunities</title>
   <updated>2026-01-01T00:00:00.000Z</updated>
   <link rel="self" type="application/atom+xml" href="https://example.org/v1/feeds/opportunities.atom"/>
   <entry>
@@ -66,7 +66,7 @@ const ATOM = `<?xml version="1.0" encoding="utf-8"?>
  */
 const documentFor = (base, { redirect, me } = {}) => ({
   openapi: "3.1.0",
-  info: { title: "RFP Hub API (test double)", version: "1.0.0" },
+  info: { title: "RFPSear.ch API (test double)", version: "1.0.0" },
   servers: [{ url: base }],
   // Document-level `security` is the inherited case: an operation that declares none of its own
   // is closed by it, and only an explicit `security: []` opts back out.

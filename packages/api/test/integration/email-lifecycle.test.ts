@@ -257,7 +257,7 @@ describeWithDb("M5 lifecycle email events", () => {
       messages.push(...(transport.drain?.(EMAILS.injected) ?? []));
       if (messages.length === 0) await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    expect(messages.some((message) => message.subject === "Welcome to RFP Hub")).toBe(true);
+    expect(messages.some((message) => message.subject === "Welcome to RFPSear.ch")).toBe(true);
   }, 60_000);
 
   it("keeps OTP signup successful when the injected post-commit queue fails", async () => {

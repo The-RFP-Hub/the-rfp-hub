@@ -1,7 +1,7 @@
 # @the-rfp-hub/mcp
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server for the
-[RFP Hub](https://github.com/The-RFP-Hub/the-rfp-hub) — search Ethereum-ecosystem funding
+[RFPSear.ch](https://github.com/The-RFP-Hub/the-rfp-hub) — search Ethereum-ecosystem funding
 opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) from any MCP client, and
 optionally submit one, with a human approval step that lives outside the tool channel. MIT licensed.
 
@@ -37,7 +37,7 @@ the one-time secret remains visible while you configure the client.
 
 ### Client-neutral connection
 
-RFP Hub MCP is model-provider and client agnostic. It is a local `stdio` server: the client launches
+RFPSear.ch MCP is model-provider and client agnostic. It is a local `stdio` server: the client launches
 one process, sends MCP messages on standard input and reads them on standard output. The server does
 not know which model, vendor or host launched it.
 
@@ -120,7 +120,7 @@ Root key `servers`, in `.vscode/mcp.json`:
     {
       "type": "promptString",
       "id": "rfphub-key",
-      "description": "RFP Hub API key",
+      "description": "RFPSear.ch API key",
       "password": true
     }
   ]

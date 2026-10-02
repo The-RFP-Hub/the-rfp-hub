@@ -149,7 +149,7 @@ export class ExportSchemaError extends Error {
       .join("\n");
     const rest = invalid.length > SHOWN ? `\n  …and ${invalid.length - SHOWN} more` : "";
     super(
-      `refusing to publish: ${invalid.length} record(s) do not validate against the RFP Hub ` +
+      `refusing to publish: ${invalid.length} record(s) do not validate against RFPSear.ch ` +
         `Standard ${SPEC_VERSION}. Nothing was written — the previous export is untouched.\n` +
         `${shown}${rest}`,
     );

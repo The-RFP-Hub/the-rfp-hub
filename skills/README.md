@@ -1,7 +1,7 @@
 # Agent skills
 
-This directory holds the RFP Hub's [Agent Skills](https://agentskills.io) — portable
-`SKILL.md` bundles that any compatible coding agent can load to work with the RFP Hub directly,
+This directory holds RFPSear.ch's [Agent Skills](https://agentskills.io) — portable
+`SKILL.md` bundles that any compatible coding agent can load to work with RFPSear.ch directly,
 without needing the API's shape explained to it first.
 
 | Skill | What it does |

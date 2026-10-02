@@ -20,7 +20,7 @@ function page(reply: FastifyReply, status: number, body: string): FastifyReply {
     .send(`<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RFP Hub email preferences</title>
+<title>RFPSear.ch email preferences</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem}button{font:inherit;padding:.5rem 1rem}</style>
 </head>
 <body>${body}</body>
@@ -36,7 +36,7 @@ export const emailController = {
       reply,
       200,
       `<h1>Stop stale listing reminders?</h1>
-<p>RFP Hub emails publishers when their listings have not been updated for a while. Confirm to stop these reminders for your account. Sign-in and account emails are not affected.</p>
+<p>RFPSear.ch emails publishers when their listings have not been updated for a while. Confirm to stop these reminders for your account. Sign-in and account emails are not affected.</p>
 <form method="post"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit">Stop reminders</button></form>`,
     );
   }),
@@ -49,7 +49,7 @@ export const emailController = {
     return page(
       reply,
       200,
-      "<h1>Reminders stopped</h1><p>You will no longer receive stale listing reminders from RFP Hub.</p>",
+      "<h1>Reminders stopped</h1><p>You will no longer receive stale listing reminders from RFPSear.ch.</p>",
     );
   }),
 };

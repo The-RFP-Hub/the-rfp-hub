@@ -72,7 +72,7 @@ test.describe("M3-7 the public directory", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(`${stack.urls.frontend}/directory`);
-      await expect(page).toHaveTitle("Directory | RFP Hub");
+      await expect(page).toHaveTitle("Directory | RFPSear.ch");
       await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible();
 
       // The filter is a parameter the endpoint declares — the list route validates its querystring
@@ -300,7 +300,7 @@ test.describe("M3-7 the public entry page", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
-      await expect(page).toHaveTitle(`${replacedTitle} | RFP Hub`);
+      await expect(page).toHaveTitle(`${replacedTitle} | RFPSear.ch`);
 
       await expect(page.getByRole("heading", { name: new RegExp(replacedTitle) })).toBeVisible();
       // The description reaches the page as text. So does the id, inside the collapsed developer

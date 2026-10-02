@@ -55,7 +55,7 @@ function previewExpired(expiresAt: string): string {
   return `That preview expired at ${expiresAt}, so NOTHING WAS APPROVED. Approvals are deliberately short-lived. Ask for a fresh preview and approve that one.`;
 }
 
-const USAGE = `rfphub-mcp — the RFP Hub MCP server
+const USAGE = `rfphub-mcp — the RFPSear.ch MCP server
 
   rfphub-mcp                 serve MCP over stdio (this is what an MCP client runs)
   rfphub-mcp pending         list previews awaiting approval, and approvals already granted
