@@ -13,7 +13,7 @@ test("the sign-in modal releases the page and opens again after logout", async (
   const email = `dialog-lifecycle-${Date.now()}@rfphub.invalid`;
 
   try {
-    await page.goto(stack.urls.frontend);
+    await page.goto(`${stack.urls.frontend}/listings/new`);
     await page.getByRole("button", { name: "Log in" }).first().click();
     await page.getByLabel("Email address", { exact: true }).fill(email);
     await page.getByRole("button", { name: "Send code" }).click();

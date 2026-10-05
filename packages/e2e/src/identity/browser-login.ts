@@ -78,12 +78,16 @@ export async function login(input: BrowserLoginInput): Promise<BrowserLoginResul
   });
 
   try {
-    await page.goto(input.frontendUrl, { waitUntil: "domcontentloaded", timeout });
+    // The header has no Log in button since "Submit a program" became its single way in, so sign-in
+    // starts from the new-listing gate, which still carries one.
+    await page.goto(`${input.frontendUrl}/listings/new`, {
+      waitUntil: "domcontentloaded",
+      timeout,
+    });
 
-    // WAIT FOR THE SESSION TO RESOLVE FIRST. The front page is the public directory now, and the
-    // header shows "restoring session…" until the client has decided whether anybody is signed in.
-    // The `Log in` control does not exist before that, so filling a field straight away races a
-    // page that has not finished deciding what to render.
+    // WAIT FOR THE SESSION TO RESOLVE FIRST. The header shows "restoring session…" until the client
+    // has decided whether anybody is signed in. The `Log in` control does not exist before that, so
+    // filling a field straight away races a page that has not finished deciding what to render.
     const logIn = page.getByRole("button", { name: "Log in" }).first();
     await logIn.waitFor({ state: "visible", timeout });
     await logIn.click();
