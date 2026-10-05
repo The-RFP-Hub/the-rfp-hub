@@ -162,6 +162,10 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/
   "$API/v1/review/organizations/example-foundation/invites"
 ```
 
+Once an organization has an owner or admin, they can send the same invites for their own team
+(`POST /v1/organizations/{slug}/invites`, or the form on the organization page), so a Hub reviewer
+is only needed for the first one. Only an owner can invite or revoke an owner.
+
 **The invited membership is not active yet.** It is applied the first time somebody signs in with,
 and proves ownership of, that address. That is the property that makes an invite safe to send
 before an account exists — and it is also why an invite to a stale address is a standing grant:

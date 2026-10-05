@@ -47,6 +47,7 @@ import type {
   ManagedOpportunityList,
   Me,
   MeMembership,
+  OrgRole,
   Publisher,
 } from "@/lib/types";
 import Link from "next/link";
@@ -288,7 +289,11 @@ function Member({
         </div>
       )}
 
-      {me.canReview ? <ReviewerPendingInvites slug={slug} /> : null}
+      {me.canReview ? (
+        <ReviewerPendingInvites slug={slug} />
+      ) : canEdit ? (
+        <MemberInvites slug={slug} role={membership.role} />
+      ) : null}
 
       {/*
         THE ORIGIN DESCRIBES ITSELF ONCE. Every link out of this page carries where it came from, so
@@ -320,6 +325,134 @@ function Member({
         seedSettled={publishers.state.status === "ready" || publishers.state.status === "error"}
       />
     </section>
+  );
+}
+
+/**
+ * An owner's or admin's own team: invite a colleague by email and withdraw an invitation. The
+ * membership applies the first time they sign in with that address. Only an owner offers the owner
+ * role, which is the same rule the API enforces.
+ */
+function MemberInvites({ slug, role }: { slug: string; role: OrgRole }) {
+  const api = useApi();
+  const load = useCallback(() => api.organizations.invites(slug), [api, slug]);
+  const invites = useResource(load);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<ActionNoteValue | null>(null);
+  const [email, setEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<OrgRole>("publisher");
+
+  const run = async (action: () => Promise<string>, failure: string) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      setNote({ kind: "ok", message: await action() });
+      invites.reload();
+    } catch (error) {
+      setNote(actionErrorNote(error, failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const roles: OrgRole[] =
+    role === "owner" ? ["publisher", "admin", "owner"] : ["publisher", "admin"];
+
+  return (
+    <>
+      <h2 className="section-head">Invite a colleague</h2>
+      <p className="muted footnote">
+        The membership applies the first time they sign in with this email address.
+      </p>
+      <div className="field">
+        <label htmlFor="member-invite-email">Email address</label>
+        <input
+          id="member-invite-email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="member-invite-role">Role</label>
+        <select
+          id="member-invite-role"
+          value={inviteRole}
+          onChange={(event) => setInviteRole(event.target.value as OrgRole)}
+        >
+          {roles.map((value) => (
+            <option key={value} value={value}>
+              {orgRoleLabel(value)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="button"
+        disabled={busy || email.trim() === ""}
+        onClick={() =>
+          void run(async () => {
+            const invite = await api.organizations.invite(slug, {
+              email: email.trim(),
+              role: inviteRole,
+            });
+            setEmail("");
+            return `Invitation saved for ${invite.email}.`;
+          }, "The invitation could not be saved.")
+        }
+      >
+        Send the invitation
+      </button>
+      <ActionNote note={note} />
+      <ResourceView
+        resource={invites.state}
+        what="pending membership invites"
+        onRetry={invites.reload}
+      >
+        {(list) =>
+          list.items.length === 0 ? null : (
+            <div className="table-scroll">
+              <table>
+                <caption>Pending membership invites</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Invited</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((invite) => (
+                    <tr key={invite.id}>
+                      <th scope="row">
+                        <UntrustedText value={invite.email} />
+                      </th>
+                      <td>{orgRoleLabel(invite.role)}</td>
+                      <td className="muted">{formatInstant(invite.createdAt)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          disabled={busy || (invite.role === "owner" && role !== "owner")}
+                          onClick={() =>
+                            void run(async () => {
+                              await api.organizations.revokeInvite(slug, invite.id);
+                              return `The pending invitation for ${invite.email} was revoked.`;
+                            }, "The invitation could not be revoked.")
+                          }
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </ResourceView>
+    </>
   );
 }
 

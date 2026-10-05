@@ -8,6 +8,9 @@
  * The verified flag is deliberately not editable here. An organisation verifying itself would make
  * the flag meaningless.
  *
+ * `/:slug/invites` lets an owner or admin bring colleagues in without a Hub reviewer: the same
+ * invites the review routes create, scoped to the caller's own organization.
+ *
  * `GET /:slug/opportunities` is the other half of an organisation's own view of itself: the entries
  * filed under its namespace, including the pending ones the public reads are pinned away from, and
  * `POST /:slug/opportunities/:id/{approve,reject}` is what a verified member does about one:
@@ -21,6 +24,91 @@ import { meteredAuth } from "../shared/rate-limit-key.js";
 import { organizationsController } from "./organizations.controller.js";
 
 export const organizations = async (router: FastifyInstance): Promise<void> => {
+  const manageInvites = meteredAuth(router, router.auth.requireSession, {
+    max: 20,
+    timeWindow: "1 minute",
+  });
+  const inviteErrors = {
+    400: { $ref: "ErrorResponse#" },
+    401: { $ref: "ErrorResponse#" },
+    403: { $ref: "ErrorResponse#" },
+    404: { $ref: "ErrorResponse#" },
+    409: { $ref: "ErrorResponse#" },
+    429: RATE_LIMITED,
+  };
+  const slugParams = {
+    type: "object",
+    required: ["slug"],
+    properties: { slug: { type: "string" } },
+  } as const;
+
+  router.post(
+    "/:slug/invites",
+    {
+      onRequest: manageInvites,
+      schema: {
+        operationId: "createOwnOrganizationMembershipInvite",
+        tags: ["publishers"],
+        summary: "Invite an email address to your organization (owner or admin, session only)",
+        description:
+          "The membership applies the first time a person signs in with, and proves ownership of, this email address. Only an owner can invite an owner.",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        body: {
+          type: "object",
+          required: ["email"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", minLength: 3, maxLength: 320 },
+            role: { type: "string", enum: ["owner", "admin", "publisher"] },
+          },
+        },
+        response: { 200: { $ref: "MembershipInvite#" }, ...inviteErrors },
+      },
+    },
+    organizationsController.createInvite,
+  );
+
+  router.get(
+    "/:slug/invites",
+    {
+      onRequest: manageInvites,
+      schema: {
+        operationId: "listOwnOrganizationMembershipInvites",
+        tags: ["publishers"],
+        summary: "List your organization's pending invites (owner or admin, session only)",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        response: { 200: { $ref: "MembershipInviteList#" }, ...inviteErrors },
+      },
+    },
+    organizationsController.listInvites,
+  );
+
+  router.delete(
+    "/:slug/invites/:inviteId",
+    {
+      onRequest: manageInvites,
+      schema: {
+        operationId: "revokeOwnOrganizationMembershipInvite",
+        tags: ["publishers"],
+        summary: "Revoke a pending invite on your organization (owner or admin, session only)",
+        description: "Only an owner can revoke an owner invite.",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["slug", "inviteId"],
+          properties: {
+            slug: { type: "string" },
+            inviteId: { type: "string", pattern: "^[0-9]+$" },
+          },
+        },
+        response: { 200: { $ref: "MembershipInvite#" }, ...inviteErrors },
+      },
+    },
+    organizationsController.revokeInvite,
+  );
+
   router.patch(
     "/:slug",
     {
