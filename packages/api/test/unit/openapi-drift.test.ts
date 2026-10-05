@@ -517,6 +517,7 @@ describe("M3 closed components vs their view types", () => {
     organizationVerified: true,
     claimedBy: "someone",
     claimedByAccountId: 1,
+    claimantIsMember: true,
     status: "pending",
     note: null,
     createdAt: "2026-08-14T00:00:00.000Z",

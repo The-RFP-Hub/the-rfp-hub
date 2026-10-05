@@ -502,6 +502,7 @@ describe("deciding a claim", () => {
     organizationVerified: false,
     claimedBy: "hub-reviewer",
     claimedByAccountId: me.accountId,
+    claimantIsMember: true,
     status: "pending" as const,
     note: "This is our program.",
     createdAt: "2026-08-20T00:00:00Z",

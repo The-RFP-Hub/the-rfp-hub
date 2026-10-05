@@ -158,8 +158,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/jso
   -d '{"organizationSlug":"my-org"}' $API/v1/opportunities/some-namespace:1459/claim
 ```
 
-Granted immediately when your organization is verified **and** already appears among the entry's
-operating organizations; queued for a reviewer otherwise. The entry keeps its id, its history and
+Any signed-in account can file a claim for an organization in the directory; you do not need to be a
+member first. It is granted immediately only when you are a member of the organization, it is
+verified **and** it already appears among the entry's operating organizations. Every other claim is
+queued for a reviewer, and approving a claim from a non-member also adds them as a member of the
+organization. The entry keeps its id, its history and
 anything already pointing at it, and publisher ownership moves to you.
 
 Two things about the scopes, if you claim with a key rather than a session:

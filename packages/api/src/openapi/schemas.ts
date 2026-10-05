@@ -756,6 +756,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "organizationVerified",
       "claimedBy",
       "claimedByAccountId",
+      "claimantIsMember",
       "status",
       "note",
       "createdAt",
@@ -771,6 +772,11 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       claimedByAccountId: {
         type: ["integer", "null"],
         description: "The stable claimant identity used to disclose self-review.",
+      },
+      claimantIsMember: {
+        type: "boolean",
+        description:
+          "Whether the claimant already holds a membership on the organization. When false, approving the claim adds them as a publisher.",
       },
       status: { type: "string", enum: ["pending", "approved", "rejected", "withdrawn"] },
       note: { type: ["string", "null"] },

@@ -136,21 +136,39 @@ describe("the public claim control", () => {
     expect(fetch.mock.calls.every(([url]) => !String(url).includes("/v1/me"))).toBe(true);
   });
 
-  it("waits for the signed-in account and explains that claims require an organization", async () => {
+  it("lets a signed-in account with no membership file a claim for a named organization", async () => {
     authSession.data = { user: { id: "user_7" } };
-    const client = clientFor({ me: account([]) });
+    const claim = vi.fn(async () =>
+      result("queued", "you are not a member, so a reviewer will decide."),
+    );
+    const client = clientFor({ me: account([]), claim });
 
     render(
       <ApiClientProvider value={client}>
-        <PublicClaimControl id="acme:round-4" />
+        <PublicClaimControl
+          id="acme:round-4"
+          organizations={[{ slug: "prezenti", name: "Prezenti" }]}
+        />
       </ApiClientProvider>,
     );
 
-    expect(await screen.findByText("This is my program — claim it")).toBeTruthy();
-    fireEvent.click(screen.getByText("This is my program — claim it"));
-    expect(screen.getByText(/A reviewer grants membership\./)).toBeTruthy();
+    fireEvent.click(await screen.findByText("This is my program — claim it"));
     expect(client.me.get).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+    expect(screen.getByText(/approving it adds you as a member/)).toBeTruthy();
+    expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("prezenti");
+
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "\u0000other" } });
+    fireEvent.change(screen.getByLabelText("Organization slug"), {
+      target: { value: " Optimism " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+
+    await waitFor(() =>
+      expect(claim).toHaveBeenCalledWith("acme:round-4", {
+        organizationSlug: "optimism",
+        note: null,
+      }),
+    );
   });
 
   it("keeps the same disclosure open while sign-in loads the claim form", async () => {

@@ -98,7 +98,15 @@ export function PublicOpportunity({ id }: { id: string }) {
             <OpportunityView
               entry={entry}
               baseUrl={api.baseUrl}
-              claimControl={<PublicClaimControl id={entry.id} />}
+              claimControl={
+                <PublicClaimControl
+                  id={entry.id}
+                  organizations={[
+                    ...entry.operatingOrganizations,
+                    ...(entry.sponsoringOrganizations ?? []),
+                  ]}
+                />
+              }
             />
             <PublicHistory id={entry.id} />
           </>

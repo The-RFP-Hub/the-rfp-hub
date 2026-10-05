@@ -17,6 +17,7 @@ import {
   opportunityDuplicates,
   orgMemberships,
 } from "../../src/db/schema.js";
+import { MAX_PENDING_CLAIMS_PER_ACCOUNT } from "../../src/modules/services/claims/claim.service.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
   bearer,
@@ -64,6 +65,10 @@ const EMAILS = {
   insider: "m3claim-insider@rfphub.invalid",
   /** A member of the aggregator namespace `HOST`, so an entry can be claimed BACK to it. */
   hostMember: "m3claim-hostmember@rfphub.invalid",
+  /** Holds no membership anywhere: the open-filing cases are about exactly that account. */
+  stranger: "m3claim-stranger@rfphub.invalid",
+  /** A second member-less account, so the pending-claim cap does not depend on test order. */
+  flooder: "m3claim-flooder@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -80,6 +85,9 @@ run("M3CLAIM ownership claims", () => {
   let submitterToken: string;
   let insiderToken: string;
   let hostMemberToken: string;
+  let strangerToken: string;
+  let strangerId: number;
+  let flooderToken: string;
   let submitterId: number;
   let operatorId: number;
   let sponsorId: number;
@@ -137,6 +145,11 @@ run("M3CLAIM ownership claims", () => {
     const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3claim-submitter" });
     const insider = await seedIdentity(EMAILS.insider, { handle: "m3claim-insider" });
     const hostMember = await seedIdentity(EMAILS.hostMember, { handle: "m3claim-hostmember" });
+    const stranger = await seedIdentity(EMAILS.stranger, { handle: "m3claim-stranger" });
+    const flooder = await seedIdentity(EMAILS.flooder, { handle: "m3claim-flooder" });
+    strangerId = stranger.account.id;
+    strangerToken = stranger.token;
+    flooderToken = flooder.token;
     submitterId = submitter.account.id;
     operatorId = operator.account.id;
     sponsorId = sponsor.account.id;
@@ -151,6 +164,8 @@ run("M3CLAIM ownership claims", () => {
       submitter.userId,
       insider.userId,
       hostMember.userId,
+      stranger.userId,
+      flooder.userId,
     );
 
     const hostOrg = await seedOrganization({ slug: HOST, verified: false });
@@ -295,11 +310,51 @@ run("M3CLAIM ownership claims", () => {
     expect(res.json().message).toMatch(/not a verified publisher/);
   });
 
-  it("refuses a claim on an organisation the account is not a member of", async () => {
-    const id = await seedEntry("not-a-member");
-    const res = await claim(sponsorToken, id, OPERATOR);
-    expect(res.statusCode).toBe(403);
-    expect(res.json().error).toBe("not_a_member");
+  it("lets an account with no membership FILE a claim, which always queues", async () => {
+    const id = await seedEntry("stranger-files", [HOST, OPERATOR], []);
+    const res = await claim(strangerToken, id, OPERATOR);
+    // OPERATOR is verified and operates the entry — a member would be granted here.
+    expect(res.statusCode).toBe(202);
+    expect(res.json().outcome).toBe("queued");
+    expect(res.json().message).toMatch(/not a member/);
+  });
+
+  it("adds the claimant as a member when a reviewer approves a stranger's claim", async () => {
+    const id = await seedEntry("stranger-approved", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    expect(queued.statusCode).toBe(202);
+
+    const decided = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { verifyOrganization: false },
+    });
+    expect(decided.statusCode).toBe(200);
+    expect(decided.json().message).toMatch(/added as a member/);
+
+    const memberships = await db
+      .select()
+      .from(orgMemberships)
+      .where(eq(orgMemberships.accountId, strangerId));
+    expect(memberships.map((m) => m.role)).toEqual(["publisher"]);
+  });
+
+  it("404s a claim on an organisation that does not exist", async () => {
+    const id = await seedEntry("no-such-org");
+    const res = await claim(strangerToken, id, "m3claim-does-not-exist");
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("caps the pending claims one account can have open", async () => {
+    for (let i = 0; i < MAX_PENDING_CLAIMS_PER_ACCOUNT; i += 1) {
+      const id = await seedEntry(`flood-${i}`, [HOST], []);
+      expect((await claim(flooderToken, id, UNVERIFIED)).statusCode).toBe(202);
+    }
+    const over = await seedEntry("flood-over", [HOST], []);
+    const res = await claim(flooderToken, over, UNVERIFIED);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("too_many_pending_claims");
   });
 
   it("400s a malformed claim body instead of 500ing on a non-string field", async () => {
@@ -368,10 +423,12 @@ run("M3CLAIM ownership claims", () => {
           eq(orgMemberships.organizationId, operatorOrgId),
         ),
       );
-    // The principal is resolved per request, so the pre-transaction membership check already fails
-    // here; the in-transaction re-check is what covers a revocation that lands between the two.
+    // The principal is resolved per request, so the pre-transaction membership check already sees
+    // no membership here and queues instead of granting; the in-transaction re-check is what covers
+    // a revocation that lands between the two.
     const res = await claim(operatorToken, id, OPERATOR);
-    expect([403]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(202);
+    expect(res.json().outcome).toBe("queued");
     await grantMembership(operatorId, operatorOrgId, "owner");
 
     const row = (

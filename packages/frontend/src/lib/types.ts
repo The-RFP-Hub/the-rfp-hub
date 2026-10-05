@@ -306,6 +306,7 @@ export interface ClaimSummary {
   organizationVerified: boolean;
   claimedBy: string;
   claimedByAccountId: number | null;
+  claimantIsMember: boolean;
   status: ClaimStatus;
   note: string | null;
   createdAt: string;
