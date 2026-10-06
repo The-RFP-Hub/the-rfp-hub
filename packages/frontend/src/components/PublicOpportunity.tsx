@@ -35,7 +35,7 @@ import {
   formatInstant,
   hasRollingDeadline,
 } from "@/lib/format";
-import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
+import { fundingTypeLabel, ingestionMethodLabel, joinOrganizationNames } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
@@ -175,7 +175,12 @@ export function OpportunityView({
                 {operator ? (
                   <>
                     {" "}
-                    by <UntrustedText value={operator.name} />
+                    by{" "}
+                    <UntrustedText
+                      value={joinOrganizationNames(
+                        entry.operatingOrganizations.map((org) => org.name),
+                      )}
+                    />
                   </>
                 ) : null}
                 {(entry.ecosystems ?? []).length > 0 ? (

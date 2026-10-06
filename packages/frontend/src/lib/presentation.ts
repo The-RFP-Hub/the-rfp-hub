@@ -177,6 +177,12 @@ export function fundingTypePlural(value: string): string {
   return FUNDING_TYPE_PLURALS[value] ?? `${fundingTypeLabel(value)}s`;
 }
 
+/** "A", "A and B", "A, B and C": every operator, in the record's own order. */
+export function joinOrganizationNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 export function fundingTypeLabel(value: string): string {
   return FUNDING_TYPE_LABELS[value] ?? fallbackLabel(value);
 }

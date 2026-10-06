@@ -9,6 +9,7 @@ import {
   fundingTypeLabel,
   ingestionMethodLabel,
   isOpenDuplicateStatus,
+  joinOrganizationNames,
   notificationActionLabel,
   notificationCopy,
   opportunityStatusLabel,
@@ -117,5 +118,16 @@ describe("publisherStatus", () => {
   ] as const)("derives %s with the required precedence", (status, source, label) => {
     expect(publisherStatus(source)).toBe(status);
     expect(PUBLISHER_STATUS_LABELS[status]).toBe(label);
+  });
+});
+
+describe("joinOrganizationNames", () => {
+  it("names every operator, in order", () => {
+    expect(joinOrganizationNames([])).toBe("");
+    expect(joinOrganizationNames(["Uniswap Foundation"])).toBe("Uniswap Foundation");
+    expect(joinOrganizationNames(["Uniswap Foundation", "Areta"])).toBe(
+      "Uniswap Foundation and Areta",
+    );
+    expect(joinOrganizationNames(["A", "B", "C"])).toBe("A, B and C");
   });
 });
