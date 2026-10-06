@@ -72,7 +72,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
   router.get(
     "/:slug/invites",
     {
-      onRequest: manageInvites,
+      onRequest: router.auth.requireSession,
       schema: {
         operationId: "listOwnOrganizationMembershipInvites",
         tags: ["publishers"],
