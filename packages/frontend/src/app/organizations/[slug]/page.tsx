@@ -289,10 +289,10 @@ function Member({
         </div>
       )}
 
-      {me.canReview ? (
-        <ReviewerPendingInvites slug={slug} />
-      ) : canEdit ? (
+      {canEdit ? (
         <MemberInvites slug={slug} role={membership.role} />
+      ) : me.canReview ? (
+        <ReviewerPendingInvites slug={slug} />
       ) : null}
 
       {/*
@@ -364,33 +364,9 @@ function MemberInvites({ slug, role }: { slug: string; role: OrgRole }) {
       <p className="muted footnote">
         The membership applies the first time they sign in with this email address.
       </p>
-      <div className="field">
-        <label htmlFor="member-invite-email">Email address</label>
-        <input
-          id="member-invite-email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="member-invite-role">Role</label>
-        <select
-          id="member-invite-role"
-          value={inviteRole}
-          onChange={(event) => setInviteRole(event.target.value as OrgRole)}
-        >
-          {roles.map((value) => (
-            <option key={value} value={value}>
-              {orgRoleLabel(value)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <button
-        type="button"
-        disabled={busy || email.trim() === ""}
-        onClick={() =>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
           void run(async () => {
             const invite = await api.organizations.invite(slug, {
               email: email.trim(),
@@ -398,11 +374,37 @@ function MemberInvites({ slug, role }: { slug: string; role: OrgRole }) {
             });
             setEmail("");
             return `Invitation saved for ${invite.email}.`;
-          }, "The invitation could not be saved.")
-        }
+          }, "The invitation could not be saved.");
+        }}
       >
-        Send the invitation
-      </button>
+        <div className="field">
+          <label htmlFor="member-invite-email">Email address</label>
+          <input
+            id="member-invite-email"
+            type="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="member-invite-role">Role</label>
+          <select
+            id="member-invite-role"
+            value={inviteRole}
+            onChange={(event) => setInviteRole(event.target.value as OrgRole)}
+          >
+            {roles.map((value) => (
+              <option key={value} value={value}>
+                {orgRoleLabel(value)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" disabled={busy || email.trim() === ""}>
+          Send the invitation
+        </button>
+      </form>
       <ActionNote note={note} />
       <ResourceView
         resource={invites.state}

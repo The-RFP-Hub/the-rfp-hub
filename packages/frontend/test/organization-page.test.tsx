@@ -137,7 +137,8 @@ const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => 
   return invite;
 });
 
-const ownInvites = vi.fn(async () => ({ items: [] as MembershipInvite[] }));
+const ownInviteRows: { current: MembershipInvite[] } = { current: [] };
+const ownInvites = vi.fn(async () => ({ items: ownInviteRows.current }));
 const ownInvite = vi.fn(async (_slug: string, body: { email: string; role: string }) => ({
   id: 1,
   organizationSlug: "filecoin",
@@ -148,7 +149,7 @@ const ownInvite = vi.fn(async (_slug: string, body: { email: string; role: strin
   acceptedAt: null,
   acceptedAccountId: null,
 }));
-const ownRevokeInvite = vi.fn();
+const ownRevokeInvite = vi.fn(async (_slug: string, inviteId: number) => ({ id: inviteId }));
 
 /** Counts each read so a test can prove BOTH lists were re-read, not just the one clicked in. */
 const reads = { approved: 0, pending: 0 };
@@ -237,7 +238,13 @@ describe("pending membership invites for staff", () => {
         acceptedAccountId: null,
       },
     ];
-    mount(me({ role: "reviewer", canReview: true }));
+    mount(
+      me({
+        role: "reviewer",
+        canReview: true,
+        memberships: [membership({ role: "publisher" })],
+      }),
+    );
 
     expect(await screen.findByRole("heading", { name: "Pending membership invites" })).toBeTruthy();
     expect(
@@ -287,6 +294,63 @@ describe("an organization's own invites", () => {
     await screen.findByLabelText("Email address");
     const roles = screen.getAllByRole("option").map((option) => option.textContent ?? "");
     expect(roles.some((label) => /owner/i.test(label))).toBe(true);
+  });
+
+  it("submits the invitation like a form, so Enter works", async () => {
+    mount(admin("admin"));
+
+    const field = await screen.findByLabelText("Email address");
+    fireEvent.change(field, { target: { value: "enter.key@example.org" } });
+    fireEvent.submit(field.closest("form") as HTMLFormElement);
+
+    await waitFor(() => expect(ownInvite).toHaveBeenCalled());
+    expect(await screen.findByText("Invitation saved for enter.key@example.org.")).toBeTruthy();
+  });
+
+  it("shows the API's refusal when the invitation cannot be saved", async () => {
+    ownInvite.mockRejectedValueOnce(new Error("already a member"));
+    mount(admin("admin"));
+
+    fireEvent.change(await screen.findByLabelText("Email address"), {
+      target: { value: "member@example.org" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send the invitation" }));
+
+    expect(await screen.findByText(/The invitation could not be saved/)).toBeTruthy();
+  });
+
+  it("lets an admin revoke a publisher invite but not an owner invite", async () => {
+    const row = (id: number, email: string, role: "owner" | "publisher"): MembershipInvite => ({
+      id,
+      organizationSlug: "filecoin",
+      email,
+      role,
+      invitedBy: 2,
+      createdAt: "2026-08-26T12:00:00Z",
+      acceptedAt: null,
+      acceptedAccountId: null,
+    });
+    ownInviteRows.current = [
+      row(31, "owner.invite@example.org", "owner"),
+      row(32, "publisher.invite@example.org", "publisher"),
+    ];
+    mount(admin("admin"));
+
+    const ownerRow = await screen.findByRole("row", { name: /owner\.invite@example\.org/ });
+    const publisherRow = await screen.findByRole("row", { name: /publisher\.invite@example\.org/ });
+    expect(within(ownerRow).getByRole("button", { name: "Revoke" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.click(within(publisherRow).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(ownRevokeInvite).toHaveBeenCalledWith("filecoin", 32));
+    ownInviteRows.current = [];
+  });
+
+  it("gives a reviewer who is also an owner the invite form", async () => {
+    mount(me({ role: "reviewer", canReview: true, memberships: [membership({ role: "owner" })] }));
+
+    expect(await screen.findByRole("button", { name: "Send the invitation" })).toBeTruthy();
   });
 
   it("shows no invite controls to a publisher", async () => {

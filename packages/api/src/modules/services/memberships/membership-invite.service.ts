@@ -45,6 +45,12 @@ export class MembershipInviteService {
       return await withTransaction(this.db, async (repos) => {
         const org = await findOrganization(repos, slug);
         await requireInviteAuthority(repos, actor, org, role);
+        if (!actor.hubReviewer && (await repos.memberships.roleForEmail(email, org.id))) {
+          throw conflict(
+            "already_a_member",
+            `${email} is already a member of ${slug}, so there is nothing to invite them to.`,
+          );
+        }
         const invite = await repos.membershipInvites.create({
           organizationId: org.id,
           email,

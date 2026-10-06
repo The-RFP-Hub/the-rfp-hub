@@ -79,7 +79,12 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
         summary: "List your organization's pending invites (owner or admin, session only)",
         security: [{ bearerAuth: [] }],
         params: slugParams,
-        response: { 200: { $ref: "MembershipInviteList#" }, ...inviteErrors },
+        response: {
+          200: { $ref: "MembershipInviteList#" },
+          401: { $ref: "ErrorResponse#" },
+          403: { $ref: "ErrorResponse#" },
+          404: { $ref: "ErrorResponse#" },
+        },
       },
     },
     organizationsController.listInvites,

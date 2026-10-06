@@ -220,6 +220,28 @@ describe("createApiClient", () => {
     expect(calls[2]?.init.body).toBeUndefined();
   });
 
+  it("lists, creates and revokes invites on the organization's own route", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.organizations.invites("filecoin foundation");
+    await api.organizations.invite("filecoin foundation", {
+      email: "person@example.org",
+      role: "admin",
+    });
+    await api.organizations.revokeInvite("filecoin foundation", 14);
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["GET", "https://api.example.com/v1/organizations/filecoin%20foundation/invites"],
+      ["POST", "https://api.example.com/v1/organizations/filecoin%20foundation/invites"],
+      ["DELETE", "https://api.example.com/v1/organizations/filecoin%20foundation/invites/14"],
+    ]);
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      email: "person@example.org",
+      role: "admin",
+    });
+  });
+
   it("lists, creates and revokes membership invites on the reviewer organization route", async () => {
     const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
     const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });

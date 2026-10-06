@@ -164,7 +164,10 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/
 
 Once an organization has an owner or admin, they can send the same invites for their own team
 (`POST /v1/organizations/{slug}/invites`, or the form on the organization page), so a Hub reviewer
-is only needed for the first one. Only an owner can invite or revoke an owner.
+is only needed for the first one. Only an owner can invite or revoke an owner, and an address that
+already belongs to a member is refused (`already_a_member`), so an invite never changes an existing
+member's role. An invite is checked again when it is redeemed: if whoever created it has lost the
+authority it was created under (removed, or an owner demoted), it is dropped instead of applied.
 
 **The invited membership is not active yet.** It is applied the first time somebody signs in with,
 and proves ownership of, that address. That is the property that makes an invite safe to send

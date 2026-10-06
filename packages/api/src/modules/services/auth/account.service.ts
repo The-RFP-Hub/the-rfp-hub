@@ -169,6 +169,23 @@ export class AccountService {
     const notificationIds: number[] = [];
 
     for (const invite of invites) {
+      if (!(await this.inviterStillAuthorised(repos, invite))) {
+        await repos.membershipInvites.revokePending(invite.organizationId, invite.id);
+        await repos.audit.record({
+          subjectKind: "organization",
+          subjectId: invite.organizationId,
+          actorKind: "user",
+          actorAccountId: account.id,
+          action: "revoke_member_invite",
+          patch: {
+            inviteId: invite.id,
+            email,
+            role: invite.role,
+            reason: "inviter_lost_authority",
+          },
+        });
+        continue;
+      }
       const existing = await repos.memberships.lockForAccountAndOrganization(
         account.id,
         invite.organizationId,
@@ -216,6 +233,26 @@ export class AccountService {
       });
     }
     return notificationIds;
+  }
+
+  /**
+   * Whether whoever created an invite still holds the authority it was created under. An invite is
+   * a stored capability, so without this a manager who was removed could keep a way back in through
+   * an invite to another address, and an owner's `owner` invite would outlive their ownership.
+   */
+  private async inviterStillAuthorised(
+    repos: Repositories,
+    invite: { invitedBy: number; organizationId: number; role: string },
+  ): Promise<boolean> {
+    const inviter = await repos.accounts.findById(invite.invitedBy);
+    if (!inviter) return false;
+    if (inviter.globalRole === "reviewer" || inviter.globalRole === "admin") return true;
+    const held = await repos.memberships.lockRoleForManagerCheck(
+      invite.invitedBy,
+      invite.organizationId,
+    );
+    if (held === "owner") return true;
+    return held === "admin" && invite.role !== "owner";
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */
