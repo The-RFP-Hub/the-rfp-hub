@@ -355,10 +355,14 @@ test.describe("M4 responsive layout", () => {
       const main = page.getByRole("main");
       const headerBefore = await readBox(header, `${viewport.name}: closed header`);
       const mainBefore = await readBox(main, `${viewport.name}: page content`);
+      // Above the compact breakpoint the header is one row. Below it, "Submit a program" takes its
+      // own row under the controls by design (see `.shell-submit` in globals.css), so the bound is
+      // the controls row plus that one, not a single row.
+      const compact = viewport.width <= 896;
       expect(
         headerBefore.height,
-        `${viewport.name}: the signed-in header must remain a single compact row`,
-      ).toBeLessThanOrEqual(72);
+        `${viewport.name}: the signed-in header must stay ${compact ? "two compact rows" : "a single compact row"}`,
+      ).toBeLessThanOrEqual(compact ? 120 : 72);
       await expectTouchTarget(page.locator(".brand"), `${viewport.name}: home link`);
       await expectTouchTarget(menu, `${viewport.name}: navigation disclosure`);
       const notifications = page.getByRole("link", { name: /^Notifications/ });
