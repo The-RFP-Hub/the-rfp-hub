@@ -10,6 +10,7 @@ import { RATE_LIMIT_HEADERS, rateLimitedError } from "./modules/routes/shared/ra
 import { analyticsEvents } from "./modules/services/insights/event-buffer.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { isHttpError } from "./modules/shared/http-error.js";
+import { buildTrustProxy } from "./modules/shared/trust-proxy.js";
 import { responseSchemas } from "./openapi/schemas.js";
 import { registerAnalyticsContext } from "./plugins/analytics-context.js";
 import { registerApexHostRule } from "./plugins/apex-host.js";
@@ -59,7 +60,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // `true`: the header is client-supplied, so blanket trust would let any caller choose the
     // address that ends up in an analytics hash or a rate-limit key. `undefined` trusts nothing.
     // See `readTrustProxy` in config.ts.
-    trustProxy: config.trustProxy,
+    trustProxy: buildTrustProxy(config.trustProxy),
   });
 
   // Any origin, and now the write verbs too.

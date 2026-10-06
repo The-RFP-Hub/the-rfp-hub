@@ -5,6 +5,7 @@
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { addressBucket } from "../../src/modules/routes/shared/rate-limit-key.js";
+import { buildTrustProxy } from "../../src/modules/shared/trust-proxy.js";
 
 const INVALID = "ip:invalid";
 
@@ -70,7 +71,7 @@ describe("addressBucket", () => {
 describe("addressBucket behind a trusted proxy", () => {
   /** What Fastify hands the key generator as `request.ip` for a given `X-Forwarded-For`. */
   async function clientAddress(forwarded: string, socket: string): Promise<string> {
-    const app = Fastify({ trustProxy: 1 });
+    const app = Fastify({ trustProxy: buildTrustProxy(1) });
     app.get("/", async (request) => ({ ip: request.ip }));
     try {
       const res = await app.inject({

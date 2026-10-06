@@ -19,6 +19,10 @@ import { configDefaults, defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
+    // The integration suites share one Postgres. Vitest 4 starts about one worker per core by
+    // default, and at 11 workers whole-suite runs failed intermittently in different files; at 4 they
+    // passed every time, at roughly the pace of the previous default.
+    maxWorkers: 4,
     // `.claude/` holds local agent worktrees, whole copies of this repository.
     // `packages/e2e` is Playwright, run only through `pnpm e2e`: its `*.spec.ts` files match
     // vitest's default include and would otherwise be collected and run here too.

@@ -137,6 +137,12 @@ What follows is the operator's short list: the ones a deployment is wrong withou
 **`TRUST_PROXY` is not a boolean, and `true` is rejected at boot.** It takes a hop count (`1`) or a
 comma-separated list of proxy addresses/CIDRs. Unset, nothing is trusted.
 
+A hop count is honoured only when the connection's immediate peer has a private or loopback address
+(10/8, 172.16/12, 192.168/16, 127/8, link-local, `::1`, `fc00::/7`, `fe80::/10`), which is what a load
+balancer inside the network is. A peer on a public address is never trusted, so a client that
+reaches the container directly cannot choose its own address through `X-Forwarded-For`. A list of
+CIDRs is stricter still and is passed through unchanged.
+
 Behind the load balancer that matters twice over:
 
 * `request.ip` is the **balancer's** address, not the client's. Rate limiting that meters by IP
