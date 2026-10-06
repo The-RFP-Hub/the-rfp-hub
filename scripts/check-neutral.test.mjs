@@ -267,6 +267,45 @@ describe("published credits", () => {
   });
 });
 
+describe("published open data", () => {
+  const LATEST = "exports/latest.json";
+  const SNAPSHOT = "exports/opportunities-2026-10-05-ed668fb5561c.json";
+  const LINE = `"description": "Applications run on ${BRAND[0].toUpperCase()}${BRAND.slice(1)}'s funding infrastructure."`;
+
+  it("does not fire on a publisher's words inside the exported data files", () => {
+    for (const file of [
+      LATEST,
+      "exports/latest.csv",
+      SNAPSHOT,
+      SNAPSHOT.replace(".json", ".csv"),
+    ]) {
+      expect(scanText(file, LINE), file).toEqual([]);
+    }
+  });
+
+  it("still fires on the same line in the rest of the export directory and beside the data", () => {
+    for (const file of [
+      "exports/README.md",
+      "exports/latest.manifest.json",
+      "exports/notes.json",
+      "exports/opportunities-latest.json",
+      "exports/opportunities-2026-10-05.json",
+      "exports/sub/latest.json",
+      "other/latest.json",
+    ]) {
+      expect(
+        scanText(file, LINE).map((f) => f.rule),
+        file,
+      ).toContain("source-neutral");
+    }
+  });
+
+  it("still applies every other rule inside the data files", () => {
+    expect(scanText(LATEST, `{"note": "${TRACKER}"}`).map((f) => f.rule)).toEqual(["tracker-id"]);
+    expect(scanText(LATEST, PLAINTEXT_APEX).map((f) => f.rule)).toEqual(["identity"]);
+  });
+});
+
 /**
  * THE DENOMINATOR.
  *
