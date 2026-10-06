@@ -304,6 +304,8 @@ export interface ClaimSummaryView {
   claimedBy: string;
   /** Stable identity for disclosing when the current reviewer is also the claimant. */
   claimedByAccountId: number | null;
+  /** False when approving would ADD the claimant to the organization. */
+  claimantIsMember: boolean;
   status: "pending" | "approved" | "rejected" | "withdrawn";
   note: string | null;
   createdAt: string;

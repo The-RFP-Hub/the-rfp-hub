@@ -711,6 +711,12 @@ function Claims({
                           {claim.claimedByAccountId === me.accountId ? (
                             <SelfReviewNotice kind="claim" compact />
                           ) : null}
+                          {claim.claimantIsMember ? null : (
+                            <div className="muted footnote">
+                              Not a member of <UntrustedText value={claim.organizationSlug} /> —
+                              approving adds them as a publisher.
+                            </div>
+                          )}
                         </th>
                         <td>
                           <UntrustedText value={claim.organizationSlug} />{" "}

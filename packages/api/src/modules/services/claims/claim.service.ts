@@ -30,6 +30,14 @@
  *    requires a verified organisation. The response says so; so do the docs. Implying otherwise is
  *    how a publisher discovers the difference by having their next write sit in the queue.
  *
+ * 6. **Filing is OPEN; granting is not.** Any signed-in account may file a claim for any existing
+ *    organisation — the reviewer's decision is the gate, not a prior membership. A non-member's
+ *    claim therefore ALWAYS queues: the immediate grant needs a membership, a verified organisation
+ *    and an operating match, and a stranger has the first of those by definition. Approving such a
+ *    claim also gives the claimant a membership (see `decide`), because ownership of an entry that
+ *    its claimant cannot write to would be a grant to nobody. Open filing is bounded by
+ *    `MAX_PENDING_CLAIMS_PER_ACCOUNT`, so the queue cannot be flooded from one account.
+ *
  * 5. **Queueing is IDEMPOTENT, including under a race.** The partial unique index is the only
  *    arbiter of "one pending claim per organisation", and a read that precedes the insert cannot
  *    be. Two colleagues filing the same claim at once therefore both pass the read and one insert
@@ -51,6 +59,7 @@ import {
 } from "../notifications/notification-dispatch.queue.js";
 
 const NOTE_MAX = 1_000;
+export const MAX_PENDING_CLAIMS_PER_ACCOUNT = 10;
 
 export interface ClaimInput {
   organizationSlug: string;
@@ -94,15 +103,6 @@ export class ClaimService {
       throw forbidden("missing_scope", "filing a claim requires the `write` scope on an API key.");
     }
 
-    // A membership is required to file a claim at all: a claim is the ORGANISATION's, and an
-    // account with no relationship to it is not entitled to speak for it.
-    if (!principal.memberships.some((m) => m.slug === slug)) {
-      throw forbidden(
-        "not_a_member",
-        `you hold no membership on \`${slug}\`, so you cannot claim on its behalf.`,
-      );
-    }
-
     if (entry.sourcePublisher === slug) {
       return {
         outcome: "unchanged",
@@ -113,8 +113,9 @@ export class ClaimService {
       };
     }
 
+    const member = principal.memberships.some((m) => m.slug === slug);
     const operates = operatingSlugs(entry).includes(slug);
-    const grantable = operates && organization.verified;
+    const grantable = member && operates && organization.verified;
 
     if (grantable && !caps.canClaimGrant) {
       // Fail LOUD, not closed-and-quiet: this claim would have been granted, and queueing it
@@ -126,7 +127,7 @@ export class ClaimService {
     }
 
     if (grantable) return this.grant(principal, entry, organization, note);
-    return this.queue(principal, entry, organization, note);
+    return this.queue(principal, entry, organization, note, member);
   }
 
   /**
@@ -266,10 +267,13 @@ export class ClaimService {
     entry: OpportunityRow,
     organization: OrganizationRow,
     note: string | null,
+    member: boolean,
   ): Promise<ClaimResultView> {
-    const reason = organization.verified
-      ? `\`${organization.slug}\` is not listed among this entry's operating organizations, so a reviewer will decide.`
-      : `\`${organization.slug}\` is not a verified publisher yet, so a reviewer will decide.`;
+    const reason = !member
+      ? `you are not a member of \`${organization.slug}\`, so a reviewer will decide.`
+      : organization.verified
+        ? `\`${organization.slug}\` is not listed among this entry's operating organizations, so a reviewer will decide.`
+        : `\`${organization.slug}\` is not a verified publisher yet, so a reviewer will decide.`;
 
     const already = await this.findPendingClaim(entry.id, organization.id);
     if (already) {
@@ -282,6 +286,14 @@ export class ClaimService {
         organizationSlug: organization.slug,
         message: `a claim from \`${organization.slug}\` is already awaiting review. ${reason}`,
       };
+    }
+
+    const pending = await this.repos.claims.countPendingForAccount(principal.accountId);
+    if (pending >= MAX_PENDING_CLAIMS_PER_ACCOUNT) {
+      throw conflict(
+        "too_many_pending_claims",
+        `you already have ${pending} claims awaiting review; wait for a decision before filing more.`,
+      );
     }
 
     return withTransaction(this.db, async (repos) => {
@@ -358,7 +370,7 @@ export class ClaimService {
     const rows = await this.repos.claims.listForReview(status);
 
     return rows.map(
-      ({ claim, opportunity, organization, handle }): ClaimSummaryView => ({
+      ({ claim, opportunity, organization, handle, claimantIsMember }): ClaimSummaryView => ({
         id: claim.id,
         opportunityId: opportunity.publicId,
         opportunityTitle: opportunity.title,
@@ -366,6 +378,7 @@ export class ClaimService {
         organizationVerified: organization.verified,
         claimedBy: handle ?? "community",
         claimedByAccountId: claim.accountId,
+        claimantIsMember: Boolean(claimantIsMember),
         status: claim.status,
         note: claim.note,
         createdAt: claim.createdAt.toISOString(),
@@ -465,6 +478,33 @@ export class ClaimService {
         });
       }
 
+      let membershipGranted = false;
+      if (found.claim.accountId !== null) {
+        const existing = await repos.memberships.lockForAccountAndOrganization(
+          found.claim.accountId,
+          found.organization.id,
+        );
+        if (existing === undefined) {
+          await repos.memberships.insertRole(
+            found.claim.accountId,
+            found.organization.id,
+            "publisher",
+          );
+          membershipGranted = true;
+          await repos.audit.record({
+            ...reviewerActor,
+            subjectKind: "organization",
+            subjectId: found.organization.id,
+            action: "grant_publisher",
+            patch: {
+              accountId: found.claim.accountId,
+              role: "publisher",
+              reason: `claim:${claimId}`,
+            },
+          });
+        }
+      }
+
       const wasPending = entry.reviewStatus !== "approved";
       await repos.opportunities.updateClaimPublisher(entry.id, {
         sourcePublisher: found.organization.slug,
@@ -512,9 +552,11 @@ export class ClaimService {
         claimId,
         opportunityId: entry.publicId,
         organizationSlug: found.organization.slug,
-        message: verified
-          ? `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`
-          : `\`${found.organization.slug}\` now publishes this entry, but the organization is NOT verified — future writes into that namespace will keep landing pending until it is.`,
+        message: `${
+          verified
+            ? `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`
+            : `\`${found.organization.slug}\` now publishes this entry, but the organization is NOT verified — future writes into that namespace will keep landing pending until it is.`
+        }${membershipGranted ? " The claimant was added as a member." : ""}`,
         publisherVerifiedNotificationIds,
       };
     });

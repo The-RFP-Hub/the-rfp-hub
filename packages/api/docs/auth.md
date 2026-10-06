@@ -293,7 +293,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 |---|---|---|
 | `POST /v1/opportunities` | T1 + `write` | auto-approves only via `canPublishImmediately` |
 | `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. Once publisher ownership has been **granted** away by a claim, the submitter keeps `PUT` only as a member of the organization that publishes it now; otherwise it takes T2 of that namespace, or T3+ |
-| `POST /v1/opportunities/:id/claim` | membership on the claiming org, + `write` | filing needs `write` on a key; an **immediate grant** needs `publish`. Either absence is a 403 naming the scope, never a silent queue |
+| `POST /v1/opportunities/:id/claim` | any account, + `write` | filing needs `write` on a key and no membership: a non-member's claim always queues, and approving it adds them to the org. An **immediate grant** also needs a membership on a verified operating org; an **immediate grant** needs `publish`. Either absence is a 403 naming the scope, never a silent queue |
 | `GET /v1/me`, `/v1/me/opportunities`, `/v1/me/opportunities/:id`, `/v1/me/duplicates` | T1 | `/me/opportunities/:id` is the owner-visible full detail for a pending or rejected entry the public route 404s |
 | `GET /v1/insights/opportunities/:id` | owner or T3+ | 403 for anyone else — a publisher's numbers are not public |
 | `GET /v1/insights/me/summary` | T1 | every entry the caller may see the numbers for |

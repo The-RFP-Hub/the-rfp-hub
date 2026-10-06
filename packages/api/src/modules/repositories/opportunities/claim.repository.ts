@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, exists, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import {
   type OpportunityClaimRow,
   accounts,
   opportunities,
   opportunityClaims,
+  orgMemberships,
   organizations,
 } from "../../../db/schema.js";
 
@@ -34,6 +35,16 @@ export class ClaimRepository {
       )
       .limit(1);
     return rows[0];
+  }
+
+  async countPendingForAccount(accountId: number): Promise<number> {
+    const counted = await this.exec
+      .select({ value: count() })
+      .from(opportunityClaims)
+      .where(
+        and(eq(opportunityClaims.accountId, accountId), eq(opportunityClaims.status, "pending")),
+      );
+    return counted[0]?.value ?? 0;
   }
 
   async insert(values: ClaimInsert): Promise<OpportunityClaimRow | undefined> {
@@ -68,6 +79,17 @@ export class ClaimRepository {
         opportunity: opportunities,
         organization: organizations,
         handle: accounts.handle,
+        claimantIsMember: exists(
+          this.exec
+            .select({ one: sql`1` })
+            .from(orgMemberships)
+            .where(
+              and(
+                eq(orgMemberships.accountId, opportunityClaims.accountId),
+                eq(orgMemberships.organizationId, opportunityClaims.organizationId),
+              ),
+            ),
+        ),
       })
       .from(opportunityClaims)
       .innerJoin(opportunities, eq(opportunities.id, opportunityClaims.opportunityId))

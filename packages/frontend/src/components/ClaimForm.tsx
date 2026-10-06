@@ -14,8 +14,23 @@ import type { Me } from "@/lib/types";
 import { type ReactNode, useState } from "react";
 
 const CLAIM_SUMMARY = "This is my program — claim it";
+const OTHER_ORGANIZATION = "\u0000other";
 
-export function ClaimForm({ id, me }: { id: string; me: Me }) {
+/** An organization the claimant might be speaking for, offered beside the ones they belong to. */
+export interface ClaimOrganization {
+  slug: string;
+  name: string;
+}
+
+export function ClaimForm({
+  id,
+  me,
+  organizations = [],
+}: {
+  id: string;
+  me: Me;
+  organizations?: ClaimOrganization[];
+}) {
   const [open, setOpen] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
   const submission = useClaimSubmission(id);
@@ -40,7 +55,13 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
       >
         {CLAIM_SUMMARY}
       </summary>
-      <ClaimFields key={draftKey} me={me} submission={submission} onCancel={cancel} />
+      <ClaimFields
+        key={draftKey}
+        me={me}
+        organizations={organizations}
+        submission={submission}
+        onCancel={cancel}
+      />
       <ActionNote note={submission.result} />
     </details>
   );
@@ -76,45 +97,77 @@ function useClaimSubmission(id: string): ClaimSubmission {
 
 function ClaimFields({
   me,
+  organizations,
   submission,
   onCancel,
 }: {
   me: Me;
+  organizations: ClaimOrganization[];
   submission: ClaimSubmission;
   onCancel: () => void;
 }) {
-  const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
+  const memberSlugs = new Set(me.memberships.map((membership) => membership.slug));
+  const suggested = organizations.filter(
+    (org, index, all) =>
+      !memberSlugs.has(org.slug) && all.findIndex((other) => other.slug === org.slug) === index,
+  );
+  const [choice, setChoice] = useState(
+    me.memberships[0]?.slug ?? suggested[0]?.slug ?? OTHER_ORGANIZATION,
+  );
+  const [typed, setTyped] = useState("");
   const [note, setNote] = useState("");
 
-  if (me.memberships.length === 0) {
-    return (
-      <p className="muted">
-        This account is not a member of any organization, so there is nothing to claim on behalf of.
-        A reviewer grants membership.
-      </p>
-    );
-  }
+  const slug = (choice === OTHER_ORGANIZATION ? typed : choice).trim().toLowerCase();
+  const member = memberSlugs.has(slug);
 
   return (
     <>
       <p className="muted footnote">
-        Granted immediately when the organization is verified <em>and</em> appears among the
-        listing&rsquo;s operating organizations. Sponsorship is not operation, so a sponsor&rsquo;s
-        claim is queued for a reviewer instead.
+        {member ? (
+          <>
+            Granted immediately when the organization is verified <em>and</em> appears among the
+            listing&rsquo;s operating organizations. Sponsorship is not operation, so a
+            sponsor&rsquo;s claim is queued for a reviewer instead.
+          </>
+        ) : (
+          <>
+            Anyone signed in can file a claim for an organization in the directory. A reviewer
+            decides it, and approving it adds you as a member of that organization.
+          </>
+        )}
       </p>
       <div className="field">
         <label htmlFor="claim-org">Organization</label>
-        <select id="claim-org" value={slug} onChange={(event) => setSlug(event.target.value)}>
+        <select id="claim-org" value={choice} onChange={(event) => setChoice(event.target.value)}>
           {me.memberships.map((membership) => (
             <option key={membership.slug} value={membership.slug}>
               {membership.name} — {membership.slug}{" "}
               {membership.verified ? "(verified)" : "(unverified)"}
             </option>
           ))}
+          {suggested.map((org) => (
+            <option key={org.slug} value={org.slug}>
+              {org.name} — {org.slug}
+            </option>
+          ))}
+          <option value={OTHER_ORGANIZATION}>Another organization…</option>
         </select>
       </div>
+      {choice === OTHER_ORGANIZATION ? (
+        <div className="field">
+          <label htmlFor="claim-org-slug">Organization slug</label>
+          <input
+            id="claim-org-slug"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="The slug shown on the organization's page"
+          />
+        </div>
+      ) : null}
       <div className="field">
-        <label htmlFor="claim-note">Note for the reviewer (optional)</label>
+        <label htmlFor="claim-note">
+          {member ? "Note for the reviewer (optional)" : "Note for the reviewer"}
+        </label>
         <input
           id="claim-note"
           value={note}
@@ -143,7 +196,13 @@ function ClaimFields({
  * Session and account reads stay inside this small secondary control so restoring either never
  * withholds the public opportunity from an anonymous reader.
  */
-export function PublicClaimControl({ id }: { id: string }) {
+export function PublicClaimControl({
+  id,
+  organizations = [],
+}: {
+  id: string;
+  organizations?: ClaimOrganization[];
+}) {
   const session = useSession();
   const [open, setOpen] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
@@ -166,9 +225,7 @@ export function PublicClaimControl({ id }: { id: string }) {
   } else if (!session.authenticated) {
     content = (
       <>
-        <p className="muted footnote">
-          Sign in with the account that belongs to the organization running this program.
-        </p>
+        <p className="muted footnote">Sign in to file a claim. A reviewer decides every claim.</p>
         <button type="button" onClick={session.login}>
           Sign in to claim
         </button>
@@ -189,7 +246,13 @@ export function PublicClaimControl({ id }: { id: string }) {
     );
   } else {
     content = (
-      <ClaimFields key={draftKey} me={session.me.data} submission={submission} onCancel={cancel} />
+      <ClaimFields
+        key={draftKey}
+        me={session.me.data}
+        organizations={organizations}
+        submission={submission}
+        onCancel={cancel}
+      />
     );
   }
 
