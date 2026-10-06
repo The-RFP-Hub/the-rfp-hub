@@ -25,8 +25,9 @@
 //
 // The forbidden strings are assembled from parts throughout, so this file does not trip its own
 // rules. There is no skip comment and no way for a file to silence a rule from the inside; the two
-// exemptions are the archived interview record, defined and bounded at ARCHIVED_SOURCE, and the
-// published credits, defined and bounded at CREDITS_SOURCE.
+// exemptions are the archived interview record, defined and bounded at ARCHIVED_SOURCE, the
+// published credits, defined and bounded at CREDITS_SOURCE, and the published open-data files,
+// defined and bounded at PUBLISHED_DATA.
 //
 // Run with `pnpm check:neutral`. Exits non-zero on any hit.
 import { execFileSync } from "node:child_process";
@@ -135,11 +136,31 @@ const ARCHIVED_SOURCE = new Set([
  */
 const CREDITS_SOURCE = new Set(["packages/frontend/src/lib/credits.ts"]);
 
-/** Every path a rule may be waived for. Both lists must stay tracked — see `main`. */
+/**
+ * THE PUBLISHED OPEN DATA IS THE THIRD EXEMPTION. The nightly export is the catalogue itself: every
+ * description in it was written by the publisher of that listing, and a publisher may legitimately
+ * name a funding platform ("apply through the … profile", "runs on …'s infrastructure"). That is
+ * the data saying something about the world, not the project speaking, and rewriting a publisher's
+ * words to satisfy this rule would falsify the catalogue. The file changes every night, so a list
+ * of exact paths cannot work; the exemption is a pattern instead, bounded three ways:
+ *
+ *   1. Only `source-neutral` is waived. A tracker ID or a retired identifier in the data is still a
+ *      defect, and still fails.
+ *   2. Only the two data formats, under their two published names: `latest.{json,csv}` and the
+ *      dated snapshot `opportunities-YYYY-MM-DD-<12 hex>.{json,csv}`. The README, the manifest and
+ *      the licence in the same directory are the project's voice and stay under the rule.
+ *   3. It fails closed: if no tracked file matches, `main` says so, so the pattern cannot outlive
+ *      a rename of the export.
+ */
+const PUBLISHED_DATA =
+  /^exports\/(?:latest|opportunities-\d{4}-\d{2}-\d{2}-[0-9a-f]{12})\.(?:json|csv)$/;
+
+/** Every exact path a rule may be waived for. Both lists must stay tracked — see `main`. */
 const WAIVED_PATHS = new Set([...ARCHIVED_SOURCE, ...CREDITS_SOURCE]);
 
-/** Whether `rule` is waived for `file`. The path must match a listed record exactly. */
-const isWaived = (file, rule) => WAIVED_PATHS.has(file) && ARCHIVE_WAIVED_RULES.has(rule);
+/** Whether `rule` is waived for `file`: an exact listed record, or a published open-data file. */
+const isWaived = (file, rule) =>
+  ARCHIVE_WAIVED_RULES.has(rule) && (WAIVED_PATHS.has(file) || PUBLISHED_DATA.test(file));
 
 // ----------------------------------------------------------------------------- identity ---
 
@@ -347,6 +368,14 @@ function main() {
     process.exit(1);
   }
 
+  if (!files.some((rel) => PUBLISHED_DATA.test(rel))) {
+    console.error(
+      "✗ check-neutral: PUBLISHED_DATA matches no tracked file, so the open-data exemption is a\n" +
+        "  waiver nobody is reading. The export was renamed or moved; update the pattern in this script.",
+    );
+    process.exit(1);
+  }
+
   const failures = files.flatMap((rel) => scanText(rel, readFileSync(join(repoRoot, rel), "utf8")));
 
   const skippedNote = skipped.length > 0 ? `, ${skipped.length} NOT scanned (listed above)` : "";
@@ -365,7 +394,9 @@ function main() {
         "  lives on the canonical domain. Retired ones are dead — see adr/0007.\n" +
         "  Archived source: if the hit is inside user-interviews/, do NOT rewrite the record to\n" +
         "  satisfy this rule — neutrality governs the project's voice, not what a respondent said.\n" +
-        "  Add the file to ARCHIVED_SOURCE in scripts/check-neutral.mjs instead, and say why.",
+        "  Add the file to ARCHIVED_SOURCE in scripts/check-neutral.mjs instead, and say why.\n" +
+        "  Published data: a name inside exports/ is a publisher's own words and is exempt from this\n" +
+        "  rule; fix it at the listing, not in the export.",
     );
     process.exit(1);
   }
@@ -373,7 +404,7 @@ function main() {
   console.log(
     `✓ check-neutral: ${scanned} — no tracker IDs, no source branding, ` +
       `no retired or off-domain identifiers, no plaintext ${CANONICAL_HOST} URLs ` +
-      `(${ARCHIVED_SOURCE.size} archived primary sources and ${CREDITS_SOURCE.size} credits file exempt from the neutrality rule only)`,
+      `(${ARCHIVED_SOURCE.size} archived primary sources, ${CREDITS_SOURCE.size} credits file and the published open-data files exempt from the neutrality rule only)`,
   );
 }
 
