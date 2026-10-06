@@ -2227,6 +2227,12 @@ pre.code-block {
     gap: var(--space-3);
   }
 
+  /* The wordmark takes its own width. In a `1fr` track the nav's `auto` column, which counts the
+     whole "Submit a program" label, left it none and the home link collapsed to a zero-width box. */
+  .shell-header[data-authenticated="true"] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .shell-account-panel {
     padding: var(--space-3);
   }

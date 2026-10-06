@@ -195,7 +195,11 @@ test.describe("M3-7 the public directory", () => {
       // …and the control is holding the value rather than sitting blank over a narrowed list.
       await expect(page.getByLabel("Status", { exact: true })).toHaveValue("open");
 
-      await page.getByRole("checkbox", { name: "Include closed & upcoming" }).check();
+      // The box is controlled by the URL, so it only flips once the navigation lands. `.check()`
+      // asserts the state straight after the click, before that, and reads it as unchanged.
+      const includeClosed = page.getByRole("checkbox", { name: "Include closed & upcoming" });
+      await includeClosed.click();
+      await expect(includeClosed).toBeChecked();
       await expect(
         page.getByRole("link", { name: `Closed probe ${token}` }),
         "and one click puts the closed round back",
