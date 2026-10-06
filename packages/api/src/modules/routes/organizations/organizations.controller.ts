@@ -1,16 +1,53 @@
 import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
+import {
+  type InviteActor,
+  MembershipInviteService,
+} from "../../services/memberships/membership-invite.service.js";
 import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { type OrganizationMetadata, ReviewService } from "../../services/review/review.service.js";
-import type { ManagedOpportunityListView } from "../../shared/api-views.js";
+import type {
+  ManagedOpportunityListView,
+  MembershipInviteListView,
+} from "../../shared/api-views.js";
 import { hasMembership, hasVerifiedMembership } from "../../shared/capabilities.js";
 import { forbidden } from "../../shared/http-error.js";
-import { bodyOf, handled, paramsOf, queryOf } from "../../shared/route-helpers.js";
+import { bodyOf, handled, idParam, paramsOf, queryOf } from "../../shared/route-helpers.js";
 
 const reviews = new ReviewService();
 const managed = new ManagedOpportunityService();
+const membershipInvites = new MembershipInviteService();
+
+const inviteActor = (request: FastifyRequest): InviteActor => {
+  const principal = principalOf(request);
+  return {
+    accountId: principal.accountId,
+    hubReviewer: principal.role === "reviewer" || principal.role === "admin",
+  };
+};
 
 export const organizationsController = {
+  createInvite: handled(async (request: FastifyRequest) => {
+    const { slug } = paramsOf<{ slug: string }>(request);
+    const { email, role } = bodyOf<{ email: string; role?: string }>(request);
+    return membershipInvites.create(inviteActor(request), slug, email, role);
+  }),
+
+  listInvites: handled(async (request: FastifyRequest) => {
+    const { slug } = paramsOf<{ slug: string }>(request);
+    const items = await membershipInvites.listPending(inviteActor(request), slug);
+    return { items } satisfies MembershipInviteListView;
+  }),
+
+  revokeInvite: handled(async (request: FastifyRequest) => {
+    const { slug, inviteId } = paramsOf<{ slug: string; inviteId: string }>(request);
+    return membershipInvites.revoke(
+      inviteActor(request),
+      slug,
+      idParam(inviteId, "membership invite"),
+    );
+  }),
+
   patch: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { slug } = paramsOf<{ slug: string }>(request);

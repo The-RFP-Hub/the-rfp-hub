@@ -137,6 +137,20 @@ const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => 
   return invite;
 });
 
+const ownInviteRows: { current: MembershipInvite[] } = { current: [] };
+const ownInvites = vi.fn(async () => ({ items: ownInviteRows.current }));
+const ownInvite = vi.fn(async (_slug: string, body: { email: string; role: string }) => ({
+  id: 1,
+  organizationSlug: "filecoin",
+  email: body.email,
+  role: body.role,
+  invitedBy: 7,
+  createdAt: "2026-08-26T12:00:00Z",
+  acceptedAt: null,
+  acceptedAccountId: null,
+}));
+const ownRevokeInvite = vi.fn(async (_slug: string, inviteId: number) => ({ id: inviteId }));
+
 /** Counts each read so a test can prove BOTH lists were re-read, not just the one clicked in. */
 const reads = { approved: 0, pending: 0 };
 
@@ -148,6 +162,9 @@ function client(account: Me, pending: unknown[] = []): ApiClient {
     opportunities: { audit: async () => ({ entries: [] }) },
     review: { membershipInvites, revokeMembershipInvite },
     organizations: {
+      invites: ownInvites,
+      invite: ownInvite,
+      revokeInvite: ownRevokeInvite,
       opportunities: async (
         _slug: string,
         query?: { reviewStatus?: string; page?: number; limit?: number },
@@ -221,7 +238,13 @@ describe("pending membership invites for staff", () => {
         acceptedAccountId: null,
       },
     ];
-    mount(me({ role: "reviewer", canReview: true }));
+    mount(
+      me({
+        role: "reviewer",
+        canReview: true,
+        memberships: [membership({ role: "publisher" })],
+      }),
+    );
 
     expect(await screen.findByRole("heading", { name: "Pending membership invites" })).toBeTruthy();
     expect(
@@ -238,6 +261,104 @@ describe("pending membership invites for staff", () => {
     await waitFor(() =>
       expect(screen.queryByRole("row", { name: /future\.member@example\.org/ })).toBeNull(),
     );
+  });
+});
+
+describe("an organization's own invites", () => {
+  const admin = (role: "owner" | "admin" | "publisher") =>
+    me({ memberships: [membership({ role })] });
+
+  it("lets an admin invite a colleague, without offering the owner role", async () => {
+    mount(admin("admin"));
+
+    fireEvent.change(await screen.findByLabelText("Email address"), {
+      target: { value: "new.colleague@example.org" },
+    });
+    const roles = screen.getAllByRole("option").map((option) => option.textContent ?? "");
+    expect(roles.some((label) => /admin/i.test(label))).toBe(true);
+    expect(roles.some((label) => /owner/i.test(label))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Send the invitation" }));
+
+    await waitFor(() =>
+      expect(ownInvite).toHaveBeenCalledWith("filecoin", {
+        email: "new.colleague@example.org",
+        role: "publisher",
+      }),
+    );
+    expect(await screen.findByText("Invitation saved for new.colleague@example.org.")).toBeTruthy();
+  });
+
+  it("offers an owner the owner role", async () => {
+    mount(admin("owner"));
+
+    await screen.findByLabelText("Email address");
+    const roles = screen.getAllByRole("option").map((option) => option.textContent ?? "");
+    expect(roles.some((label) => /owner/i.test(label))).toBe(true);
+  });
+
+  it("submits the invitation like a form, so Enter works", async () => {
+    mount(admin("admin"));
+
+    const field = await screen.findByLabelText("Email address");
+    fireEvent.change(field, { target: { value: "enter.key@example.org" } });
+    fireEvent.submit(field.closest("form") as HTMLFormElement);
+
+    await waitFor(() => expect(ownInvite).toHaveBeenCalled());
+    expect(await screen.findByText("Invitation saved for enter.key@example.org.")).toBeTruthy();
+  });
+
+  it("shows the API's refusal when the invitation cannot be saved", async () => {
+    ownInvite.mockRejectedValueOnce(new Error("already a member"));
+    mount(admin("admin"));
+
+    fireEvent.change(await screen.findByLabelText("Email address"), {
+      target: { value: "member@example.org" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send the invitation" }));
+
+    expect(await screen.findByText(/The invitation could not be saved/)).toBeTruthy();
+  });
+
+  it("lets an admin revoke a publisher invite but not an owner invite", async () => {
+    const row = (id: number, email: string, role: "owner" | "publisher"): MembershipInvite => ({
+      id,
+      organizationSlug: "filecoin",
+      email,
+      role,
+      invitedBy: 2,
+      createdAt: "2026-08-26T12:00:00Z",
+      acceptedAt: null,
+      acceptedAccountId: null,
+    });
+    ownInviteRows.current = [
+      row(31, "owner.invite@example.org", "owner"),
+      row(32, "publisher.invite@example.org", "publisher"),
+    ];
+    mount(admin("admin"));
+
+    const ownerRow = await screen.findByRole("row", { name: /owner\.invite@example\.org/ });
+    const publisherRow = await screen.findByRole("row", { name: /publisher\.invite@example\.org/ });
+    expect(within(ownerRow).getByRole("button", { name: "Revoke" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.click(within(publisherRow).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(ownRevokeInvite).toHaveBeenCalledWith("filecoin", 32));
+    ownInviteRows.current = [];
+  });
+
+  it("gives a reviewer who is also an owner the invite form", async () => {
+    mount(me({ role: "reviewer", canReview: true, memberships: [membership({ role: "owner" })] }));
+
+    expect(await screen.findByRole("button", { name: "Send the invitation" })).toBeTruthy();
+  });
+
+  it("shows no invite controls to a publisher", async () => {
+    mount(admin("publisher"));
+
+    await screen.findByText(/You are an/);
+    expect(screen.queryByRole("button", { name: "Send the invitation" })).toBeNull();
+    expect(ownInvites).not.toHaveBeenCalled();
   });
 });
 

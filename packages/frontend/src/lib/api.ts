@@ -47,6 +47,7 @@ import type {
   NotificationList,
   NotificationReadAll,
   Opportunity,
+  OrgRole,
   OrganizationList,
   OrganizationSummary,
   OwnedDuplicateList,
@@ -494,6 +495,21 @@ export function createApiClient(options: ApiClientOptions) {
         request<OrganizationSummary>("PATCH", `/v1/organizations/${encodeURIComponent(slug)}`, {
           body: patch,
         }),
+      /** The organization's own invites. Owner or admin; only an owner may invite or revoke an owner. */
+      invites: (slug: string) =>
+        request<MembershipInviteList>(
+          "GET",
+          `/v1/organizations/${encodeURIComponent(slug)}/invites`,
+        ),
+      invite: (slug: string, body: { email: string; role: OrgRole }) =>
+        request<MembershipInvite>("POST", `/v1/organizations/${encodeURIComponent(slug)}/invites`, {
+          body,
+        }),
+      revokeInvite: (slug: string, inviteId: number) =>
+        request<MembershipInvite>(
+          "DELETE",
+          `/v1/organizations/${encodeURIComponent(slug)}/invites/${inviteId}`,
+        ),
     },
 
     // ── administration (T4) ─────────────────────────────────────────────────────

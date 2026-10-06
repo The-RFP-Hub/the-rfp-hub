@@ -34,11 +34,12 @@
  * The answer is DATA, not a decision: `effectiveCaps` in `modules/shared/capabilities.ts` stays the
  * single pure place where capabilities are derived, and this only replaces the facts underneath it.
  */
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import {
   type OrgMembershipRow,
   accounts,
+  authUser,
   orgMemberships,
   organizations,
 } from "../../../db/schema.js";
@@ -223,6 +224,26 @@ export class MembershipRepository {
       .from(orgMemberships)
       .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
       .where(and(eq(orgMemberships.accountId, accountId), eq(organizations.slug, slug)))
+      .limit(1);
+    return rows[0]?.role;
+  }
+
+  /** The role held in an organization by whichever account signs in with this address, if any. */
+  async roleForEmail(
+    email: string,
+    organizationId: number,
+  ): Promise<OrgMembershipRow["role"] | undefined> {
+    const rows = await this.exec
+      .select({ role: orgMemberships.role })
+      .from(orgMemberships)
+      .innerJoin(accounts, eq(accounts.id, orgMemberships.accountId))
+      .innerJoin(authUser, eq(authUser.id, accounts.authUserId))
+      .where(
+        and(
+          eq(orgMemberships.organizationId, organizationId),
+          sql`lower(${authUser.email}) = ${email}`,
+        ),
+      )
       .limit(1);
     return rows[0]?.role;
   }

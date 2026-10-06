@@ -191,12 +191,21 @@ export const reviewController = {
     const principal = principalOf(request);
     const { slug } = paramsOf<{ slug: string }>(request);
     const { email, role } = bodyOf<{ email: string; role?: string }>(request);
-    return membershipInvites.create(principal.accountId, slug, email, role);
+    return membershipInvites.create(
+      { accountId: principal.accountId, hubReviewer: true },
+      slug,
+      email,
+      role,
+    );
   }),
 
   listMembershipInvites: handled(async (request: FastifyRequest) => {
     const { slug } = paramsOf<{ slug: string }>(request);
-    const items = await membershipInvites.listPending(slug);
+    const principal = principalOf(request);
+    const items = await membershipInvites.listPending(
+      { accountId: principal.accountId, hubReviewer: true },
+      slug,
+    );
     return { items } satisfies MembershipInviteListView;
   }),
 
@@ -204,7 +213,7 @@ export const reviewController = {
     const principal = principalOf(request);
     const { slug, inviteId } = paramsOf<{ slug: string; inviteId: string }>(request);
     return membershipInvites.revoke(
-      principal.accountId,
+      { accountId: principal.accountId, hubReviewer: true },
       slug,
       idParam(inviteId, "membership invite"),
     );
