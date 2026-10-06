@@ -131,7 +131,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `HOST` | `0.0.0.0` | |
 | `DB_POOL_MAX` | `10` | Bound it on a shared instance |
 | `PUBLIC_BASE_URL` | the API's **own** origin, https | Published as `servers[0].url`; never the specification's apex |
-| `TRUST_PROXY` | the load balancer's CIDR, or a hop count | **Not a boolean.** Blanket trust lets any client spoof `X-Forwarded-For`, and that header is an analytics input. Unset → no proxy is trusted |
+| `TRUST_PROXY` | the load balancer's CIDR, or a hop count | **Not a boolean.** Blanket trust lets any client spoof `X-Forwarded-For`, and that header is an analytics input. A hop count only applies when the immediate peer is a private or loopback address. Unset → no proxy is trusted |
 | `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
