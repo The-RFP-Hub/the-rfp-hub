@@ -430,6 +430,10 @@ async function main() {
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
     pkg.dependencies["@the-rfp-hub/standard"] = standardSpec;
     pkg.dependencies["rfphub-validate"] = validateSpec;
+    // Only the test runner's TYPES matter to this build (the tsconfig names `vitest/globals`), not
+    // its version, and with vitest 4 in the tree npm 10 fails to resolve it beside better-auth's
+    // optional peer on it ("reading 'edgesOut'"). The 3.x line installs cleanly.
+    if (pkg.devDependencies?.vitest) pkg.devDependencies.vitest = "^3.2.7";
     writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
     // The package's own `build` script, never `next build` directly: after a plain `npm install`
