@@ -44,7 +44,7 @@
     "jose": "^6.2.8",
     "pg": "^8.13.1",
     "rfphub-validate": "workspace:*",
-    "undici": "^7.16.0",
+    "undici": "^7.30.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
