@@ -35,13 +35,19 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 describe("createApiClient", () => {
-  it("approves and verifies a claim without a separate verification flag", async () => {
-    const { fetchImpl, calls } = stubFetch(() => json({ outcome: "granted" }));
+  it("approves and verifies a claim with a payload accepted by older APIs", async () => {
+    const { fetchImpl, calls } = stubFetch((call) => {
+      // The pre-upgrade API requires the explicit affirmative flag.
+      const body = JSON.parse(String(call.init.body));
+      return body.verifyOrganization === true
+        ? json({ outcome: "granted" })
+        : json({ error: "bad_request", message: "verifyOrganization is required" }, 400);
+    });
     const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
     await api.review.approveClaim(12);
     expect(calls[0]?.url).toBe("https://api.example.com/v1/review/claims/12/approve");
     expect(calls[0]?.init.method).toBe("POST");
-    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({});
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ verifyOrganization: true });
   });
   it("carries Retry-After off a 429 so a page can say how long to wait", async () => {
     const { fetchImpl } = stubFetch(

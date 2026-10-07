@@ -418,7 +418,8 @@ export function createApiClient(options: ApiClientOptions) {
       /** Approval also verifies the organization and grants the claimant access. */
       approveClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/approve`, {
-          body: {},
+          // Older APIs require this field; it never exposes a verification choice in the UI.
+          body: { verifyOrganization: true },
         }),
       rejectClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/reject`),
