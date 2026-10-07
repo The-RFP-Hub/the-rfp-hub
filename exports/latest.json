@@ -1,8 +1,8 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-06T10:29:53.929Z",
-  "count": 169,
+  "generatedAt": "2026-10-07T10:23:48.848Z",
+  "count": 170,
   "opportunities": [
     {
       "specVersion": "1.0.1",
@@ -3361,9 +3361,11 @@
         }
       ],
       "source": {
+        "publisher": "ethereum-foundation",
+        "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-09-26T01:06:47.793Z"
+        "verifiedAt": "2026-10-07T01:05:54.094Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -3413,7 +3415,7 @@
       ],
       "postedAt": "2019-11-19T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-08-14T20:36:43.292Z"
+      "updatedAt": "2026-10-06T14:04:00.645Z"
     },
     {
       "specVersion": "1.0.1",
@@ -7051,9 +7053,11 @@
         }
       ],
       "source": {
+        "publisher": "ethereum-foundation",
+        "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-09-26T01:06:45.752Z"
+        "verifiedAt": "2026-10-07T01:05:52.016Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -7127,7 +7131,7 @@
       ],
       "postedAt": "2026-03-25T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-08-14T20:36:43.260Z"
+      "updatedAt": "2026-10-06T14:02:52.185Z"
     },
     {
       "specVersion": "1.0.1",
@@ -7167,9 +7171,11 @@
         }
       ],
       "source": {
+        "publisher": "ethereum-foundation",
+        "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-09-26T01:06:46.765Z"
+        "verifiedAt": "2026-10-07T01:05:53.148Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -7245,7 +7251,7 @@
       ],
       "postedAt": "2026-04-20T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-08-14T20:36:43.266Z"
+      "updatedAt": "2026-10-06T14:03:23.574Z"
     },
     {
       "specVersion": "1.0.1",
@@ -18076,6 +18082,96 @@
       "postedAt": "2026-09-15T00:00:00.000Z",
       "createdAt": "2026-10-01T12:40:59.248Z",
       "updatedAt": "2026-10-01T12:40:59.250Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "uniswap-foundation:uf-open-grants",
+      "fundingType": "grant",
+      "title": "Uniswap Foundation Open Grants",
+      "description": "**Scope of this record: the Uniswap Foundation's broad Open Grants intake.** The Foundation funds \"work that expands, strengthens, or advances the Uniswap ecosystem\" and publishes its eligibility criteria on a public Notion page, \"UF Open Grants: Eligibility Criteria\", which links one application form. This is the programme the Unichain Grants record deliberately leaves out: that record covers only the narrow Unichain track, with its own form and its $7,500 ceiling, and this one is the broad programme beside it. The two forms differ.\n\n**Funding categories.** Five are published: Ecosystem Grants (expand the builder ecosystem — supply-side liquidity tools, targeted infrastructure and protocol integrations; demand-side developer onboarding, SDKs and education); Governance Grants (broader participation, governance tooling, analytics and experiments); Community & Events Grants (in-person events, virtual hackathons, ambassador programs, delegate engagement, \"funded on committed Uniswap-specific output, not attendance\"); Security Grants (audit subsidies run through UFSF/Areta, plus an Open Security Fund for broader security tooling); and Research & Implementation Grants (structured research support, protocol experiments, novel ideas).\n\n**What the Foundation offers.** Per its builder-support page: funding based on project scope and needs, technical resources and ecosystem connections, and strategic support covering partnerships, distribution and guidance. Applicants are advised to prepare their deployment to Unichain or v4, documentation, and impact metrics. The page publishes no award sizes.\n\n**What a strong application contains.** Uniswap fit; ecosystem benefit beyond the applicant's own product (commercial products seeking a subsidy \"may be better suited to a partnership or integration conversation\"); a plan; deliverables and budget with checkable milestones, each mapped to line-item costs; impact and evidence, supported by onchain data, public dashboards, app-store listings or GitHub activity — raw registrations, pool counts, self-priced TVL, attendance, enrollment, completion and reach are expressly not sufficient; and a named team. First-time builders are welcome, with scope matched to track record.\n\n**What it does not fund.** Consulting and advisory engagements and incentive or liquidity-mining campaigns (both routed to sov@uniswapfoundation.org); standalone security audits (the UFSF audit subsidy via Areta); token launch projects (not funded through UF grants); and Unichain-specific builder grants (the Unichain Grants track).\n\n**Disqualifying issues.** Fabricated or materially overstated claims; unexplained duplication of existing funded work, Uniswap infrastructure or a well-maintained open-source tool; unrealistic timelines; no verifiable team identity and no discoverable evidence of prior work; and proposals that could be submitted unchanged to another protocol or foundation.\n\n**Legal review.** Some projects may need legal review before funding, which does not by itself make a project ineligible. Applicants are asked to disclose privacy or mixing features (including relayers or shielded balances), token issuance or distribution including airdrops or claim flows, and sanctions screening, gambling or money transmission.\n\n**What this record cannot say.** The criteria page publishes no award ceiling, no budget, no deadline and no announcement date, so none is recorded here, and `postedAt` is absent. Read 2026-10-06; the application form returned HTTP 200 on that date.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Uniswap Foundation",
+          "slug": "uniswap-foundation",
+          "orgType": "foundation",
+          "website": "https://www.uniswapfoundation.org/",
+          "ecosystems": [
+            "Ethereum",
+            "Uniswap"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/UniswapFND",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://discord.com/invite/uniswap",
+              "platform": "discord"
+            },
+            {
+              "url": "https://github.com/uniswapfoundation",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "uniswap-foundation",
+        "submittedBy": "brunodmsi",
+        "submittedAt": "2026-10-06T19:12:41.095Z",
+        "ingestedVia": "publisher_api",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-10-06T19:12:41.169Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "programModel": "grant",
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Uniswap Foundation's broad, rolling grants program for work that expands the Uniswap ecosystem across five categories — ecosystem, governance, community and events, security, and research. No award ceiling or deadline is published.",
+      "ecosystems": [
+        "Ethereum",
+        "Uniswap"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Ecosystem",
+        "Governance",
+        "Community",
+        "Security",
+        "Research"
+      ],
+      "eligibility": "Work that expands, strengthens or advances the Uniswap ecosystem, in one of five categories. Applications need Uniswap fit, ecosystem benefit beyond the applicant's own product, a plan, milestone-based deliverables and budget, evidence of impact, and a named team; first-time builders are welcome. Not funded: consulting or advisory engagements, incentive campaigns and liquidity mining, standalone security audits, token launch projects, and Unichain-specific builder grants.",
+      "prerequisites": "Applicants should be ready to name the team, define milestones with deliverables and line-item costs, and evidence impact with onchain data, public dashboards, app-store listings or GitHub activity. Projects with privacy or mixing features, token distribution, or sanctions, gambling or money-transmission exposure should say so, as they may need legal review.",
+      "additionalReferences": "Eligibility criteria: https://uniswap.notion.site/UF-Open-Grants-Eligibility-Criteria-3275073cd08a80b599a9f5b9687b158b | Application form: https://share.hsforms.com/1fxQjPQTgTYmPwlYxxKlSGQsdca9 | Foundation grants portfolio: https://www.uniswapfoundation.org/grants | Builder-support overview: https://developers.uniswap.org/docs/ecosystem/builder-support/get-funded | Consulting and incentive-campaign enquiries: sov@uniswapfoundation.org | Sibling programs: Unichain Grants (curated:unichain-grants) and the UFSF audit subsidy (fundingmap:1462)",
+      "applicationUrl": "https://share.hsforms.com/1fxQjPQTgTYmPwlYxxKlSGQsdca9",
+      "website": "https://www.uniswapfoundation.org/grants",
+      "socialLinks": [
+        {
+          "url": "https://x.com/UniswapFND",
+          "platform": "twitter"
+        },
+        {
+          "url": "https://discord.com/invite/uniswap",
+          "platform": "discord"
+        },
+        {
+          "url": "https://github.com/uniswapfoundation",
+          "platform": "github"
+        }
+      ],
+      "deadlines": [
+        {
+          "label": "application",
+          "deadlineType": "rolling"
+        }
+      ],
+      "createdAt": "2026-10-06T19:12:41.093Z",
+      "updatedAt": "2026-10-06T19:12:41.095Z"
     },
     {
       "specVersion": "1.0.1",
