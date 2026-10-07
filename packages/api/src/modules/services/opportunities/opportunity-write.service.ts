@@ -154,6 +154,8 @@ export interface WriteOptions {
   pathId?: string;
   /** `PUT` refuses to create; `POST` refuses to silently overwrite. */
   mode: "create" | "replace";
+  /** Session super admins may catalog without a personal owner; actor attribution stays in audit. */
+  attribution?: "personal" | "unassigned";
 }
 
 /** What the decision block derives, from one row and one principal. The namespace is its input. */
@@ -175,11 +177,44 @@ export class OpportunityWriteService {
     this.repos = repositories(db);
   }
 
+  /** Advisory UI access; writes still re-check authority under their transaction locks. */
+  async canEdit(principal: Principal, row: OpportunityRow): Promise<boolean> {
+    if (row.mergedIntoId !== null || !canWriteWith(principal)) return false;
+    const namespace = row.sourcePublisher ?? namespaceOfPublicId(row.publicId) ?? row.publicId;
+    const owningSubmitter = await this.submitterStillOwns(this.repos, principal, row, namespace);
+    return mayWriteExisting(
+      effectiveCaps(principal, namespace),
+      owningSubmitter,
+      principal,
+      namespace,
+    );
+  }
+
   async write(
     principal: RequestPrincipal,
     body: unknown,
     options: WriteOptions,
   ): Promise<WriteResult> {
+    if (
+      options.attribution !== undefined &&
+      options.attribution !== "personal" &&
+      options.attribution !== "unassigned"
+    )
+      throw badRequest(
+        "invalid_attribution",
+        "Choose personal or unassigned submission attribution.",
+      );
+    if (options.mode !== "create" && options.attribution !== undefined)
+      throw badRequest(
+        "attribution_create_only",
+        "Submission attribution can only be chosen when creating a program.",
+      );
+    const unassigned = options.attribution === "unassigned";
+    if (unassigned && !effectiveCaps(principal).canAdmin)
+      throw forbidden(
+        "admin_required",
+        "Only a signed-in Hub administrator can create without a personal submitter.",
+      );
     const record = asDocument(body);
     assertWithinCaps(record);
 
@@ -236,6 +271,7 @@ export class OpportunityWriteService {
       existing: preview,
       namespace,
       mode: options.mode,
+      unassigned,
       now: new Date(),
     });
 
@@ -246,7 +282,12 @@ export class OpportunityWriteService {
       //
       // Decided on the unlocked read on purpose: neither branch writes anything, and the losing
       // half of a create/create race is answered by the unique constraint under the lock instead.
-      const repeat = this.identicalRepeat(principal, advisory.attributed, preview);
+      const repeat = await this.identicalRepeat(
+        principal,
+        advisory.attributed,
+        preview,
+        unassigned,
+      );
       if (repeat) {
         // The post-commit work runs for a repeat too. Nothing changed, so the embedding is skipped
         // on its content hash — but the caller gets the SAME answer the original create gave, which
@@ -270,6 +311,7 @@ export class OpportunityWriteService {
       principal,
       document,
       mode: options.mode,
+      unassigned,
       warnings: warnings.map((warning) => warning.message),
     });
   }
@@ -291,6 +333,7 @@ export class OpportunityWriteService {
     existing: OpportunityRow | undefined;
     namespace: string;
     mode: "create" | "replace";
+    unassigned: boolean;
     now: Date;
   }): Promise<WriteDecision> {
     const { repos, principal, document, existing, namespace, mode, now } = ctx;
@@ -351,6 +394,8 @@ export class OpportunityWriteService {
         now,
         existing,
         editorial,
+        unassigned: ctx.unassigned,
+        preserveSubmitter: existing ? await repos.audit.hasSubmitterTransfer(existing.id) : false,
       }),
     };
   }
@@ -395,7 +440,10 @@ export class OpportunityWriteService {
     if (!existing || existing.submittedBy !== principal.accountId) return false;
     if (existing.sourcePublisher === null) return true;
     if (hasMembership(principal, namespace)) return true;
-    return !(await repos.audit.hasPublisherGrant(existing.id));
+    return (
+      !(await repos.audit.hasPublisherGrant(existing.id)) &&
+      !(await repos.audit.hasSubmitterTransfer(existing.id))
+    );
   }
 
   /**
@@ -479,7 +527,8 @@ export class OpportunityWriteService {
    *
    * `submittedBy` is the publishing organization's slug when the account holds a verified
    * membership on the namespace (the entry is the ORGANISATION's), else the account's public handle,
-   * else `"community"` — never a string from the body.
+   * else `"community"` — never a string from the body. An explicit submitter transfer is preserved
+   * across later edits, including edits by other organization members.
    *
    * AN EDITORIAL REPLACEMENT ATTRIBUTES NOTHING TO THE EDITOR. A reviewer correcting a typo in
    * somebody else's entry is not its submitter and did not ingest it, so re-deriving attribution
@@ -499,15 +548,19 @@ export class OpportunityWriteService {
       now: Date;
       existing: OpportunityRow | undefined;
       editorial: boolean;
+      unassigned: boolean;
+      preserveSubmitter: boolean;
     },
   ): Opportunity {
-    const { principal, caps, namespace, now, existing, editorial } = ctx;
+    const { principal, caps, namespace, now, existing, editorial, preserveSubmitter } = ctx;
     const publishingAsOrg = principal.memberships.some((m) => m.slug === namespace && m.verified);
-    const submittedBy = editorial
-      ? (existing?.sourceSubmittedBy ?? undefined)
-      : publishingAsOrg
-        ? namespace
-        : (principal.account.handle ?? "community");
+    const submittedBy = ctx.unassigned
+      ? undefined
+      : editorial || preserveSubmitter || existing?.submittedBy === null
+        ? (existing?.sourceSubmittedBy ?? undefined)
+        : publishingAsOrg
+          ? namespace
+          : (principal.account.handle ?? "community");
 
     return {
       ...document,
@@ -539,19 +592,24 @@ export class OpportunityWriteService {
   }
 
   /**
-   * An identical repeat of a create by the original submitter → the original result.
+   * An identical retry belongs to the original submitter or the audited unassigned creator.
    *
    * Compared through the same normalized projection that produced the row, with the server-owned
    * timestamps excluded, so "identical" means identical as STORED rather than identical as typed.
    */
-  private identicalRepeat(
+  private async identicalRepeat(
     principal: RequestPrincipal,
     document: Opportunity,
     existing: OpportunityRow,
-  ): WriteResult | undefined {
-    if (existing.submittedBy !== null && existing.submittedBy !== principal.accountId) {
-      return undefined;
-    }
+    unassigned: boolean,
+  ): Promise<WriteResult | undefined> {
+    if (unassigned) {
+      if (
+        existing.submittedBy !== null ||
+        !(await this.repos.audit.wasCreatedUnassignedBy(existing.id, principal.accountId))
+      )
+        return undefined;
+    } else if (existing.submittedBy !== principal.accountId) return undefined;
     const { opp } = fromStandard(document);
     const candidate = comparable(opp);
     const stored = comparable(existing);
@@ -579,6 +637,7 @@ export class OpportunityWriteService {
     principal: RequestPrincipal;
     document: Opportunity;
     mode: "create" | "replace";
+    unassigned: boolean;
     warnings: string[];
   }): Promise<WriteResult> {
     const committed = await withTransaction(this.db, async (repos) => {
@@ -636,6 +695,7 @@ export class OpportunityWriteService {
       principal: RequestPrincipal;
       document: Opportunity;
       mode: "create" | "replace";
+      unassigned: boolean;
       existing: OpportunityRow | undefined;
     },
   ): Promise<{ row: OpportunityRow; namespace: string; created: boolean }> {
@@ -654,7 +714,11 @@ export class OpportunityWriteService {
     // first is not a preference: two such writes by one account would otherwise both hold the
     // shared lock and both try to upgrade it, and Postgres answers that with a deadlock rather than
     // a queue. Observed, not theorised — see `assertPendingHeadroom` for what the lock is FOR.
-    if (mayEnterQueue) await lockAccountRow(repos, ctx.principal.accountId);
+    const account = mayEnterQueue
+      ? await lockAccountRow(repos, ctx.principal.accountId)
+      : undefined;
+    if (ctx.unassigned && account?.globalRole !== "admin")
+      throw forbidden("admin_required", "Your administrator permission is no longer active.");
     const principal = await this.reproveAuthority(repos, ctx.principal, namespace);
     const { caps, editorial, attributed } = await this.decide({
       repos,
@@ -663,6 +727,7 @@ export class OpportunityWriteService {
       existing,
       namespace,
       mode: ctx.mode,
+      unassigned: ctx.unassigned,
       now,
     });
     const document = attributed;
@@ -713,7 +778,7 @@ export class OpportunityWriteService {
           ? "pending"
           : (existing?.reviewStatus ?? "pending"),
       isListed: existing?.isListed ?? true,
-      submittedBy: existing?.submittedBy ?? principal.accountId,
+      submittedBy: existing ? existing.submittedBy : ctx.unassigned ? null : principal.accountId,
       approvedBy: autoApprove
         ? (existing?.approvedBy ?? principal.accountId)
         : existing?.approvedBy,
@@ -727,7 +792,8 @@ export class OpportunityWriteService {
     // The transition that costs a slot: something that was not in the queue is now in it. A create
     // that auto-publishes never gets here, and neither does an edit of an entry that was already
     // pending.
-    if (mayEnterQueue && values.reviewStatus === "pending") {
+    // Admin catalog entries have no personal queue owner; this trusted action is rate-limited.
+    if (!ctx.unassigned && mayEnterQueue && values.reviewStatus === "pending") {
       await this.assertPendingHeadroom(repos, principal.accountId);
     }
 
@@ -764,7 +830,11 @@ export class OpportunityWriteService {
       // public `changedFields` of every entry in the corpus, where it is noise. Recorded at write
       // time rather than read time because a role is revocable and the trail must say what was true
       // when the action was taken.
-      patch: editorial ? { ...patch, actorRole: principal.role } : patch,
+      patch: ctx.unassigned
+        ? { ...patch, submitterAttribution: "unassigned" }
+        : editorial
+          ? { ...patch, actorRole: principal.role }
+          : patch,
     });
     // An auto-approval is a second, separate decision and gets its own row: "created" and
     // "published without review" are different facts and a reader must be able to see both.
@@ -860,8 +930,8 @@ export class OpportunityWriteService {
  * statement. Acquiring the strongest level once, up front, is the standard remedy and the reason
  * this is not simply folded into the check that needs it.
  */
-async function lockAccountRow(repos: Repositories, accountId: number): Promise<void> {
-  await repos.accounts.lockById(accountId);
+async function lockAccountRow(repos: Repositories, accountId: number) {
+  return repos.accounts.lockById(accountId);
 }
 
 /**
@@ -985,7 +1055,7 @@ function operatingSlugs(document: Opportunity): string[] {
  */
 function refusalReason(principal: Principal, existing: OpportunityRow, namespace: string): string {
   if (existing.submittedBy === principal.accountId) {
-    return `you submitted this entry, but publisher ownership has since moved to \`${namespace}\` by a granted claim. Only a member of that organization, or a Hub reviewer, may replace it now.`;
+    return `you submitted this entry, but publisher ownership has since moved to \`${namespace}\` and is managed by that organization. Only a member of that organization, or a Hub reviewer, may replace it now.`;
   }
   return "that entry was submitted by another account and you are not a verified publisher of its namespace.";
 }

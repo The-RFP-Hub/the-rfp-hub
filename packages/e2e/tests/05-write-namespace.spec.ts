@@ -8,12 +8,65 @@
  * over HTTP; the HTTP case here is a smoke test that the same path works under real concurrency,
  * and it says so.
  */
+import { markAsImportedClaimFixture } from "../src/db-seed.js";
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
 import type { ApiClient } from "../src/http.js";
 import { me } from "../src/identity/actors.js";
 import type { ActorName } from "../src/state.js";
 
 test.describe.configure({ mode: "serial" });
+
+test("an administrator's default form submission keeps the audit actor without a personal owner", async ({
+  stack,
+  api,
+  anonApi,
+  contextAs,
+  db,
+}) => {
+  skipUnlessActor(stack, "admin");
+  const context = await contextAs("admin");
+  const page = await context.newPage();
+  const namespace = `catalog-${Date.now()}`;
+  const id = `${namespace}:round`;
+  await page.goto(`${stack.urls.frontend}/listings/new`);
+  await expect(page.getByRole("heading", { name: "Submit an opportunity" })).toBeVisible();
+  await expect(page.getByLabel("Link this opportunity to my account")).not.toBeChecked();
+  await page.getByLabel(/^Title/).fill(`Catalog opportunity ${namespace}`);
+  await page
+    .getByLabel(/^Description/)
+    .fill("An administrator catalogs an opportunity on behalf of its operating organization.");
+  await page.getByLabel(/^Name/).fill(namespace);
+  await page.getByLabel(/^Slug/).fill(namespace);
+  await page.getByLabel(/^Application URL/).fill(stack.urls.programme);
+  await page.getByLabel(/^Id\b/).fill(id);
+  await page.getByRole("button", { name: "Submit", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Submitted." })).toBeVisible();
+
+  const stored = await db.query<{
+    submitted_by: number | null;
+    source_submitted_by: string | null;
+  }>("SELECT submitted_by, source_submitted_by FROM opportunities WHERE public_id = $1", [id]);
+  expect(stored.rows[0]).toEqual({ submitted_by: null, source_submitted_by: null });
+  const admin = await api("admin");
+  const self = await me(admin);
+  const audit = await db.query<{
+    actor_account_id: string;
+    patch: { submitterAttribution: string };
+  }>(
+    "SELECT a.actor_account_id, a.patch FROM audit_log a JOIN opportunities o ON o.id = a.subject_id WHERE a.subject_kind = 'opportunity' AND o.public_id = $1 AND a.action = 'create'",
+    [id],
+  );
+  expect(Number(audit.rows[0]?.actor_account_id)).toBe(self.accountId);
+  expect(audit.rows[0]?.patch.submitterAttribution).toBe("unassigned");
+  expect(
+    (await admin.post(`/v1/review/opportunities/${encodeURIComponent(id)}/approve`, {})).status,
+  ).toBe(200);
+  const eligibility = await anonApi.get<{ canClaim: boolean }>(
+    `/v1/opportunities/${encodeURIComponent(id)}/claim-status`,
+  );
+  expect(eligibility.status).toBe(200);
+  expect(eligibility.body.canClaim).toBe(true);
+});
 
 test.describe("M3-2 who may publish, and where", () => {
   // Only what EVERY test here uses. The one case that needs an unaffiliated account declares that
@@ -388,8 +441,8 @@ test.describe("M3-2 provenance belongs to the server", () => {
  *      `pending`, so every fixture here is published by a reviewer first — which is also the real
  *      shape of the problem: a claim is how a publisher takes over an entry the public can already
  *      see.
- *   2. A claim for the organization the entry is ALREADY published under is `unchanged`, not
- *      `granted` — there is nothing to transfer. So the entry is submitted under a third namespace
+ *   2. Programs with an account owner, a verified publisher or an earlier granted claim are closed
+ *      to further claims. These fixtures explicitly model imported programs without an account owner. So the entry is submitted under a third namespace
  *      and names the claiming organization among its OPERATING organizations, which is exactly the
  *      aggregator-then-operator sequence the feature exists for.
  */
@@ -408,6 +461,7 @@ test.describe("M3-2 claims", () => {
    * reviewer publish it. Returns its id.
    */
   async function publishedEntry(
+    db: import("pg").Pool,
     api: (actor: ActorName) => Promise<ApiClient>,
     fixture: (
       namespace: string,
@@ -429,18 +483,21 @@ test.describe("M3-2 claims", () => {
       {},
     );
     expect(approved.status, "a claim can only be filed against a public entry").toBe(200);
+    await markAsImportedClaimFixture(db, id);
     return id;
   }
 
   test("a claim on a verified operating organization is granted immediately", async ({
     stack,
     api,
+    db,
     opportunityFixture,
   }) => {
     // Published under a third-party namespace, but naming the publisher's own verified organization
     // as an operator — the aggregator-listed-it, the-operator-claims-it case.
     const aggregator = `${stack.namespaces.publisher}-aggregator`;
     const id = await publishedEntry(
+      db,
       api,
       opportunityFixture,
       aggregator,
@@ -471,12 +528,19 @@ test.describe("M3-2 claims", () => {
   }) => {
     const aggregator = `${stack.namespaces.publisher}-aggregator2`;
     const unverified = `${stack.namespaces.publisher}-pending`;
-    const id = await publishedEntry(api, opportunityFixture, aggregator, `queued-${Date.now()}`, {
-      operatingOrganizations: [
-        { name: aggregator, slug: aggregator },
-        { name: unverified, slug: unverified },
-      ],
-    });
+    const id = await publishedEntry(
+      db,
+      api,
+      opportunityFixture,
+      aggregator,
+      `queued-${Date.now()}`,
+      {
+        operatingOrganizations: [
+          { name: aggregator, slug: aggregator },
+          { name: unverified, slug: unverified },
+        ],
+      },
+    );
 
     // The claimant must be a member of the organization it claims for; that organization is NOT
     // verified, which is what makes the claim reviewable rather than grantable.
@@ -528,11 +592,13 @@ test.describe("M3-2 claims", () => {
   test("a sponsoring-only organization can never be granted ownership", async ({
     stack,
     api,
+    db,
     opportunityFixture,
   }) => {
     const aggregator = `${stack.namespaces.publisher}-aggregator3`;
     const sponsorOnly = `${stack.namespaces.publisher}-sponsor`;
     const id = await publishedEntry(
+      db,
       api,
       opportunityFixture,
       aggregator,
@@ -565,16 +631,24 @@ test.describe("M3-2 claims", () => {
   test("a would-be-granted claim made with a key lacking `publish` is refused, never quietly queued", async ({
     stack,
     api,
+    db,
     keyClient,
     opportunityFixture,
   }) => {
     const aggregator = `${stack.namespaces.publisher}-aggregator4`;
-    const id = await publishedEntry(api, opportunityFixture, aggregator, `keyclaim-${Date.now()}`, {
-      operatingOrganizations: [
-        { name: aggregator, slug: aggregator },
-        { name: stack.namespaces.publisher, slug: stack.namespaces.publisher },
-      ],
-    });
+    const id = await publishedEntry(
+      db,
+      api,
+      opportunityFixture,
+      aggregator,
+      `keyclaim-${Date.now()}`,
+      {
+        operatingOrganizations: [
+          { name: aggregator, slug: aggregator },
+          { name: stack.namespaces.publisher, slug: stack.namespaces.publisher },
+        ],
+      },
+    );
 
     const writeOnly = await keyClient("publisher", ["read", "write"]);
     const claim = await writeOnly.client.post<{ error: string; message: string }>(

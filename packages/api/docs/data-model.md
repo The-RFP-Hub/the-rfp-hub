@@ -844,8 +844,17 @@ held to containment on replace — a foreign-operated one is still rejected.
     field against the stored row (timestamps excluded). Byte-identical *and* from the original
     submitter → the original result, `200`, so a retried create succeeds. Otherwise `409`. A
     `ux_opp_source` collision is its own `409`, naming the colliding `(source_system, original_id)`.
+  - **Unassigned catalog creation (T4 session only).** `POST ?attribution=unassigned` creates with
+    `submitted_by=NULL` and no public `source.submittedBy`. The creator is still the audit actor;
+    the creation patch records `submitterAttribution='unassigned'`. The default API path remains
+    personal. The administrator role is rechecked under the account lock. Publication follows the
+    usual namespace rules; no personal pending slot is consumed. Editing an unassigned or imported
+    row preserves its null personal submitter and existing public attribution. Identical retries
+    require the same unassigned choice and original audited creator, rather than allowing anyone
+    to retry a row merely because its submitter is null. This creation marker is not an ownership
+    grant and does not close claims by itself.
 - **Claim (T1+):** `POST /v1/opportunities/:id/claim {organizationSlug, note?}`; the caller must hold
-  a membership on that organization.
+  a membership for an immediate grant; non-members may queue claims for unowned programs.
   - **Granted immediately (200)** when the org is `verified` **and** its slug appears in
     `operatingOrganizations[].slug`. Operating, **not** `org_slugs`: that column is the union
     *including sponsors*, and matching on it would let a sponsoring organization seize publisher
@@ -855,10 +864,27 @@ held to containment on replace — a foreign-operated one is still rejected.
     request cannot be won.
   - **Queued (202)** otherwise, as an `opportunity_claims` row for T3.
   - T3 approval takes `{verifyOrganization: boolean}` explicitly. With `false`, ownership transfers
-    but the organization stays unverified — so **subsequent writes from that publisher remain
-    `pending`**, because auto-approval requires a verified org. The response and the docs say so.
-  - `409` when `source_publisher` already names a different verified org; `200` no-op when the
-    caller's org already owns it. A grant sets `last_seen_at` and audits `claim`.
+    but the organization stays unverified. Membership alone does not authorize replacing an
+    imported or unassigned entry: editing requires verification or a session reviewer role.
+    The team may view management details while waiting for verification. Approval of the claim
+    therefore does not by itself guarantee immediate editing access.
+  - Ownership closes claims globally: an account in `submitted_by`, a verified publisher, or
+    an opportunity audit marker `grant_publisher` / `submitter_transfer` means `409 already_claimed`
+    for all subsequent claims, including for the same organization. A granted claim stays closed
+    after the organization loses verification. Pending approvals cannot overwrite established
+    ownership; rejection remains possible. Filing and decisions hold the opportunity lock.
+    A grant sets `last_seen_at` and audits `claim`. Team membership is managed separately.
+    The public claim-status endpoint returns `canClaim` without exposing account identities.
+- **Submission attribution:** `POST /v1/opportunities/:id/submitter` is session-only for an
+  owner/admin of the current verified publisher. It explicitly changes `submitted_by` and
+  `source_submitted_by` to that manager's account and public name, recording the previous values
+  in an `update` audit row with reason `submitter_transfer`. Publisher, visibility, review status
+  and submission timestamp remain unchanged. Team access continues through `source_publisher`;
+  subsequent content edits preserve the attribution. Transferred submission attribution does not
+  retain editing access after the manager's publisher membership is revoked.
+  Global administrators may use `POST /v1/admin/opportunities/:id/submitter` with a recipient
+  account ID and required reason. The same audit marker preserves attribution after team edits;
+  the administrator is the audit actor and no organization membership is created.
 - **Ingestion (outbox, ⏳ M4):** upsert keyed by `(source_system, original_id)` (the partial
   `ux_opp_source` index; today's ingest upserts on `public_id`), deduped by
   `ingestion_events.event_id`; `ingested_via='outbox'`. One-way only — the Hub never

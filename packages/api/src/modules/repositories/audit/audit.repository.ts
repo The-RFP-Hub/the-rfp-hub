@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import { accounts, auditLog } from "../../../db/schema.js";
 import type { auditAction, auditSubjectKind } from "../../../db/schema.js";
@@ -73,6 +73,39 @@ export class AuditRepository {
           eq(auditLog.subjectKind, "opportunity"),
           eq(auditLog.subjectId, opportunityId),
           eq(auditLog.action, "grant_publisher"),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  async wasCreatedUnassignedBy(opportunityId: number, accountId: number): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "opportunity"),
+          eq(auditLog.subjectId, opportunityId),
+          eq(auditLog.action, "create"),
+          eq(auditLog.actorAccountId, accountId),
+          sql`${auditLog.patch}->>'submitterAttribution' = 'unassigned'`,
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  async hasSubmitterTransfer(opportunityId: number): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "opportunity"),
+          eq(auditLog.subjectId, opportunityId),
+          eq(auditLog.action, "update"),
+          sql`${auditLog.patch}->>'reason' = 'submitter_transfer'`,
         ),
       )
       .limit(1);

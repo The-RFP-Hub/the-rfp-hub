@@ -23,7 +23,9 @@ export default function NewListingPage() {
           <section>
             <h1>Submit an opportunity</h1>
             <PublisherJourney current="submit" />
-            {verified.length > 0 ? (
+            {me.directCreate ? (
+              <p className="muted footnote">This account can publish directly in any namespace.</p>
+            ) : verified.length > 0 ? (
               <p className="muted footnote">
                 This account publishes into{" "}
                 {verified.map((membership) => membership.slug).join(", ")} without review. An id
@@ -41,6 +43,7 @@ export default function NewListingPage() {
             <OpportunityForm
               mode="create"
               accountId={me.accountId}
+              canCreateUnassigned={me.canAdmin}
               initial={emptyForm()}
               // What the API is going to decide, handed to the form so the id field can say it
               // live rather than after a round trip.

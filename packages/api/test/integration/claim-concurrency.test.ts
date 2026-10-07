@@ -46,6 +46,7 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
   let penderToken: string;
   let reviewerToken: string;
   let operatorOrgId: number;
+  let penderAccountId: number;
   const userIds: string[] = [];
 
   /** One approved, listed entry published under `HOST` and operated by everyone who claims it. */
@@ -100,6 +101,7 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
     await grantMembership(operator.account.id, operatorOrg.id);
     await grantMembership(pender.account.id, penderOrg.id);
     operatorOrgId = operatorOrg.id;
+    penderAccountId = pender.account.id;
 
     operatorToken = operator.token;
     penderToken = pender.token;
@@ -193,5 +195,88 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
     expect(decided.statusCode, decided.body).toBe(200);
     expect(decided.json().outcome).toBe("granted");
     expect((await publisherOf(id))?.publisher).toBe(PENDER);
+  }, 30_000);
+  it("rejects a queued claim whose request started before ownership was granted", async () => {
+    const id = await seedEntry("stale-filing");
+    const row = await publisherOf(id);
+    if (!row) throw new Error("missing fixture");
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("select id from opportunities where id = $1 for update", [row.id]);
+      const pending = app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/claim`,
+        headers: bearer(penderToken),
+        payload: { organizationSlug: PENDER },
+      });
+      await barrier.waitForWaiters(1);
+      await barrier.run("update opportunities set source_publisher = $1 where id = $2", [
+        OPERATOR,
+        row.id,
+      ]);
+      await barrier.run(
+        "insert into audit_log (subject_kind, subject_id, action, actor_kind, patch) values ('opportunity', $1, 'grant_publisher', 'user', '{}')",
+        [row.id],
+      );
+      await barrier.commit();
+      const response = await pending;
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json().error).toBe("already_claimed");
+    } finally {
+      await barrier.rollback();
+    }
+  }, 30_000);
+
+  it("allows only one immediate grant when two claims race", async () => {
+    const id = await seedEntry("one-grant");
+    const results = await Promise.all(
+      [1, 2].map(() =>
+        app.inject({
+          method: "POST",
+          url: `/v1/opportunities/${id}/claim`,
+          headers: bearer(operatorToken),
+          payload: { organizationSlug: OPERATOR },
+        }),
+      ),
+    );
+    expect(results.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    expect(results.find((response) => response.statusCode === 409)?.json().error).toBe(
+      "already_claimed",
+    );
+  });
+  it("serializes an account's pending cap across different opportunities", async () => {
+    await seedOrganization({ slug: PENDER, verified: false });
+    for (let index = 0; index < 9; index++) {
+      const id = await seedEntry(`cap-existing-${index}`);
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/claim`,
+        headers: bearer(penderToken),
+        payload: { organizationSlug: PENDER },
+      });
+      expect(response.statusCode, response.body).toBe(202);
+    }
+    const ids = await Promise.all([seedEntry("cap-first"), seedEntry("cap-second")]);
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("select id from accounts where id = $1 for update", [penderAccountId]);
+      const requests = ids.map((id) =>
+        app.inject({
+          method: "POST",
+          url: `/v1/opportunities/${id}/claim`,
+          headers: bearer(penderToken),
+          payload: { organizationSlug: PENDER },
+        }),
+      );
+      await barrier.waitForWaiters(2);
+      await barrier.commit();
+      const responses = await Promise.all(requests);
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([202, 409]);
+      expect(responses.find((response) => response.statusCode === 409)?.json().error).toBe(
+        "too_many_pending_claims",
+      );
+    } finally {
+      await barrier.rollback();
+    }
   }, 30_000);
 });

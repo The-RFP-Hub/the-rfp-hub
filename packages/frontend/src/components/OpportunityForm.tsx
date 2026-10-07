@@ -277,6 +277,7 @@ export function OpportunityForm({
    * keeps this component renderable by anything that has a form but not a session.
    */
   authority,
+  canCreateUnassigned = false,
 }: {
   initial: OpportunityFormState;
   mode: "create" | "edit";
@@ -284,9 +285,12 @@ export function OpportunityForm({
   accountId?: number;
   carried?: Record<string, unknown>;
   authority?: PublishAuthority;
+  /** Session super admins can create a catalog entry without a personal owner. */
+  canCreateUnassigned?: boolean;
 }) {
   const api = useApi();
   const [form, setForm] = useState<OpportunityFormState>(initial);
+  const [linkSubmitter, setLinkSubmitter] = useState(!canCreateUnassigned);
   const initialForm = useRef(initial);
   // `fromDocument(entry)` creates new row keys every time it is called. Capture the canonical
   // initial state exactly once so a parent render cannot manufacture a dirty edit.
@@ -552,7 +556,9 @@ export function OpportunityForm({
     try {
       const response =
         mode === "create"
-          ? await api.opportunities.create(document)
+          ? canCreateUnassigned && !linkSubmitter
+            ? await api.opportunities.create(document, { attribution: "unassigned" })
+            : await api.opportunities.create(document)
           : await api.opportunities.replace(form.id, document);
       if (mode === "create" && accountId !== undefined) {
         skipDraftCleanup.current = true;
@@ -661,6 +667,22 @@ export function OpportunityForm({
       <p className={styles.requiredLegend}>
         <span aria-hidden="true">*</span> Required
       </p>
+
+      {mode === "create" && canCreateUnassigned ? (
+        <Section title="Submission attribution">
+          <CheckField
+            path="linkSubmitter"
+            label="Link this opportunity to my account"
+            checked={linkSubmitter}
+            onChange={setLinkSubmitter}
+            hint={
+              linkSubmitter
+                ? "Your account will be the personal submitter, closing new claims. Organization members keep their existing access."
+                : "No personal submitter will be assigned. Your action stays in the history; organization access follows the publisher."
+            }
+          />
+        </Section>
+      ) : null}
 
       <Section title="What is it">
         <TextField

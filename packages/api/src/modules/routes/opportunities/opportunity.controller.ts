@@ -1,7 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { ClaimEligibilityService } from "../../services/claims/claim-eligibility.service.js";
+import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
 import { captureViews } from "../../shared/analytics-capture.js";
 import { REVALIDATE_CACHE, opportunitySchemaDocument } from "../../shared/canonical-documents.js";
+import { notFound } from "../../shared/http-error.js";
+import { handled, paramsOf } from "../../shared/route-helpers.js";
 import { sendCanonical } from "../canonical/index.js";
 import { type RawQuery, parseOpportunityQuery } from "./types.js";
 
@@ -58,4 +62,12 @@ const find = async (req: FastifyRequest, res: FastifyReply) => {
 const schema = async (req: FastifyRequest, res: FastifyReply) =>
   sendCanonical({ ...opportunitySchemaDocument, cacheControl: REVALIDATE_CACHE }, req, res);
 
-export const opportunityController = { getAll, find, schema };
+const claimStatus = handled(async (request: FastifyRequest) => {
+  const { id } = paramsOf<{ id: string }>(request);
+  const row = await new ManagedOpportunityService().findAny(id);
+  if (!row || row.reviewStatus !== "approved" || !row.isListed || row.mergedIntoId !== null)
+    throw notFound(`no opportunity ${JSON.stringify(id)}.`);
+  return { canClaim: await new ClaimEligibilityService().canClaim(row) };
+});
+
+export const opportunityController = { getAll, find, schema, claimStatus };

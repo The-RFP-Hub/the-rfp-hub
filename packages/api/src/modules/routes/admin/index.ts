@@ -36,6 +36,36 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   };
 
   router.post(
+    "/opportunities/:id/submitter",
+    {
+      onRequest: meteredAuth(router, guard, ADMIN_GRANT),
+      schema: {
+        operationId: "assignOpportunitySubmitter",
+        tags: ["admin"],
+        summary: "Attribute a submission to an existing account, preserving organization access",
+        security: [{ bearerAuth: [] }],
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["accountId", "reason"],
+          properties: {
+            accountId: { type: "integer", minimum: 1 },
+            reason: { type: "string", minLength: 1, maxLength: 1000 },
+          },
+        },
+        response: {
+          200: { $ref: "Opportunity#" },
+          409: { $ref: "ErrorResponse#" },
+          429: RATE_LIMITED,
+          ...errors,
+        },
+      },
+    },
+    adminController.assignSubmitter,
+  );
+
+  router.post(
     "/accounts/:id/role",
     {
       onRequest: meteredAuth(router, guard, ADMIN_GRANT),

@@ -29,6 +29,7 @@ import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3ld";
+const IMPORT_NS = `${NS}-import`;
 const EMAIL = "m3ld-publisher@rfphub.invalid";
 const PUBLIC_ID = `${NS}:one`;
 
@@ -47,6 +48,7 @@ run("M3LD JSON-LD context scope", () => {
     await app.ready();
     const publisher = await seedIdentity(EMAIL, { handle: "m3ld-publisher" });
     const org = await seedOrganization({ slug: NS, verified: true });
+    await seedOrganization({ slug: IMPORT_NS, verified: false });
     await grantMembership(publisher.account.id, org.id, "owner");
     token = publisher.token;
     userId = publisher.userId;
@@ -60,7 +62,7 @@ run("M3LD JSON-LD context scope", () => {
         description: "d",
         status: "open",
         operatingOrganizations: [{ name: NS, slug: NS }],
-        source: { publisher: NS, ingestedVia: "import", verifiedAgainstSource: null },
+        source: { publisher: IMPORT_NS, ingestedVia: "import", verifiedAgainstSource: null },
         ecosystems: ["M3LD"],
         fundingDetails: { fundingType: "grant" },
       },
@@ -71,7 +73,7 @@ run("M3LD JSON-LD context scope", () => {
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
-      organizationSlugs: [NS],
+      organizationSlugs: [NS, IMPORT_NS],
       userIds: [userId],
       emails: [EMAIL],
     });

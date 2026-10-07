@@ -77,3 +77,4 @@ packages/frontend/CLAUDE.md
 /INFRA-REQUEST.local.md
 
 .claude
+.worktrees/

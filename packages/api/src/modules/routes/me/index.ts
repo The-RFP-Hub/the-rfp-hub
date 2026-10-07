@@ -109,6 +109,46 @@ export const me = async (router: FastifyInstance): Promise<void> => {
   );
 
   router.get(
+    "/opportunities/:id/access",
+    {
+      onRequest: router.auth.requireAuth,
+      schema: {
+        operationId: "getOpportunityAccess",
+        tags: ["account"],
+        summary: "This account's management and editing access to a listing",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: [
+              "canViewManagement",
+              "canEdit",
+              "canAssumeSubmission",
+              "canAssignSubmission",
+              "canClaim",
+            ],
+            properties: {
+              canViewManagement: { type: "boolean" },
+              canEdit: { type: "boolean" },
+              canAssumeSubmission: { type: "boolean" },
+              canAssignSubmission: { type: "boolean" },
+              canClaim: { type: "boolean" },
+            },
+          },
+          401: { $ref: "ErrorResponse#" },
+          404: { $ref: "ErrorResponse#" },
+        },
+      },
+    },
+    meController.opportunityAccess,
+  );
+
+  router.get(
     "/opportunities/:id",
     {
       onRequest: router.auth.requireAuth,
