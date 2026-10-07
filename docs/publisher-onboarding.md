@@ -117,15 +117,17 @@ If a claim is already in the queue, decide it here rather than opening a second 
 ```sh staging-write
 curl -s -H "Authorization: Bearer $REVIEWER" "$API/v1/review/claims" | jq
 curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
-  -d '{"verifyOrganization":true}' "$API/v1/review/claims/7/approve"
+  -d '{}' "$API/v1/review/claims/7/approve"
 ```
 
-**`verifyOrganization` is an explicit decision, not a side effect.** With `false`, ownership
-transfers but the organization stays unverified, so that publisher's later writes keep landing
-`pending` — which, undocumented, becomes the support ticket "the claim was approved, why is my next
-submission still in review".
+**Approving a claim also verifies its organization in the same transaction.** It transfers
+publisher ownership and adds the claimant as a publisher when needed, so the claimant can edit
+and manage the entry immediately. Personal submission attribution stays unchanged. The legacy
+`verifyOrganization` field is accepted but ignored, even when `false`; approval always verifies.
+Rejection changes neither verification nor ownership. Submitting an opportunity for an organization
+alone never verifies it.
 
-### Step 6 — verify the organization
+### Step 6 — verify the organization if no claim was approved
 
 ```sh staging-write
 curl -X POST -H "Authorization: Bearer $REVIEWER" \

@@ -2,8 +2,8 @@
  * Claims establish publisher ownership once, for public programs without an owner.
  * Existing members of a verified operating organization get an immediate grant; others queue.
  * API keys need write to file and publish to grant. Reviewer approval may add publisher membership
- * and explicitly verify the organization. Every mutation locks the opportunity first; grants also
- * lock organization and membership, preventing concurrent grants and revoked authority.
+ * and always verifies the organization in the same transaction. Every mutation locks the opportunity
+ * first; grants also lock organization and membership, preventing concurrent grants and revoked authority.
  */
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow, OrganizationRow } from "../../../db/schema.js";
@@ -282,17 +282,15 @@ export class ClaimService {
     );
   }
 
-  /**
-   * A reviewer's decision, with the verification choice made EXPLICIT.
-   *
-   * `verifyOrganization: false` on an unverified organisation still transfers ownership — and the
-   * returned message states that the publisher's future writes will keep landing `pending`, because
-   * auto-approval needs a verified organisation and nothing here changed that.
-   */
+  /** Approval verifies the organization, grants membership and transfers ownership atomically. */
   async decide(
     reviewerId: number,
     claimId: number,
-    decision: { approve: boolean; verifyOrganization?: boolean },
+    decision: {
+      approve: boolean;
+      /** @deprecated Approval always verifies; retained for existing service callers. */
+      verifyOrganization?: boolean;
+    },
   ): Promise<ClaimResultView> {
     const settled = await withTransaction(this.db, async (repos) => {
       // The immutable opportunity id lets us lock entry before claim, matching grant().
@@ -338,18 +336,10 @@ export class ClaimService {
         };
       }
 
-      let verified = found.organization.verified;
+      const newlyVerified = !found.organization.verified;
       let publisherVerifiedNotificationIds: number[] = [];
-      if (decision.verifyOrganization === true && !verified) {
+      if (newlyVerified) {
         await repos.organizations.verifyForClaim(found.organization.id, now);
-        verified = true;
-        publisherVerifiedNotificationIds = await repos.notifications.record(
-          buildPublisherVerifiedNotifications(
-            await repos.memberships.accountIdsForOrganization(found.organization.id),
-            found.organization,
-            now,
-          ),
-        );
         await repos.audit.record({
           ...reviewerActor,
           subjectKind: "organization",
@@ -386,16 +376,24 @@ export class ClaimService {
         }
       }
 
+      if (newlyVerified) {
+        publisherVerifiedNotificationIds = await repos.notifications.record(
+          buildPublisherVerifiedNotifications(
+            await repos.memberships.accountIdsForOrganization(found.organization.id),
+            found.organization,
+            now,
+          ),
+        );
+      }
+
       const wasPending = entry.reviewStatus !== "approved";
       await repos.opportunities.updateClaimPublisher(entry.id, {
         sourcePublisher: found.organization.slug,
         sourceSubmittedBy: found.organization.slug,
         lastSeenAt: now,
-        // Approving the CLAIM publishes the entry only when the new publisher is verified;
-        // otherwise the entry keeps whatever review status it had.
-        reviewStatus: verified ? "approved" : entry.reviewStatus,
-        approvedBy: verified ? (entry.approvedBy ?? reviewerId) : entry.approvedBy,
-        approvedAt: verified ? (entry.approvedAt ?? now) : entry.approvedAt,
+        reviewStatus: "approved",
+        approvedBy: entry.approvedBy ?? reviewerId,
+        approvedAt: entry.approvedAt ?? now,
         updatedAt: now,
       });
 
@@ -404,7 +402,7 @@ export class ClaimService {
         subjectKind: "claim",
         subjectId: claimId,
         action: "approve",
-        patch: { status: { before: "pending", after: "approved" }, verifyOrganization: verified },
+        patch: { status: { before: "pending", after: "approved" }, verifyOrganization: true },
       });
       await repos.audit.record({
         ...reviewerActor,
@@ -415,7 +413,7 @@ export class ClaimService {
           sourcePublisher: { before: entry.sourcePublisher, after: found.organization.slug },
         },
       });
-      if (verified && wasPending) {
+      if (wasPending) {
         await repos.audit.record({
           ...reviewerActor,
           subjectKind: "opportunity",
@@ -433,11 +431,7 @@ export class ClaimService {
         claimId,
         opportunityId: entry.publicId,
         organizationSlug: found.organization.slug,
-        message: `${
-          verified
-            ? `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`
-            : `\`${found.organization.slug}\` now publishes this entry, but the organization is NOT verified — future writes into that namespace will keep landing pending until it is.`
-        }${membershipGranted ? " The claimant was added as a member." : ""}`,
+        message: `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.${membershipGranted ? " The claimant was added as a member." : ""}`,
         publisherVerifiedNotificationIds,
       };
     });

@@ -415,10 +415,10 @@ export function createApiClient(options: ApiClientOptions) {
         request<MergeResult>("POST", `/v1/review/duplicates/${pairId}/merge`, { body }),
       claims: (query?: { status?: ClaimStatus }) =>
         request<ClaimList>("GET", "/v1/review/claims", { query }),
-      /** `verifyOrganization` is required: an approval that does not verify leaves auto-approval off. */
-      approveClaim: (claimId: number, verifyOrganization: boolean) =>
+      /** Approval also verifies the organization and grants the claimant access. */
+      approveClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/approve`, {
-          body: { verifyOrganization },
+          body: {},
         }),
       rejectClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/reject`),

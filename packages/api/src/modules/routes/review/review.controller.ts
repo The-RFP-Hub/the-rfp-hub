@@ -139,10 +139,8 @@ export const reviewController = {
   approveClaim: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);
-    const { verifyOrganization } = bodyOf<{ verifyOrganization: boolean }>(request);
     return claims.decide(principal.accountId, idParam(id, "claim"), {
       approve: true,
-      verifyOrganization,
     });
   }),
 

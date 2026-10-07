@@ -309,7 +309,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `GET /v1/review/opportunities`, `POST …/:id/approve\|reject`, `PATCH …/:id` | T3, **session** | |
 | `GET /v1/review/opportunities/:id` | T3, **session** | one entry in full, whatever its review status. The owner route `GET /v1/me/opportunities/:id` is scoped to entries the caller owns, and everything a reviewer is sent to is by definition somebody else's |
 | `POST /v1/review/opportunities/:id/verify` | T3, **session** | triggering a source check is a reviewer capability |
-| `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval carries `verifyOrganization` |
+| `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval also verifies the organization |
 | `GET /v1/review/duplicates`, `POST …/:id/confirm\|dismiss\|merge` | T3, **session** | |
 | `POST /v1/review/organizations/:slug/verify\|unverify`, `PATCH …/:slug`, `POST\|DELETE …/:slug/members` | T3, **session** | |
 | `GET /v1/review/accounts`, `GET /v1/review/organizations` | T3, **session** | discovery for the review screens |
@@ -657,18 +657,18 @@ a verified publisher, a recorded publisher grant, or an explicit submitter trans
 to members and non-members, including claims for the same organization. Once granted, a claim
 remains closed even if that organization later loses verification. Existing pending claims cannot
 be approved after another claim wins; reviewers can still reject them. Returning an unowned
-program to review does not prevent a decision on an existing claim: a verified publisher may
-restore approval, while an unverified publisher retains the current review status. Neither path
-changes whether the program is listed.
+program to review does not prevent a decision on an existing claim: approval verifies the publisher
+and restores approval without changing whether the program is listed.
 
 `GET /v1/opportunities/:id/claim-status` returns public `{ canClaim }` for listed, approved programs
 only, so anonymous visitors also see no claim control once ownership is established. Private or
 merged programs return 404. Filing and approval re-check ownership under the opportunity lock.
 Additional access for an owned program is managed through organization memberships, not claims.
-If a reviewer grants a claim with `verifyOrganization: false`, the organization stays unverified.
-Its members can view management details, but replacing an imported or unassigned entry still
-requires organization verification or a session reviewer role. Claim approval alone therefore
-does not guarantee immediate editing access.
+Reviewer approval verifies the organization, adds claimant membership when needed and transfers
+publisher ownership in one transaction. The authorized claimant can immediately view management
+and edit the entry. Personal submission attribution stays unchanged. The deprecated
+`verifyOrganization` field is accepted but ignored, including `false`. A rejected claim never
+verifies the organization, and an ordinary opportunity submission is not evidence for verification.
 The public page uses `GET /v1/me/opportunities/:id/access` to show editing and management
 actions instead of claim for accounts that already have access. On an API key, filing a claim
 at all needs the `write` scope, and a claim that *would* be granted immediately needs `publish` —
@@ -706,15 +706,13 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/m
 # Check the entry against its own applicationUrl before deciding.
 curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/my-org:42/verify
 
-# Claims. `verifyOrganization` is an explicit decision, not a side effect:
+# Claims. Approval also verifies the organization atomically:
 curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
-  -d '{"verifyOrganization":true}' $API/v1/review/claims/7/approve
+  -d '{}' $API/v1/review/claims/7/approve
 ```
 
-> **`verifyOrganization: false` transfers ownership but does *not* unlock auto-approval.**
-> Auto-approval requires a **verified** organization, so that publisher's later writes keep landing
-> `pending`. The response says so, and this paragraph exists because "the claim was approved, why is
-> my next submission still in review" is otherwise a support ticket rather than a documented rule.
+> **Approval always verifies the organization.** Authorized members can publish in that namespace
+> without review. Legacy clients may still send `verifyOrganization`, but cannot skip verification.
 
 Verifying an organization is what actually flips a namespace to T2, and revoking a membership takes
 it back on the very next request:

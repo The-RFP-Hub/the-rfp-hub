@@ -4,9 +4,8 @@
  * Claiming publisher ownership on an organization's behalf.
  *
  * The API answers 200 (granted) or 202 (queued) and returns a `message` saying what the outcome
- * means for FUTURE writes — an approval on an unverified organization transfers ownership without
- * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
- * paraphrase is exactly where a dashboard would start promising something the API did not.
+ * means for future writes. Reviewer approval verifies the organization, grants claimant membership
+ * when needed and transfers publisher ownership in one transaction. The sentence is shown verbatim.
  */
 import { ActionNote, type ActionNoteValue, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";

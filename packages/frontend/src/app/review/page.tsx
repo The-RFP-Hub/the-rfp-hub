@@ -641,14 +641,7 @@ function LastDecision({
 
 // ── claims ────────────────────────────────────────────────────────────────────────
 
-/**
- * Ownership claims, with the two approvals ranked rather than presented as a pair.
- *
- * THEY ARE NOT PEERS. Approving transfers ownership of one listing; approving AND verifying hands
- * the organization permanent publishing rights over its whole namespace, for every member it has or
- * later gains. Two buttons side by side said those were comparable choices, and the more dangerous
- * one was the easier click because it came first.
- */
+/** Reviewer approval verifies the organization and grants publisher ownership together. */
 function Claims({
   claims,
   me,
@@ -666,10 +659,9 @@ function Claims({
   return (
     <>
       <p className="muted footnote">
-        Approving a claim transfers publisher ownership of that listing.{" "}
-        <strong>Verifying the organization is a separate and much larger decision</strong> — it is
-        what unlocks auto-approval for everything that organization publishes from then on. The API
-        returns a sentence saying which happened; it is shown verbatim.
+        Approving a claim verifies the organization and transfers publisher ownership of the
+        listing. The claimant can then manage it, and authorized members can publish in that
+        organization’s namespace without review.
       </p>
       <ActionNote note={note} />
       <ResourceView resource={claims.state} what="the claim queue" onRetry={claims.reload}>
@@ -731,19 +723,6 @@ function Claims({
                               type="button"
                               disabled={busy}
                               onClick={() =>
-                                void run(async () => {
-                                  const result = await api.review.approveClaim(claim.id, false);
-                                  claims.reload();
-                                  return result.message;
-                                })
-                              }
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
                                 setPanel(
                                   panel?.id === claim.id && panel.kind === "verify"
                                     ? null
@@ -767,10 +746,6 @@ function Claims({
                               Reject…
                             </button>
                           </div>
-                          <p className="muted footnote">
-                            Approving alone transfers this listing; the organization&rsquo;s future
-                            writes still wait for review.
-                          </p>
                         </td>
                       </tr>
                       {panel?.id === claim.id ? (
@@ -785,7 +760,7 @@ function Claims({
                                 onCancel={() => setPanel(null)}
                                 onConfirm={() =>
                                   void run(async () => {
-                                    const result = await api.review.approveClaim(claim.id, true);
+                                    const result = await api.review.approveClaim(claim.id);
                                     setPanel(null);
                                     claims.reload();
                                     return result.message;
@@ -796,17 +771,14 @@ function Claims({
                                   <SelfReviewNotice kind="claim" />
                                 ) : null}
                                 <p>
-                                  Every member of{" "}
                                   <strong>
                                     <UntrustedText value={claim.organizationSlug} />
                                   </strong>{" "}
-                                  — and every member added later — will publish anything into that
-                                  namespace immediately and without review.{" "}
-                                  <strong>
-                                    This is not a badge; it is a grant of publishing power.
-                                  </strong>{" "}
-                                  Withdrawing it later stops future writes but already-published
-                                  listings stay published.
+                                  will become the verified publisher of this listing. The claimant
+                                  will be added as a publisher if needed and can edit and manage it.
+                                  Authorized members, including future members, can publish in this
+                                  namespace without review. Personal submission attribution stays
+                                  unchanged.
                                 </p>
                               </ConfirmPanel>
                             ) : (

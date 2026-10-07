@@ -72,6 +72,12 @@ test.describe("open claims", () => {
       slug,
     ]);
 
+    // Ordinary submission and opportunity approval do not verify the organization.
+    const organization = await db.query("select verified from organizations where slug = $1", [
+      slug,
+    ]);
+    expect(organization.rows[0]?.verified).toBe(false);
+
     const claimant = await freshIdentity(stack, `claimant-${stamp}`);
     const claimantApi = clientFor(stack, claimant.token);
     const before = await claimantApi.get<Me>("/v1/me");
@@ -96,11 +102,23 @@ test.describe("open claims", () => {
     await expect(
       row.getByText(/Not a member of .* approving adds them as a publisher/),
     ).toBeVisible();
-    await row.getByRole("button", { name: "Approve", exact: true }).click();
+    await row.getByRole("button", { name: "Approve and verify…", exact: true }).click();
+    await review
+      .getByRole("group", { name: `Approve the claim and verify ${slug}?` })
+      .getByRole("button", { name: "Approve and verify", exact: true })
+      .click();
     await expect(review.locator("tr").filter({ hasText: id })).toHaveCount(0);
 
     const after = await claimantApi.get<Me>("/v1/me");
-    expect(after.body.memberships.map((m) => [m.slug, m.role])).toEqual([[slug, "publisher"]]);
+    expect(after.body.memberships.map((m) => [m.slug, m.role, m.verified])).toEqual([
+      [slug, "publisher", true],
+    ]);
+    const access = await claimantApi.get<{
+      canViewManagement: boolean;
+      canEdit: boolean;
+      canClaim: boolean;
+    }>(`/v1/me/opportunities/${encodeURIComponent(id)}/access`);
+    expect(access.body).toMatchObject({ canViewManagement: true, canEdit: true, canClaim: false });
     await page.reload();
     await expect(page.locator("summary", { hasText: /claim/i })).toHaveCount(0);
     expect(
@@ -110,6 +128,17 @@ test.describe("open claims", () => {
         })
       ).status,
     ).toBe(409);
+    await page.getByRole("link", { name: "Edit program", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /edit/i })).toBeVisible();
+    await page.getByLabel("Title", { exact: true }).fill("Edited by the approved claimant");
+    await page.getByRole("button", { name: "Replace", exact: true }).click();
+    await expect(
+      page.getByText("Edited by the approved claimant", { exact: true }).first(),
+    ).toBeVisible();
+    const managed = await claimantApi.get<{ title: string }>(
+      `/v1/me/opportunities/${encodeURIComponent(id)}`,
+    );
+    expect(managed.body.title).toBe("Edited by the approved claimant");
     await claimantContext.close();
     await reviewerContext.close();
   });

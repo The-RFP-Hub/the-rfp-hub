@@ -509,6 +509,31 @@ describe("deciding a claim", () => {
     decidedAt: null,
   };
 
+  it("offers one approval, confirms verification and sends a single decision", async () => {
+    tab.current = "claims";
+    const api = client();
+    const approveClaim = vi.fn(async () => ({
+      message: "Organization verified and claim approved.",
+    }));
+    api.review.approveClaim = approveClaim as unknown as ApiClient["review"]["approveClaim"];
+    api.review.claims = async () => ({ items: [claim] });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Approve and verify…" }));
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(approveClaim).not.toHaveBeenCalled();
+    const panel = screen.getByRole("group", {
+      name: "Approve the claim and verify indie-collective?",
+    });
+    expect(panel.textContent).toContain("can edit and manage it");
+    fireEvent.click(within(panel).getByRole("button", { name: "Approve and verify" }));
+    await waitFor(() => expect(approveClaim).toHaveBeenCalledWith(claim.id));
+    expect(await screen.findByText("Organization verified and claim approved.")).toBeTruthy();
+  });
+
   it("discloses a reviewer deciding their own claim in the row and confirmation", async () => {
     tab.current = "claims";
     const api = client();

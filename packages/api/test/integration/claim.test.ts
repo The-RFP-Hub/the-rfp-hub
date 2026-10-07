@@ -1,13 +1,12 @@
 /**
  * Claiming publisher ownership: the operating-vs-sponsoring distinction, the one-pending-claim-per
- * ORGANISATION key, the `publish`-scope bar, and the reviewer decision that carries the verification
- * choice explicitly.
+ * ORGANISATION key, the `publish`-scope bar, and atomic reviewer approval and verification.
  *
  * Isolation tag: `M3CLAIM` / `m3claim:`.
  */
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import {
@@ -17,8 +16,13 @@ import {
   opportunityClaims,
   opportunityDuplicates,
   orgMemberships,
+  organizations,
 } from "../../src/db/schema.js";
-import { MAX_PENDING_CLAIMS_PER_ACCOUNT } from "../../src/modules/services/claims/claim.service.js";
+import { AuditRepository } from "../../src/modules/repositories/index.js";
+import {
+  ClaimService,
+  MAX_PENDING_CLAIMS_PER_ACCOUNT,
+} from "../../src/modules/services/claims/claim.service.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
   bearer,
@@ -83,6 +87,7 @@ run("M3CLAIM ownership claims", () => {
   let sponsorToken: string;
   let unverifiedToken: string;
   let reviewerToken: string;
+  let reviewerId: number;
   let submitterToken: string;
   let insiderToken: string;
   let hostMemberToken: string;
@@ -192,6 +197,7 @@ run("M3CLAIM ownership claims", () => {
     sponsorToken = sponsor.token;
     unverifiedToken = unverified.token;
     reviewerToken = reviewer.token;
+    reviewerId = reviewer.account.id;
     submitterToken = submitter.token;
     insiderToken = insider.token;
     hostMemberToken = hostMember.token;
@@ -477,7 +483,7 @@ run("M3CLAIM ownership claims", () => {
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(decided.statusCode).toBe(200);
     expect(decided.json().message).toMatch(/added as a member/);
@@ -487,6 +493,56 @@ run("M3CLAIM ownership claims", () => {
       .from(orgMemberships)
       .where(eq(orgMemberships.accountId, strangerId));
     expect(memberships.map((m) => m.role)).toEqual(["publisher"]);
+    const organization = (
+      await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+    )[0];
+    expect(organization?.verified).toBe(true);
+    expect(organization?.verifiedAt).not.toBeNull();
+    expect(
+      await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.accountId, strangerId),
+            eq(notifications.kind, "publisher_verified"),
+          ),
+        ),
+    ).toHaveLength(1);
+    const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+    expect(row).toMatchObject({ sourcePublisher: UNVERIFIED, submittedBy: null });
+    const access = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(strangerToken),
+    });
+    expect(access.json()).toMatchObject({
+      canViewManagement: true,
+      canEdit: true,
+      canClaim: false,
+    });
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: `/v1/me/opportunities/${id}`,
+          headers: bearer(strangerToken),
+        })
+      ).statusCode,
+    ).toBe(200);
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(strangerToken),
+      payload: submission(id, UNVERIFIED, { title: "Managed by the approved claimant" }),
+    });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().reviewStatus).toBe("approved");
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]?.submittedBy,
+    ).toBeNull();
+    // Later fixtures exercise an unverified membership independently of this approval.
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
   });
 
   it("404s a claim on an organisation that does not exist", async () => {
@@ -704,14 +760,14 @@ run("M3CLAIM ownership claims", () => {
     }
   });
 
-  it("closes claims after an approval even when the owning organization stays unverified", async () => {
+  it("closes claims globally after an approval verifies the owning organization", async () => {
     const id = await seedEntry("owned-unverified");
     const queued = await claim(unverifiedToken, id, UNVERIFIED);
     const approved = await app.inject({
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(approved.statusCode, approved.body).toBe(200);
     expect(
@@ -727,6 +783,7 @@ run("M3CLAIM ownership claims", () => {
     async (verified) => {
       const id = await seedEntry(`review-again-${verified}`);
       const slug = verified ? SPONSOR : UNVERIFIED;
+      if (!verified) await seedOrganization({ slug, verified: false });
       const queued = await claim(verified ? sponsorToken : unverifiedToken, id, slug);
       expect(queued.statusCode, queued.body).toBe(202);
       await db
@@ -738,12 +795,12 @@ run("M3CLAIM ownership claims", () => {
         method: "POST",
         url: `/v1/review/claims/${queued.json().claimId}/approve`,
         headers: bearer(reviewerToken),
-        payload: { verifyOrganization: false },
+        payload: {},
       });
       expect(decided.statusCode, decided.body).toBe(200);
       const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
       expect(row?.sourcePublisher).toBe(slug);
-      expect(row?.reviewStatus).toBe(verified ? "approved" : "pending");
+      expect(row?.reviewStatus).toBe("approved");
       expect(row?.isListed).toBe(false);
     },
   );
@@ -757,7 +814,7 @@ run("M3CLAIM ownership claims", () => {
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(decided.statusCode).toBe(409);
     expect(decided.json().error).toBe("already_claimed");
@@ -859,7 +916,7 @@ run("M3CLAIM ownership claims", () => {
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(approval.statusCode, approval.body).toBe(409);
     expect(approval.json().error).toBe("opportunity_merged");
@@ -910,35 +967,205 @@ run("M3CLAIM ownership claims", () => {
     expect(rejectedClaim?.status).toBe("rejected");
   });
 
-  it("transfers ownership on approval WITHOUT unlocking auto-approval when the org stays unverified", async () => {
-    const id = await seedEntry("queued-unverified", [HOST], [UNVERIFIED]);
+  it.each([undefined, true, false])(
+    "always verifies on approval with legacy flag %s",
+    async (verifyOrganization) => {
+      await seedOrganization({ slug: UNVERIFIED, verified: false });
+      const id = await seedEntry(`queued-verify-flag-${verifyOrganization}`, [HOST], [UNVERIFIED]);
+      const queued = await claim(unverifiedToken, id, UNVERIFIED);
+      expect(queued.statusCode).toBe(202);
+      const decided = await app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        headers: bearer(reviewerToken),
+        // New clients send an empty decision; legacy clients cannot opt out of verification.
+        payload: verifyOrganization === undefined ? {} : { verifyOrganization },
+      });
+      expect(decided.statusCode, decided.body).toBe(200);
+      expect(decided.json().message).toMatch(/auto-approve/);
+      const organization = (
+        await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+      )[0];
+      expect(organization?.verified).toBe(true);
+      const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+      expect(row).toMatchObject({ sourcePublisher: UNVERIFIED, submittedBy: null });
+      const write = await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(unverifiedToken),
+        payload: submission(`${UNVERIFIED}:after-claim-${verifyOrganization}`, UNVERIFIED),
+      });
+      expect(write.statusCode, write.body).toBe(201);
+      expect(write.json().reviewStatus).toBe("approved");
+    },
+  );
+
+  it("also ignores the legacy false flag for direct service callers", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("service-verification", [HOST], []);
     const queued = await claim(unverifiedToken, id, UNVERIFIED);
-    expect(queued.statusCode).toBe(202);
+    expect(queued.statusCode, queued.body).toBe(202);
+    const result = await new ClaimService(db, { notificationQueue: { enqueue: () => {} } }).decide(
+      reviewerId,
+      queued.json().claimId,
+      { approve: true, verifyOrganization: false },
+    );
+    expect(result.outcome).toBe("granted");
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0]
+        ?.verified,
+    ).toBe(true);
+  });
 
-    const decided = await app.inject({
-      method: "POST",
-      url: `/v1/review/claims/${queued.json().claimId}/approve`,
-      headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
-    });
-    expect(decided.statusCode).toBe(200);
-    expect(decided.json().message).toMatch(/NOT verified/);
-
-    // Ownership moved…
-    const row = (
-      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+  it("rolls back verification, membership, ownership, decision, notifications and audit together", async () => {
+    const beforeOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
+    await db
+      .delete(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, strangerId),
+          eq(orgMemberships.organizationId, beforeOrg.id),
+        ),
+      );
+    const id = await seedEntry("atomic-approval", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const claimId = queued.json().claimId as number;
+    const beforeEntry = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id))
     )[0];
-    expect(row?.sourcePublisher).toBe(UNVERIFIED);
-
-    // …and the new publisher's next write still lands pending, which is exactly what the message
-    // said would happen.
-    const write = await app.inject({
-      method: "POST",
-      url: "/v1/opportunities",
-      headers: bearer(unverifiedToken),
-      payload: submission(`${UNVERIFIED}:after-claim`, UNVERIFIED),
+    const beforeNotifications = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.accountId, strangerId));
+    const enqueue = vi.fn();
+    const original = AuditRepository.prototype.record;
+    const audit = vi.spyOn(AuditRepository.prototype, "record").mockImplementation(function (
+      this: AuditRepository,
+      input,
+    ) {
+      if (input.subjectKind === "opportunity" && input.action === "grant_publisher")
+        throw new Error("forced failure after all approval writes");
+      return original.call(this, input);
     });
-    expect(write.json().reviewStatus).toBe("pending");
+    try {
+      await expect(
+        new ClaimService(db, { notificationQueue: { enqueue } }).decide(reviewerId, claimId, {
+          approve: true,
+          verifyOrganization: false,
+        }),
+      ).rejects.toThrow("forced failure");
+    } finally {
+      audit.mockRestore();
+    }
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0],
+    ).toEqual(beforeEntry);
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (await db.select().from(opportunityClaims).where(eq(opportunityClaims.id, claimId)))[0]
+        ?.status,
+    ).toBe("pending");
+    expect(
+      await db
+        .select()
+        .from(orgMemberships)
+        .where(
+          and(
+            eq(orgMemberships.accountId, strangerId),
+            eq(orgMemberships.organizationId, beforeOrg.id),
+          ),
+        ),
+    ).toEqual([]);
+    expect(
+      await db.select().from(notifications).where(eq(notifications.accountId, strangerId)),
+    ).toEqual(beforeNotifications);
+    expect(
+      await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.subjectKind, "claim"),
+            eq(auditLog.subjectId, claimId),
+            eq(auditLog.action, "approve"),
+          ),
+        ),
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.subjectKind, "organization"),
+            eq(auditLog.subjectId, beforeOrg.id),
+            eq(auditLog.action, "verify_organization"),
+          ),
+        ),
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ patch: expect.objectContaining({ reason: `claim:${claimId}` }) }),
+      ]),
+    );
+  });
+
+  it("only reviewer sessions can approve and verify", async () => {
+    const beforeOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("approval-authority", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const key = await mintApiKeyFor(reviewerId, ["read", "write", "publish"]);
+    for (const token of [strangerToken, key, undefined]) {
+      const refused = await app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        ...(token ? { headers: bearer(token) } : {}),
+        payload: {},
+      });
+      expect(refused.statusCode, refused.body).toBe(token ? 403 : 401);
+    }
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (
+        await db
+          .select()
+          .from(opportunityClaims)
+          .where(eq(opportunityClaims.id, queued.json().claimId))
+      )[0]?.status,
+    ).toBe("pending");
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]
+        ?.sourcePublisher,
+    ).toBe(HOST);
+  });
+
+  it("rejection leaves verification, membership and ownership unchanged", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("reject-unverified", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const beforeOrg = (
+      await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+    )[0];
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/reject`,
+      headers: bearer(reviewerToken),
+    });
+    expect(rejected.statusCode, rejected.body).toBe(200);
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]
+        ?.sourcePublisher,
+    ).toBe(HOST);
+    expect(
+      await db.select().from(orgMemberships).where(eq(orgMemberships.accountId, strangerId)),
+    ).toEqual([]);
   });
 
   /**
@@ -1199,6 +1426,16 @@ run("M3CLAIM ownership claims", () => {
   });
 
   it("unlocks auto-approval when the reviewer verifies the organisation as part of the approval", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const beforeNotifications = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.accountId, unverifiedId),
+          eq(notifications.kind, "publisher_verified"),
+        ),
+      );
     const id = await seedEntry("queued-verify", [HOST], [UNVERIFIED]);
     const queued = await claim(unverifiedToken, id, UNVERIFIED);
     const decided = await app.inject({
@@ -1219,7 +1456,7 @@ run("M3CLAIM ownership claims", () => {
           eq(notifications.kind, "publisher_verified"),
         ),
       );
-    expect(verifiedEmails).toHaveLength(1);
+    expect(verifiedEmails).toHaveLength(beforeNotifications.length + 1);
 
     const write = await app.inject({
       method: "POST",

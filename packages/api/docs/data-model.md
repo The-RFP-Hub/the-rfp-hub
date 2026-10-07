@@ -863,11 +863,11 @@ held to containment on replace — a foreign-operated one is still rejected.
     transaction**, with `SELECT … FOR UPDATE` on the opportunity row, so a revocation racing the
     request cannot be won.
   - **Queued (202)** otherwise, as an `opportunity_claims` row for T3.
-  - T3 approval takes `{verifyOrganization: boolean}` explicitly. With `false`, ownership transfers
-    but the organization stays unverified. Membership alone does not authorize replacing an
-    imported or unassigned entry: editing requires verification or a session reviewer role.
-    The team may view management details while waiting for verification. Approval of the claim
-    therefore does not by itself guarantee immediate editing access.
+  - T3 approval verifies the organization, adds the claimant as a publisher if needed and transfers
+    ownership in one transaction. The authorized claimant can view management and edit immediately.
+    Personal submission attribution stays unchanged. The deprecated `verifyOrganization` field is
+    accepted but ignored, including `false`. Rejection never verifies the organization, and an
+    ordinary submission for an organization alone does not verify it.
   - Ownership closes claims globally: an account in `submitted_by`, a verified publisher, or
     an opportunity audit marker `grant_publisher` / `submitter_transfer` means `409 already_claimed`
     for all subsequent claims, including for the same organization. A granted claim stays closed
