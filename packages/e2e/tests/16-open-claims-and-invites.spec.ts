@@ -1,3 +1,4 @@
+import { markAsImportedClaimFixture } from "../src/db-seed.js";
 import { DESKTOP_UA, expect, freshIdentity, skipUnlessActor, test } from "../src/fixtures.js";
 import { ApiClient } from "../src/http.js";
 /**
@@ -28,6 +29,7 @@ test.describe("open claims", () => {
   });
 
   async function publishedEntry(
+    db: import("pg").Pool,
     api: (actor: ActorName) => Promise<ApiClient>,
     fixture: (
       namespace: string,
@@ -53,20 +55,28 @@ test.describe("open claims", () => {
       (await reviewer.post(`/v1/review/opportunities/${encodeURIComponent(id)}/approve`, {}))
         .status,
     ).toBe(200);
+    await markAsImportedClaimFixture(db, id);
     return { id, title: document.title as string };
   }
 
   test("a stranger files a claim from the listing and approval makes them a publisher", async ({
     stack,
     api,
+    db,
     contextAs,
     opportunityFixture,
   }) => {
     const stamp = Date.now();
     const slug = `${stack.namespaces.publisher}-open`;
-    const { id } = await publishedEntry(api, opportunityFixture, slug, `open-claim-${stamp}`, [
+    const { id } = await publishedEntry(db, api, opportunityFixture, slug, `open-claim-${stamp}`, [
       slug,
     ]);
+
+    // Ordinary submission and opportunity approval do not verify the organization.
+    const organization = await db.query("select verified from organizations where slug = $1", [
+      slug,
+    ]);
+    expect(organization.rows[0]?.verified).toBe(false);
 
     const claimant = await freshIdentity(stack, `claimant-${stamp}`);
     const claimantApi = clientFor(stack, claimant.token);
@@ -80,7 +90,9 @@ test.describe("open claims", () => {
     await page.getByLabel("Organization", { exact: true }).selectOption(slug);
     await page.getByLabel(/note/i).fill(`open claim ${stamp}`);
     await page.getByRole("button", { name: "File the claim" }).click();
-    await expect(page.getByText(/queued/i)).toBeVisible();
+    await expect(
+      page.getByText("Your request is awaiting review. You do not need to submit it again."),
+    ).toBeVisible();
 
     const reviewerContext = await contextAs("reviewer");
     const review = await reviewerContext.newPage();
@@ -90,11 +102,43 @@ test.describe("open claims", () => {
     await expect(
       row.getByText(/Not a member of .* approving adds them as a publisher/),
     ).toBeVisible();
-    await row.getByRole("button", { name: "Approve", exact: true }).click();
+    await row.getByRole("button", { name: "Approve and verify…", exact: true }).click();
+    await review
+      .getByRole("group", { name: `Approve the claim and verify ${slug}?` })
+      .getByRole("button", { name: "Approve and verify", exact: true })
+      .click();
     await expect(review.locator("tr").filter({ hasText: id })).toHaveCount(0);
 
     const after = await claimantApi.get<Me>("/v1/me");
-    expect(after.body.memberships.map((m) => [m.slug, m.role])).toEqual([[slug, "publisher"]]);
+    expect(after.body.memberships.map((m) => [m.slug, m.role, m.verified])).toEqual([
+      [slug, "publisher", true],
+    ]);
+    const access = await claimantApi.get<{
+      canViewManagement: boolean;
+      canEdit: boolean;
+      canClaim: boolean;
+    }>(`/v1/me/opportunities/${encodeURIComponent(id)}/access`);
+    expect(access.body).toMatchObject({ canViewManagement: true, canEdit: true, canClaim: false });
+    await page.reload();
+    await expect(page.locator("summary", { hasText: /claim/i })).toHaveCount(0);
+    expect(
+      (
+        await claimantApi.post(`/v1/opportunities/${encodeURIComponent(id)}/claim`, {
+          organizationSlug: slug,
+        })
+      ).status,
+    ).toBe(409);
+    await page.getByRole("link", { name: "Edit program", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /edit/i })).toBeVisible();
+    await page.getByLabel("Title", { exact: true }).fill("Edited by the approved claimant");
+    await page.getByRole("button", { name: "Replace", exact: true }).click();
+    await expect(
+      page.getByText("Edited by the approved claimant", { exact: true }).first(),
+    ).toBeVisible();
+    const managed = await claimantApi.get<{ title: string }>(
+      `/v1/me/opportunities/${encodeURIComponent(id)}`,
+    );
+    expect(managed.body.title).toBe("Edited by the approved claimant");
     await claimantContext.close();
     await reviewerContext.close();
   });
@@ -102,11 +146,14 @@ test.describe("open claims", () => {
   test("a claim for an organization that does not exist is a 404", async ({
     stack,
     api,
+    db,
     opportunityFixture,
   }) => {
     const stamp = Date.now();
     const slug = `${stack.namespaces.publisher}-known`;
-    const { id } = await publishedEntry(api, opportunityFixture, slug, `unknown-${stamp}`, [slug]);
+    const { id } = await publishedEntry(db, api, opportunityFixture, slug, `unknown-${stamp}`, [
+      slug,
+    ]);
     const stranger = clientFor(stack, (await freshIdentity(stack, `unknown-${stamp}`)).token);
     const response = await stranger.post(`/v1/opportunities/${encodeURIComponent(id)}/claim`, {
       organizationSlug: `no-such-org-${stamp}`,
@@ -117,12 +164,14 @@ test.describe("open claims", () => {
   test("an account holds at most ten pending claims", async ({
     stack,
     api,
+    db,
     opportunityFixture,
   }) => {
     const stamp = Date.now();
     const base = `${stack.namespaces.publisher}-cap${stamp}`;
     const slugs = Array.from({ length: 11 }, (_, index) => `${base}-${index}`);
     const { id } = await publishedEntry(
+      db,
       api,
       opportunityFixture,
       slugs[0] as string,

@@ -84,6 +84,7 @@
   --text-sm: 0.8125rem;
   --text-md: 0.875rem;
   --text-base: 0.9375rem;
+  --text-control: 1rem;
   --text-h3-compact: 1rem;
   --text-h3: 1.05rem;
   --text-lede: 1.05rem;
@@ -3415,4 +3416,10 @@ body:has(.landing) {
 
 .rule > h2 + * {
   margin-top: 0;
+}
+
+/* Claim inputs stay legible on phones and retain comfortable touch targets. */
+.claim-form :is(input, select, button) {
+  font-size: var(--text-control);
+  min-block-size: var(--control-touch);
 }

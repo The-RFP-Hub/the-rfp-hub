@@ -161,9 +161,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/jso
 Any signed-in account can file a claim for an organization in the directory; you do not need to be a
 member first. It is granted immediately only when you are a member of the organization, it is
 verified **and** it already appears among the entry's operating organizations. Every other claim is
-queued for a reviewer, and approving a claim from a non-member also adds them as a member of the
-organization. The entry keeps its id, its history and
-anything already pointing at it, and publisher ownership moves to you.
+queued for a reviewer. Approval verifies the organization in the same transaction and adds a
+non-member claimant as a publisher. The claimant can edit and manage the entry. It keeps its id,
+its history, personal submission attribution and anything already pointing at it; publisher
+ownership moves to the organization.
 
 Two things about the scopes, if you claim with a key rather than a session:
 

@@ -309,7 +309,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `GET /v1/review/opportunities`, `POST …/:id/approve\|reject`, `PATCH …/:id` | T3, **session** | |
 | `GET /v1/review/opportunities/:id` | T3, **session** | one entry in full, whatever its review status. The owner route `GET /v1/me/opportunities/:id` is scoped to entries the caller owns, and everything a reviewer is sent to is by definition somebody else's |
 | `POST /v1/review/opportunities/:id/verify` | T3, **session** | triggering a source check is a reviewer capability |
-| `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval carries `verifyOrganization` |
+| `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval also verifies the organization |
 | `GET /v1/review/duplicates`, `POST …/:id/confirm\|dismiss\|merge` | T3, **session** | |
 | `POST /v1/review/organizations/:slug/verify\|unverify`, `PATCH …/:slug`, `POST\|DELETE …/:slug/members` | T3, **session** | |
 | `GET /v1/review/accounts`, `GET /v1/review/organizations` | T3, **session** | discovery for the review screens |
@@ -453,7 +453,7 @@ cross-system unique key.
 | Field | Set to |
 |---|---|
 | `source.publisher` | the resolved namespace |
-| `source.submittedBy` | the publishing organization's slug when the account holds a verified membership on the namespace; else the account's public handle; else `"community"` |
+| `source.submittedBy` | on personal creation: the verified publisher's slug, else the account's public handle, else `"community"`; omitted on unassigned creation; existing attribution is preserved when editing an entry without a personal submitter |
 | `source.submittedAt` | server `now()` on create, **preserved** on update |
 | `source.ingestedVia` | `publisher_api` for a key, `submission` for a session |
 | `source.originalId` | accepted **only** from a credential that could publish here; otherwise forced null |
@@ -590,10 +590,53 @@ An invalid document comes back as:
 and the service is the sole validator. The published OpenAPI document still `$ref`s `Opportunity` as
 the request schema: it is the accurate contract, it is simply not the enforcement point.
 
+### Team access and personal submission attribution
+
+Signed-in global administrators may create with `POST /v1/opportunities?attribution=unassigned`.
+The Standard document body is unchanged. This leaves `submitted_by` null and omits public
+`source.submittedBy`, ignoring client-supplied attribution. The administrator remains the creation
+audit actor, with `submitterAttribution: "unassigned"` recorded in the patch. The new-entry form
+defaults to this choice for administrators; **Link this opportunity to my account** opts into
+personal attribution. Ordinary accounts and API keys cannot create unassigned entries. Omitting
+the query retains personal creation for existing API clients. This choice changes attribution,
+not publication authority: normal namespace approval rules still apply. Unassigned catalog entries
+do not consume a personal pending-submission slot.
+
+Editing never assigns a missing personal submitter. An identical unassigned creation retry succeeds
+only for the original audited creator, using the same attribution choice; other creators or a
+different choice receive `409`. Existing personal submissions are not cleared by this feature.
+An unassigned entry remains claimable only if its publisher is unverified and no durable ownership
+grant or explicit attribution transfer has occurred.
+
+An `owner`, `admin` or `publisher` membership in the current verified publisher organization
+allows editing its programs, including programs submitted by somebody else. All three roles can
+open the management details and analytics. A colleague claiming a program on the organization's
+behalf gives the organization access; it does not replace its other members' permissions.
+
+`POST /v1/opportunities/:id/submitter` lets a signed-in **owner or admin** of that verified
+publisher attribute the submission to their own account. It sets the submitter account and public
+attribution, preserves the publisher, visibility and original submission date, and records both
+previous values in the audit trail. Other members keep their access. Subsequent team edits preserve
+the chosen attribution; changing it requires this explicit action. API keys and ordinary publisher
+members cannot use this route.
+
+`POST /v1/admin/opportunities/:id/submitter` lets a signed-in global administrator select an
+existing account using `{ accountId, reason }`. A non-empty reason (up to 1000 characters) is
+required. The recipient must have an active sign-in identity and a public handle or display name.
+The administrator stays the actor in the audit trail; the recipient becomes the submitter.
+This changes attribution only and does not grant organization membership. Publisher, visibility,
+original submission date and team permissions remain unchanged. The management page offers
+**Change submitter** to global administrators, with account search and an explicit confirmation.
+
+The management page offers **Use my name as submitter** when permitted. The public page's access
+endpoint exposes `canEdit`, `canViewManagement`, `canAssumeSubmission`, `canAssignSubmission` and `canClaim` so the interface shows
+only the permitted actions.
+
 ### Claiming an entry somebody else published
 
-An entry ingested into your namespace before you had an account is claimed rather than
-re-submitted, so its id, its history and anything already pointing at it survive.
+If an imported program is already published under your verified organization, its authorized
+members can manage it immediately. A claim transfers publisher ownership of an unowned import to your organization, preserving
+the program's id and history. Request additional access to an owned program through its organization.
 
 ```sh
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
@@ -604,15 +647,37 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/jso
 Two outcomes, and the status code is the whole answer:
 
 * **`200 {"outcome":"granted"}`** — your organization is **verified** *and* its slug appears in the
-  entry's `operatingOrganizations`. Publisher ownership transfers immediately.
+  entry's `operatingOrganizations`, and you are already a member. Publisher ownership transfers immediately.
   *Sponsorship is not operation:* appearing only in `sponsoringOrganizations` does not grant, or a
   sponsor could seize an entry it merely funds.
 * **`202 {"outcome":"queued","claimId":…}`** — anything else. A reviewer decides.
 
-`409` when the entry is already owned by a **different** verified organization;
-`200 {"outcome":"unchanged"}` when your organization already owns it. On an API key, filing a claim
+`409 already_claimed` for **any** further claim when the program already has a submitter account,
+a verified publisher, a recorded publisher grant, or an explicit submitter transfer. This applies
+to members and non-members, including claims for the same organization. Once granted, a claim
+remains closed even if that organization later loses verification. Existing pending claims cannot
+be approved after another claim wins; reviewers can still reject them. Returning an unowned
+program to review does not prevent a decision on an existing claim: approval verifies the publisher
+and restores approval without changing whether the program is listed.
+
+`GET /v1/opportunities/:id/claim-status` returns public `{ canClaim }` for listed, approved programs
+only, so anonymous visitors also see no claim control once ownership is established. Private or
+merged programs return 404. Filing and approval re-check ownership under the opportunity lock.
+Additional access for an owned program is managed through organization memberships, not claims.
+Reviewer approval verifies the organization, adds claimant membership when needed and transfers
+publisher ownership in one transaction. The authorized claimant can immediately view management
+and edit the entry. Personal submission attribution stays unchanged. The deprecated
+`verifyOrganization` field is accepted but ignored, including `false`. A rejected claim never
+verifies the organization, and an ordinary opportunity submission is not evidence for verification.
+The public page uses `GET /v1/me/opportunities/:id/access` to show editing and management
+actions instead of claim for accounts that already have access. On an API key, filing a claim
 at all needs the `write` scope, and a claim that *would* be granted immediately needs `publish` —
-each absence is a 403 naming the scope, never a quiet downgrade to a queued claim.
+each absence is a 403 naming the scope, never a quiet downgrade to a queued claim. At most ten
+pending claims are allowed per account. Queueing locks the account before counting, so requests
+on different programs cannot exceed this cap concurrently. One pending request per program and
+organization is idempotent; another colleague receives the existing request id, without replacing
+the original claimant or their note. An immediate grant settles a pending request only when
+its claimant is the grant actor; it does not approve another person's membership request.
 
 **A granted claim moves `PUT` with it.** Ownership is the row's `source.publisher`, not who first
 typed the entry in, so once a claim is granted the original submitter's account no longer holds
@@ -625,7 +690,8 @@ misleading "submitted by another account".
 `grant_publisher` action was ever recorded against the entry (`audit_log` is append-only and both
 grant paths write it). Two shapes make the cheaper guesses wrong, and both are real — a legacy
 import whose publisher never matched its id prefix and never involved a claim, and an entry claimed
-away and later claimed back, whose id and publisher agree again while ownership has moved twice. An
+whose publisher was subsequently corrected to match its original id again. Historical grants
+remain authoritative even when the current publisher and id prefix match. An
 ordinary submission filed into a namespace you hold no membership on is untouched: you may still
 edit what you filed.
 
@@ -640,15 +706,13 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/m
 # Check the entry against its own applicationUrl before deciding.
 curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/my-org:42/verify
 
-# Claims. `verifyOrganization` is an explicit decision, not a side effect:
+# Claims. Approval also verifies the organization atomically:
 curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
-  -d '{"verifyOrganization":true}' $API/v1/review/claims/7/approve
+  -d '{}' $API/v1/review/claims/7/approve
 ```
 
-> **`verifyOrganization: false` transfers ownership but does *not* unlock auto-approval.**
-> Auto-approval requires a **verified** organization, so that publisher's later writes keep landing
-> `pending`. The response says so, and this paragraph exists because "the claim was approved, why is
-> my next submission still in review" is otherwise a support ticket rather than a documented rule.
+> **Approval always verifies the organization.** Authorized members can publish in that namespace
+> without review. Legacy clients may still send `verifyOrganization`, but cannot skip verification.
 
 Verifying an organization is what actually flips a namespace to T2, and revoking a membership takes
 it back on the very next request:

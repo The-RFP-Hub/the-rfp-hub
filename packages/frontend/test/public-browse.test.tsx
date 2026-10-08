@@ -173,7 +173,7 @@ function stub(overrides?: {
     client: {
       baseUrl: BASE_URL,
       directory: { list, find },
-      opportunities: { audit },
+      opportunities: { audit, claimStatus: async () => ({ canClaim: true }) },
     } as unknown as ApiClient,
     list,
     find,
@@ -928,7 +928,7 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
-    const claim = screen.getByText("This is my program — claim it");
+    const claim = await screen.findByText("This is my program — claim it");
     expect(claim).toBeTruthy();
     fireEvent.click(claim);
     expect(screen.getByRole("button", { name: "Sign in to claim" })).toBeTruthy();
@@ -940,8 +940,8 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
-    fireEvent.click(screen.getByText("This is my program — claim it"));
-    expect(screen.getByText("Restoring your session…")).toBeTruthy();
+    expect(screen.queryByText("This is my program — claim it")).toBeNull();
+    expect(screen.getByText("Checking your program access…")).toBeTruthy();
   });
 
   it("claims the canonical id returned by the public detail read, not an aliased route id", async () => {
@@ -971,7 +971,16 @@ describe("the public opportunity page", () => {
     const { client: publicClient } = stub();
     const client = {
       ...publicClient,
-      me: { get: vi.fn(async () => me) },
+      me: {
+        get: vi.fn(async () => me),
+        opportunityAccess: vi.fn(async () => ({
+          canEdit: false,
+          canViewManagement: false,
+          canAssumeSubmission: false,
+          canAssignSubmission: false,
+          canClaim: true,
+        })),
+      },
       opportunities: { ...publicClient.opportunities, claim },
     } as unknown as ApiClient;
 

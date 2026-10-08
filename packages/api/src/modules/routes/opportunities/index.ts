@@ -56,6 +56,27 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
   );
 
   router.get(
+    "/:id/claim-status",
+    {
+      schema: {
+        operationId: "getOpportunityClaimStatus",
+        tags: ["opportunities"],
+        summary: "Whether this public listing still accepts ownership claims",
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        response: {
+          200: {
+            type: "object",
+            required: ["canClaim"],
+            properties: { canClaim: { type: "boolean" } },
+          },
+          404: { $ref: "ErrorResponse#" },
+        },
+      },
+    },
+    opportunityController.claimStatus,
+  );
+
+  router.get(
     "/:id",
     {
       schema: {

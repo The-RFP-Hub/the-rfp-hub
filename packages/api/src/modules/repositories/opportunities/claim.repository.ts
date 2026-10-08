@@ -65,6 +65,7 @@ export class ClaimRepository {
         and(
           eq(opportunityClaims.opportunityId, opportunityId),
           eq(opportunityClaims.organizationId, organizationId),
+          eq(opportunityClaims.accountId, decidedBy),
           eq(opportunityClaims.status, "pending"),
         ),
       )

@@ -74,6 +74,8 @@ const result = (
 
 function clientFor(options?: {
   me?: Me;
+  access?: { canEdit: boolean; canViewManagement: boolean; canClaim?: boolean };
+  canClaim?: boolean;
   claim?: (
     id: string,
     body: { organizationSlug: string; note?: string | null },
@@ -81,8 +83,20 @@ function clientFor(options?: {
 }): ApiClient {
   return {
     baseUrl: "https://api.example.com",
-    me: { get: vi.fn(async () => options?.me ?? account()) },
+    me: {
+      get: vi.fn(async () => options?.me ?? account()),
+      opportunityAccess: vi.fn(async () => ({
+        canClaim: true,
+        canAssignSubmission: false,
+        ...(options?.access ?? {
+          canEdit: false,
+          canViewManagement: false,
+          canAssumeSubmission: false,
+        }),
+      })),
+    },
     opportunities: {
+      claimStatus: vi.fn(async () => ({ canClaim: options?.canClaim ?? true })),
       claim:
         options?.claim ??
         vi.fn(async () => result("granted", "Future writes will publish under acme.")),
@@ -90,13 +104,13 @@ function clientFor(options?: {
   } as unknown as ApiClient;
 }
 
-function renderForm(client: ApiClient, me = account()) {
+async function renderForm(client: ApiClient, me = account()) {
   render(
     <ApiClientProvider value={client}>
       <ClaimForm id="acme:round-4" me={me} />
     </ApiClientProvider>,
   );
-  fireEvent.click(screen.getByText("This is my program — claim it"));
+  fireEvent.click(await screen.findByText("This is my program — claim it"));
 }
 
 beforeEach(() => {
@@ -111,13 +125,115 @@ afterEach(() => {
 });
 
 describe("the public claim control", () => {
+  it.each([
+    { canEdit: true, canViewManagement: true, canAssumeSubmission: false },
+    { canEdit: false, canViewManagement: true, canAssumeSubmission: false },
+  ])("replaces claim with the actions authorized by the server: %j", async (access) => {
+    authSession.data = { user: { id: "user_7" } };
+    const client = clientFor({ access });
+    render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+    const details = await screen.findByRole("link", { name: "View management details" });
+    expect(details.getAttribute("href")).toBe("/listings/acme%3Around-4");
+    expect(Boolean(screen.queryByRole("link", { name: "Edit program" }))).toBe(access.canEdit);
+    expect(screen.queryByText("This is my program — claim it")).toBeNull();
+    expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+    expect(client.opportunities.claim).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "hides claim for a globally owned program, signed in: %s",
+    async (signedIn) => {
+      if (signedIn) authSession.data = { user: { id: "user_7" } };
+      const client = clientFor({
+        canClaim: false,
+        access: { canEdit: false, canViewManagement: false, canClaim: false },
+      });
+      const { container } = render(
+        <ApiClientProvider value={client}>
+          <PublicClaimControl id="acme:round-4" />
+        </ApiClientProvider>,
+      );
+      await waitFor(() => expect(container.textContent).toBe(""));
+      expect(screen.queryByText("This is my program — claim it")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Sign in to claim" })).toBeNull();
+      expect(client.opportunities.claim).not.toHaveBeenCalled();
+    },
+  );
+
+  it("hides the extracted form when ownership has already been established", async () => {
+    const client = clientFor({
+      access: { canEdit: false, canViewManagement: false, canClaim: false },
+    });
+    const { container } = render(
+      <ApiClientProvider value={client}>
+        <ClaimForm id="acme:round-4" me={account()} />
+      </ApiClientProvider>,
+    );
+    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(client.opportunities.claim).not.toHaveBeenCalled();
+  });
+
+  it("refreshes ownership and removes claim when a stale page is refused", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const claim = vi.fn(async (): Promise<ClaimResult> => {
+      throw new ApiError(409, "already_claimed", "This program already has an owner.");
+    });
+    const client = clientFor({ claim });
+    vi.mocked(client.me.opportunityAccess)
+      .mockResolvedValueOnce({
+        canEdit: false,
+        canViewManagement: false,
+        canAssumeSubmission: false,
+        canAssignSubmission: false,
+        canClaim: true,
+      })
+      .mockResolvedValue({
+        canEdit: false,
+        canViewManagement: false,
+        canAssumeSubmission: false,
+        canAssignSubmission: false,
+        canClaim: false,
+      });
+    const { container } = render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
+    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(claim).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer claim when checking access fails, and lets the user retry", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const client = clientFor();
+    vi.mocked(client.me.opportunityAccess).mockRejectedValueOnce(
+      new ApiError(503, "unavailable", "Access check unavailable."),
+    );
+    render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Check access again" }));
+    expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "File the claim" })).toBeTruthy();
+  });
+
   it("opens the existing sign-in overlay from the signed-out CTA without requesting /v1/me", async () => {
     const fetch = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(JSON.stringify({ status: "ok", db: "up", auth: { google: false } }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ status: "ok", db: "up", auth: { google: false }, canClaim: true }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
     );
     vi.stubGlobal("fetch", fetch);
 
@@ -127,7 +243,7 @@ describe("the public claim control", () => {
       </AuthRoot>,
     );
 
-    fireEvent.click(screen.getByText("This is my program — claim it"));
+    fireEvent.click(await screen.findByText("This is my program — claim it"));
     fireEvent.click(screen.getByRole("button", { name: "Sign in to claim" }));
 
     expect(await screen.findByRole("dialog")).toBeTruthy();
@@ -154,7 +270,7 @@ describe("the public claim control", () => {
 
     fireEvent.click(await screen.findByText("This is my program — claim it"));
     expect(client.me.get).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/approving it adds you as a member/)).toBeTruthy();
+    expect(await screen.findByText(/Approval adds you as a publisher/)).toBeTruthy();
     expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("prezenti");
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "\u0000other" } });
@@ -179,7 +295,7 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    const summary = screen.getByText("This is my program — claim it");
+    const summary = await screen.findByText("This is my program — claim it");
     const disclosure = summary.closest("details") as HTMLDetailsElement;
     fireEvent.click(summary);
     expect(disclosure.open).toBe(true);
@@ -192,8 +308,10 @@ describe("the public claim control", () => {
     );
 
     expect(await screen.findByRole("button", { name: "File the claim" })).toBeTruthy();
-    expect(screen.getByText("This is my program — claim it")).toBe(summary);
-    expect(disclosure.open).toBe(true);
+    expect(
+      (screen.getByText("This is my program — claim it").closest("details") as HTMLDetailsElement)
+        .open,
+    ).toBe(true);
   });
 
   it("closes and resets the public claim draft on Cancel", async () => {
@@ -205,9 +323,9 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
+    await screen.findByRole("button", { name: "File the claim" });
     const summary = await screen.findByText("This is my program — claim it");
     fireEvent.click(summary);
-    await screen.findByRole("button", { name: "File the claim" });
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
       target: { value: "Unsent public note" },
@@ -226,6 +344,11 @@ describe("the public claim control", () => {
     authSession.data = { user: { id: "user_7" } };
     let answerClaim: ((response: Response) => void) | undefined;
     const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/access")) {
+        return new Response(
+          JSON.stringify({ canViewManagement: false, canEdit: false, canClaim: true }),
+        );
+      }
       if (String(input).endsWith("/v1/me")) {
         return new Response(JSON.stringify(account()), {
           status: 200,
@@ -275,13 +398,44 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    expect(await screen.findByText("queued: A reviewer will decide this claim.")).toBeTruthy();
+    expect(await screen.findByText("A reviewer will decide this claim.")).toBeTruthy();
+  });
+  it("does not carry a queued outcome into another account", async () => {
+    const client = clientFor({
+      claim: vi.fn(async () => result("queued", "First account request.")),
+    });
+    const view = render(
+      <ApiClientProvider value={client}>
+        <ClaimForm id="acme:round-4" me={account()} />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByText("This is my program — claim it"));
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+    await screen.findByText("First account request.");
+    view.rerender(
+      <ApiClientProvider value={client}>
+        <ClaimForm id="acme:round-4" me={{ ...account(), accountId: 8 }} />
+      </ApiClientProvider>,
+    );
+    await screen.findByText("This is my program — claim it");
+    expect(screen.queryByText("First account request.")).toBeNull();
+    expect(
+      screen.queryByText("Your request is awaiting review. You do not need to submit it again."),
+    ).toBeNull();
   });
 });
 
 describe("the extracted claim form", () => {
-  it("shows every membership and selects the first one by default", () => {
-    renderForm(clientFor());
+  it("replaces a granted claim with editing and management actions", async () => {
+    await renderForm(clientFor());
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+    expect(await screen.findByRole("link", { name: "Edit program" })).toBeTruthy();
+    expect(screen.queryByText("This is my program — claim it")).toBeNull();
+    expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+  });
+
+  it("shows every membership and selects the first one by default", async () => {
+    await renderForm(clientFor());
 
     const select = screen.getByLabelText("Organization") as HTMLSelectElement;
     expect(select.value).toBe("acme");
@@ -291,8 +445,8 @@ describe("the extracted claim form", () => {
     ).toBeTruthy();
   });
 
-  it("closes on Cancel and discards the unsent organization and note", () => {
-    renderForm(clientFor());
+  it("closes on Cancel and discards the unsent organization and note", async () => {
+    await renderForm(clientFor());
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
@@ -300,7 +454,7 @@ describe("the extracted claim form", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    const summary = screen.getByText("This is my program — claim it");
+    const summary = await screen.findByText("This is my program — claim it");
     expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
     fireEvent.click(summary);
     expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("acme");
@@ -311,7 +465,7 @@ describe("the extracted claim form", () => {
 
   it("posts exactly the selected organization and reviewer note", async () => {
     const claim = vi.fn(async () => result("queued", "A reviewer will decide this claim."));
-    renderForm(clientFor({ claim }));
+    await renderForm(clientFor({ claim }));
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
@@ -329,16 +483,15 @@ describe("the extracted claim form", () => {
   });
 
   it.each([
-    result("granted", "Future writes will publish under acme."),
     result("queued", "A reviewer will decide this claim."),
     result("unchanged", "Acme already publishes this opportunity.", null),
   ])("renders the API's $outcome outcome message verbatim", async (answer) => {
     const claim = vi.fn(async () => answer);
-    renderForm(clientFor({ claim }));
+    await renderForm(clientFor({ claim }));
 
     fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
 
-    expect(await screen.findByText(`${answer.outcome}: ${answer.message}`)).toBeTruthy();
+    expect(await screen.findByText(answer.message)).toBeTruthy();
   });
 
   it("surfaces a conflict with a different verified publisher legibly", async () => {
@@ -349,7 +502,7 @@ describe("the extracted claim form", () => {
         "This opportunity already has a different verified publisher.",
       );
     });
-    renderForm(clientFor({ claim }));
+    await renderForm(clientFor({ claim }));
 
     fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
 
@@ -368,7 +521,7 @@ describe("the extracted claim form", () => {
     const claim = vi.fn(async (): Promise<ClaimResult> => {
       throw new ApiError(503, "unavailable", "Claims are temporarily unavailable.");
     });
-    renderForm(clientFor({ claim }));
+    await renderForm(clientFor({ claim }));
 
     fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
 

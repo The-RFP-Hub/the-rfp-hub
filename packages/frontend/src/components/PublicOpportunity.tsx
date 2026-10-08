@@ -100,6 +100,7 @@ export function PublicOpportunity({ id }: { id: string }) {
               baseUrl={api.baseUrl}
               claimControl={
                 <PublicClaimControl
+                  key={entry.id}
                   id={entry.id}
                   organizations={[
                     ...entry.operatingOrganizations,

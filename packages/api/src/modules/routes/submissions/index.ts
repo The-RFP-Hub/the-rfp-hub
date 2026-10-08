@@ -61,9 +61,14 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
         tags: ["submissions"],
         summary: "Submit an opportunity",
         description:
-          "The body is a full RFP Hub Standard opportunity. The server sets every `source.*` attribution field itself. A submission auto-approves only when the credential may publish into the resolved namespace; otherwise it is stored `pending` and is invisible to the public reads. An identical repeat of an earlier create returns 200 with the original result.",
+          "The body is a full RFP Hub Standard opportunity. The server sets every `source.*` attribution field itself. Session super admins may pass `attribution=unassigned` to omit personal ownership while retaining the creator in audit. A submission auto-approves only when the credential may publish into the resolved namespace; otherwise it is stored `pending` and is invisible to the public reads. An identical repeat of an earlier create returns 200 with the original result.",
         security: [{ bearerAuth: [] }],
         ...writeSchema,
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: { attribution: { type: "string", enum: ["personal", "unassigned"] } },
+        },
       },
     },
     submissionsController.create,
@@ -84,9 +89,39 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
         ...writeSchema,
+        querystring: { type: "object", additionalProperties: false, properties: {} },
       },
     },
     submissionsController.replace,
+  );
+
+  router.post(
+    "/:id/submitter",
+    {
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 20,
+        timeWindow: "1 minute",
+      }),
+      schema: {
+        operationId: "assumeOpportunitySubmission",
+        tags: ["submissions"],
+        summary: "Attribute a program submission to the signed-in organization manager",
+        description:
+          "Only an owner or admin of the current verified publisher can assume the submission. The publisher and team permissions are preserved. The previous attribution is recorded in the audit trail.",
+        security: [{ bearerAuth: [] }],
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        response: {
+          200: { $ref: "Opportunity#" },
+          400: { $ref: "ErrorResponse#" },
+          401: { $ref: "ErrorResponse#" },
+          403: { $ref: "ErrorResponse#" },
+          404: { $ref: "ErrorResponse#" },
+          409: { $ref: "ErrorResponse#" },
+          429: RATE_LIMITED,
+        },
+      },
+    },
+    submissionsController.assumeSubmitter,
   );
 
   router.post(

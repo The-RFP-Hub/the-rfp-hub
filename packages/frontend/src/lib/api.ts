@@ -294,6 +294,14 @@ export function createApiClient(options: ApiClientOptions) {
 
     // ── identity ────────────────────────────────────────────────────────────────
     me: {
+      opportunityAccess: (id: string) =>
+        request<{
+          canViewManagement: boolean;
+          canEdit: boolean;
+          canAssumeSubmission: boolean;
+          canAssignSubmission: boolean;
+          canClaim: boolean;
+        }>("GET", `/v1/me/opportunities/${encodeURIComponent(id)}/access`),
       get: () => request<Me>("GET", "/v1/me"),
       update: (body: { handle?: string | null; displayName?: string | null }) =>
         request<Me>("PATCH", "/v1/me", { body }),
@@ -325,8 +333,15 @@ export function createApiClient(options: ApiClientOptions) {
 
     // ── writes ──────────────────────────────────────────────────────────────────
     opportunities: {
-      create: (document: unknown) =>
-        request<SubmissionResult>("POST", "/v1/opportunities", { body: document }),
+      claimStatus: (id: string) =>
+        request<{ canClaim: boolean }>(
+          "GET",
+          `/v1/opportunities/${encodeURIComponent(id)}/claim-status`,
+        ),
+      assumeSubmission: (id: string) =>
+        request<Opportunity>("POST", `/v1/opportunities/${encodeURIComponent(id)}/submitter`),
+      create: (document: unknown, options?: { attribution: "unassigned" }) =>
+        request<SubmissionResult>("POST", "/v1/opportunities", { body: document, query: options }),
       replace: (id: string, document: unknown) =>
         request<SubmissionResult>("PUT", `/v1/opportunities/${encodeURIComponent(id)}`, {
           body: document,
@@ -400,10 +415,11 @@ export function createApiClient(options: ApiClientOptions) {
         request<MergeResult>("POST", `/v1/review/duplicates/${pairId}/merge`, { body }),
       claims: (query?: { status?: ClaimStatus }) =>
         request<ClaimList>("GET", "/v1/review/claims", { query }),
-      /** `verifyOrganization` is required: an approval that does not verify leaves auto-approval off. */
-      approveClaim: (claimId: number, verifyOrganization: boolean) =>
+      /** Approval also verifies the organization and grants the claimant access. */
+      approveClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/approve`, {
-          body: { verifyOrganization },
+          // Older APIs require this field; it never exposes a verification choice in the UI.
+          body: { verifyOrganization: true },
         }),
       rejectClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/reject`),
@@ -514,6 +530,12 @@ export function createApiClient(options: ApiClientOptions) {
 
     // ── administration (T4) ─────────────────────────────────────────────────────
     admin: {
+      assignSubmitter: (id: string, body: { accountId: number; reason: string }) =>
+        request<Opportunity>(
+          "POST",
+          `/v1/admin/opportunities/${encodeURIComponent(id)}/submitter`,
+          { body },
+        ),
       setRole: (accountId: number, role: "submitter" | "reviewer" | "admin") =>
         request<AccountSummary>("POST", `/v1/admin/accounts/${accountId}/role`, { body: { role } }),
       setDirectCreate: (accountId: number, directCreate: boolean) =>

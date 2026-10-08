@@ -56,8 +56,7 @@ describe("publishing into a namespace", () => {
     expect(effectiveCaps(p, undefined).canPublishImmediately).toBe(false);
   });
 
-  // Verification is the whole point of T2 — approval of a claim without verifying the org
-  // transfers ownership but must NOT unlock auto-approval.
+  // Ordinary submissions do not verify an organization; unverified memberships stay in review.
   it("an UNVERIFIED membership does not auto-approve", () => {
     const p = principal({ memberships: [UNVERIFIED] });
     expect(effectiveCaps(p, "unverified-org").canPublishImmediately).toBe(false);

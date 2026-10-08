@@ -13,17 +13,21 @@ import { config } from "../../../config.js";
 import { principalOf } from "../../../plugins/auth.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
 import { DedupeService } from "../../services/dedupe/dedupe.service.js";
+import { OpportunitySubmitterService } from "../../services/opportunities/opportunity-submitter.service.js";
 import {
   OpportunityWriteService,
+  type WriteOptions,
   type WriteResult,
 } from "../../services/opportunities/opportunity-write.service.js";
 import { VerificationService } from "../../services/verification/verification.service.js";
 import type { ClaimResultView, SubmissionResultView } from "../../shared/api-views.js";
-import { bodyOf, handled, paramsOf } from "../../shared/route-helpers.js";
+import { badRequest } from "../../shared/http-error.js";
+import { bodyOf, handled, paramsOf, queryOf } from "../../shared/route-helpers.js";
 
 const dedupe = new DedupeService();
 const verification = new VerificationService();
 const claims = new ClaimService();
+const submitters = new OpportunitySubmitterService();
 
 const writes = new OpportunityWriteService(undefined, {
   async afterCommit(event) {
@@ -52,10 +56,19 @@ function toView(result: WriteResult): SubmissionResultView {
   };
 }
 
+/** The write routes bypass Ajv to humanize body errors, so their query is checked explicitly. */
+function attributionOf(request: FastifyRequest): WriteOptions["attribution"] {
+  const query = queryOf<Record<string, unknown>>(request);
+  if (Object.keys(query).some((key) => key !== "attribution"))
+    throw badRequest("invalid_query", "The only submission query option is attribution.");
+  return query.attribution as WriteOptions["attribution"];
+}
+
 export const submissionsController = {
   create: handled(async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = principalOf(request);
-    const result = await writes.write(principal, request.body, { mode: "create" });
+    const attribution = attributionOf(request);
+    const result = await writes.write(principal, request.body, { mode: "create", attribution });
     // A recognised identical repeat is a 200 carrying the ORIGINAL result: the create already
     // happened, and reporting 201 a second time would claim a row was made that was not.
     return reply.code(result.repeated ? 200 : 201).send(toView(result));
@@ -64,8 +77,17 @@ export const submissionsController = {
   replace: handled(async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);
-    const result = await writes.write(principal, request.body, { mode: "replace", pathId: id });
+    const result = await writes.write(principal, request.body, {
+      mode: "replace",
+      pathId: id,
+      attribution: attributionOf(request),
+    });
     return reply.code(200).send(toView(result));
+  }),
+
+  assumeSubmitter: handled(async (request: FastifyRequest) => {
+    const { id } = paramsOf<{ id: string }>(request);
+    return submitters.assume(principalOf(request), id);
   }),
 
   claim: handled(async (request: FastifyRequest, reply: FastifyReply) => {

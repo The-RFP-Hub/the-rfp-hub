@@ -1,23 +1,28 @@
 /**
  * Claiming publisher ownership: the operating-vs-sponsoring distinction, the one-pending-claim-per
- * ORGANISATION key, the `publish`-scope bar, and the reviewer decision that carries the verification
- * choice explicitly.
+ * ORGANISATION key, the `publish`-scope bar, and atomic reviewer approval and verification.
  *
  * Isolation tag: `M3CLAIM` / `m3claim:`.
  */
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import {
+  auditLog,
   notifications,
   opportunities,
   opportunityClaims,
   opportunityDuplicates,
   orgMemberships,
+  organizations,
 } from "../../src/db/schema.js";
-import { MAX_PENDING_CLAIMS_PER_ACCOUNT } from "../../src/modules/services/claims/claim.service.js";
+import { AuditRepository } from "../../src/modules/repositories/index.js";
+import {
+  ClaimService,
+  MAX_PENDING_CLAIMS_PER_ACCOUNT,
+} from "../../src/modules/services/claims/claim.service.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
   bearer,
@@ -82,6 +87,7 @@ run("M3CLAIM ownership claims", () => {
   let sponsorToken: string;
   let unverifiedToken: string;
   let reviewerToken: string;
+  let reviewerId: number;
   let submitterToken: string;
   let insiderToken: string;
   let hostMemberToken: string;
@@ -134,7 +140,7 @@ run("M3CLAIM ownership claims", () => {
     await app.ready();
 
     const rival = await seedIdentity(EMAILS.rival, { handle: "m3claim-rival" });
-    const operator = await seedIdentity(EMAILS.operator, { handle: "m3claim-operator" });
+    const operator = await seedIdentity(EMAILS.operator, { handle: "m3claim-manager" });
     const colleague = await seedIdentity(EMAILS.colleague, { handle: "m3claim-colleague" });
     const sponsor = await seedIdentity(EMAILS.sponsor, { handle: "m3claim-sponsor" });
     const unverified = await seedIdentity(EMAILS.unverified, { handle: "m3claim-unverified" });
@@ -191,6 +197,7 @@ run("M3CLAIM ownership claims", () => {
     sponsorToken = sponsor.token;
     unverifiedToken = unverified.token;
     reviewerToken = reviewer.token;
+    reviewerId = reviewer.account.id;
     submitterToken = submitter.token;
     insiderToken = insider.token;
     hostMemberToken = hostMember.token;
@@ -214,6 +221,120 @@ run("M3CLAIM ownership claims", () => {
       headers: bearer(token),
       payload: { organizationSlug: slug, ...(note ? { note } : {}) },
     });
+
+  it("keeps organization access after a colleague claims, and lets its manager assume submission attribution", async () => {
+    const id = await seedEntry("manager-submission");
+    expect((await claim(colleagueToken, id, OPERATOR)).statusCode).toBe(200);
+    // Imported historical ownership: retain coverage of transferring a previous attribution.
+    await db
+      .update(opportunities)
+      .set({ submittedBy: submitterId })
+      .where(eq(opportunities.publicId, id));
+    const assume = (token: string) =>
+      app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/submitter`,
+        headers: bearer(token),
+      });
+    for (const token of [colleagueToken, rivalToken, reviewerToken]) {
+      const refused = await assume(token);
+      expect(refused.statusCode, refused.body).toBe(403);
+    }
+    const key = await mintApiKeyFor(operatorId, ["read", "write", "publish"]);
+    expect((await assume(key)).statusCode).toBe(403);
+    const transferred = await assume(operatorToken);
+    expect(transferred.statusCode, transferred.body).toBe(200);
+    expect(transferred.json().source.submittedBy).toBe("m3claim-manager");
+    const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+    expect(row?.submittedBy).toBe(operatorId);
+    expect(row?.sourcePublisher).toBe(OPERATOR);
+    expect(row?.reviewStatus).toBe("approved");
+    if (!row) throw new Error("missing transferred program");
+    const audit = await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "opportunity"),
+          eq(auditLog.subjectId, row.id),
+          eq(auditLog.action, "update"),
+        ),
+      );
+    expect(
+      audit.some(
+        (record) =>
+          record.patch?.reason === "submitter_transfer" &&
+          (record.patch?.submittedByAccountId as { before: number }).before === submitterId,
+      ),
+    ).toBe(true);
+    expect((await assume(operatorToken)).statusCode).toBe(200);
+    for (const token of [operatorToken, colleagueToken]) {
+      const access = await app.inject({
+        method: "GET",
+        url: `/v1/me/opportunities/${id}/access`,
+        headers: bearer(token),
+      });
+      expect(access.json().canEdit).toBe(true);
+      expect(
+        (
+          await app.inject({
+            method: "GET",
+            url: `/v1/insights/opportunities/${id}`,
+            headers: bearer(token),
+          })
+        ).statusCode,
+      ).toBe(200);
+      const edited = await app.inject({
+        method: "PUT",
+        url: `/v1/opportunities/${id}`,
+        headers: bearer(token),
+        payload: submission(id, OPERATOR, {
+          title: "Maintained by the organization",
+          operatingOrganizations: [
+            { name: HOST, slug: HOST },
+            { name: OPERATOR, slug: OPERATOR },
+          ],
+        }),
+      });
+      expect(edited.statusCode, edited.body).toBe(200);
+      expect(edited.json().opportunity.source.submittedBy).toBe("m3claim-manager");
+    }
+    const unchanged = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id))
+    )[0];
+    expect(unchanged?.submittedBy).toBe(operatorId);
+    // Admin is a separate organization role, and has the same attribution authority as owner.
+    await db
+      .update(orgMemberships)
+      .set({ role: "admin" })
+      .where(
+        and(
+          eq(orgMemberships.accountId, operatorId),
+          eq(orgMemberships.organizationId, operatorOrgId),
+        ),
+      );
+    try {
+      const adminId = await seedEntry("admin-submission");
+      expect((await claim(colleagueToken, adminId, OPERATOR)).statusCode).toBe(200);
+      const adminTransfer = await app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${adminId}/submitter`,
+        headers: bearer(operatorToken),
+      });
+      expect(adminTransfer.statusCode, adminTransfer.body).toBe(200);
+      expect(adminTransfer.json().source.submittedBy).toBe("m3claim-manager");
+    } finally {
+      await db
+        .update(orgMemberships)
+        .set({ role: "owner" })
+        .where(
+          and(
+            eq(orgMemberships.accountId, operatorId),
+            eq(orgMemberships.organizationId, operatorOrgId),
+          ),
+        );
+    }
+  });
 
   it("grants immediately to a verified OPERATING organisation", async () => {
     const id = await seedEntry("grant");
@@ -263,10 +384,44 @@ run("M3CLAIM ownership claims", () => {
     expect(row?.sourceSystem).toBe(HOST);
   });
 
+  it.each([true, false])(
+    "an immediate grant settles only the actor's own pending request, same account: %s",
+    async (sameAccount) => {
+      const id = await seedEntry(`settle-${sameAccount}`, [HOST], []);
+      const queued = await claim(sameAccount ? operatorToken : rivalToken, id, OPERATOR);
+      expect(queued.statusCode, queued.body).toBe(202);
+      await db
+        .update(opportunities)
+        .set({
+          operatingOrganizations: [
+            { name: HOST, slug: HOST },
+            { name: OPERATOR, slug: OPERATOR },
+          ],
+        })
+        .where(eq(opportunities.publicId, id));
+      const granted = await claim(operatorToken, id, OPERATOR);
+      expect(granted.statusCode, granted.body).toBe(200);
+      expect(granted.json().claimId).toBe(sameAccount ? queued.json().claimId : null);
+      const request = (
+        await db
+          .select()
+          .from(opportunityClaims)
+          .where(eq(opportunityClaims.id, queued.json().claimId))
+      )[0];
+      expect(request?.status).toBe(sameAccount ? "approved" : "pending");
+      if (!sameAccount) {
+        const rejected = await app.inject({
+          method: "POST",
+          url: `/v1/review/claims/${queued.json().claimId}/reject`,
+          headers: bearer(reviewerToken),
+        });
+        expect(rejected.statusCode, rejected.body).toBe(200);
+      }
+    },
+  );
+
   it("is idempotent when two colleagues file the same claim at the same instant", async () => {
-    // Both requests read "no pending claim" before either inserts, so the partial unique index is
-    // the only arbiter and one insert raises 23505. That is a race, not a failure: the claim is
-    // the ORGANISATION's, so the loser is answered with the winning claim rather than a 500.
+    // The opportunity lock serializes both filings; colleagues receive the same organization claim.
     const id = await seedEntry("concurrent", [HOST], [OPERATOR]);
     const [first, second] = await Promise.all([
       claim(operatorToken, id, OPERATOR, "ours"),
@@ -328,7 +483,7 @@ run("M3CLAIM ownership claims", () => {
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(decided.statusCode).toBe(200);
     expect(decided.json().message).toMatch(/added as a member/);
@@ -338,6 +493,56 @@ run("M3CLAIM ownership claims", () => {
       .from(orgMemberships)
       .where(eq(orgMemberships.accountId, strangerId));
     expect(memberships.map((m) => m.role)).toEqual(["publisher"]);
+    const organization = (
+      await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+    )[0];
+    expect(organization?.verified).toBe(true);
+    expect(organization?.verifiedAt).not.toBeNull();
+    expect(
+      await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.accountId, strangerId),
+            eq(notifications.kind, "publisher_verified"),
+          ),
+        ),
+    ).toHaveLength(1);
+    const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+    expect(row).toMatchObject({ sourcePublisher: UNVERIFIED, submittedBy: null });
+    const access = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(strangerToken),
+    });
+    expect(access.json()).toMatchObject({
+      canViewManagement: true,
+      canEdit: true,
+      canClaim: false,
+    });
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: `/v1/me/opportunities/${id}`,
+          headers: bearer(strangerToken),
+        })
+      ).statusCode,
+    ).toBe(200);
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(strangerToken),
+      payload: submission(id, UNVERIFIED, { title: "Managed by the approved claimant" }),
+    });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().reviewStatus).toBe("approved");
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]?.submittedBy,
+    ).toBeNull();
+    // Later fixtures exercise an unverified membership independently of this approval.
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
   });
 
   it("404s a claim on an organisation that does not exist", async () => {
@@ -500,12 +705,140 @@ run("M3CLAIM ownership claims", () => {
     expect(row?.sourcePublisher).toBe(HOST);
   });
 
-  it("is a 200 no-op when the caller's organisation already publishes it", async () => {
+  it("directs an existing publisher member to management instead of accepting another claim", async () => {
     const id = await seedEntry("noop");
     await claim(operatorToken, id, OPERATOR);
     const again = await claim(operatorToken, id, OPERATOR);
-    expect(again.statusCode).toBe(200);
-    expect(again.json().outcome).toBe("unchanged");
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error).toBe("already_claimed");
+    const access = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(operatorToken),
+    });
+    expect(access.statusCode, access.body).toBe(200);
+    expect(access.json()).toEqual({
+      canViewManagement: true,
+      canEdit: true,
+      canAssumeSubmission: true,
+      canAssignSubmission: false,
+      canClaim: false,
+    });
+    const outsider = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(rivalToken),
+    });
+    expect(outsider.json()).toEqual({
+      canViewManagement: false,
+      canEdit: false,
+      canAssumeSubmission: false,
+      canAssignSubmission: false,
+      canClaim: false,
+    });
+    const request = await claim(rivalToken, id, OPERATOR);
+    expect(request.statusCode, request.body).toBe(409);
+    expect(request.json().error).toBe("already_claimed");
+  });
+
+  it("closes claims globally for account-owned and verified-publisher programs without any prior claim", async () => {
+    for (const kind of ["account", "verified"] as const) {
+      const id = await seedEntry(`owned-${kind}`);
+      await db
+        .update(opportunities)
+        .set(kind === "account" ? { submittedBy: submitterId } : { sourcePublisher: OPERATOR })
+        .where(eq(opportunities.publicId, id));
+      const status = await app.inject({
+        method: "GET",
+        url: `/v1/opportunities/${id}/claim-status`,
+      });
+      expect(status.statusCode).toBe(200);
+      expect(status.json().canClaim).toBe(false);
+      for (const token of [operatorToken, rivalToken, colleagueToken, strangerToken]) {
+        expect((await claim(token, id, OPERATOR)).statusCode).toBe(409);
+      }
+    }
+  });
+
+  it("closes claims globally after an approval verifies the owning organization", async () => {
+    const id = await seedEntry("owned-unverified");
+    const queued = await claim(unverifiedToken, id, UNVERIFIED);
+    const approved = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: {},
+    });
+    expect(approved.statusCode, approved.body).toBe(200);
+    expect(
+      (await app.inject({ method: "GET", url: `/v1/opportunities/${id}/claim-status` })).json()
+        .canClaim,
+    ).toBe(false);
+    expect((await claim(operatorToken, id, OPERATOR)).statusCode).toBe(409);
+    expect((await claim(unverifiedToken, id, UNVERIFIED)).statusCode).toBe(409);
+  });
+
+  it.each([false, true])(
+    "decides an existing claim after its opportunity returns to review, verified publisher: %s",
+    async (verified) => {
+      const id = await seedEntry(`review-again-${verified}`);
+      const slug = verified ? SPONSOR : UNVERIFIED;
+      if (!verified) await seedOrganization({ slug, verified: false });
+      const queued = await claim(verified ? sponsorToken : unverifiedToken, id, slug);
+      expect(queued.statusCode, queued.body).toBe(202);
+      await db
+        .update(opportunities)
+        .set({ reviewStatus: "pending", isListed: false })
+        .where(eq(opportunities.publicId, id));
+      expect((await claim(operatorToken, id, OPERATOR)).statusCode).toBe(404);
+      const decided = await app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        headers: bearer(reviewerToken),
+        payload: {},
+      });
+      expect(decided.statusCode, decided.body).toBe(200);
+      const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+      expect(row?.sourcePublisher).toBe(slug);
+      expect(row?.reviewStatus).toBe("approved");
+      expect(row?.isListed).toBe(false);
+    },
+  );
+
+  it("refuses old pending approvals after another claim wins, while still allowing rejection", async () => {
+    const id = await seedEntry("stale-approval");
+    const queued = await claim(sponsorToken, id, SPONSOR);
+    expect(queued.statusCode).toBe(202);
+    expect((await claim(operatorToken, id, OPERATOR)).statusCode).toBe(200);
+    const decided = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: {},
+    });
+    expect(decided.statusCode).toBe(409);
+    expect(decided.json().error).toBe("already_claimed");
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]
+        ?.sourcePublisher,
+    ).toBe(OPERATOR);
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/reject`,
+      headers: bearer(reviewerToken),
+    });
+    expect(rejected.statusCode).toBe(200);
+  });
+
+  it("does not expose private listings through the access endpoint", async () => {
+    const id = await seedEntry("private-access");
+    await db.update(opportunities).set({ isListed: false }).where(eq(opportunities.publicId, id));
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(operatorToken),
+    });
+    expect(response.statusCode).toBe(404);
   });
 
   it("409s a claim against an entry a different VERIFIED organisation already publishes", async () => {
@@ -583,7 +916,7 @@ run("M3CLAIM ownership claims", () => {
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+      payload: {},
     });
     expect(approval.statusCode, approval.body).toBe(409);
     expect(approval.json().error).toBe("opportunity_merged");
@@ -634,35 +967,205 @@ run("M3CLAIM ownership claims", () => {
     expect(rejectedClaim?.status).toBe("rejected");
   });
 
-  it("transfers ownership on approval WITHOUT unlocking auto-approval when the org stays unverified", async () => {
-    const id = await seedEntry("queued-unverified", [HOST], [UNVERIFIED]);
+  it.each([undefined, true, false])(
+    "always verifies on approval with legacy flag %s",
+    async (verifyOrganization) => {
+      await seedOrganization({ slug: UNVERIFIED, verified: false });
+      const id = await seedEntry(`queued-verify-flag-${verifyOrganization}`, [HOST], [UNVERIFIED]);
+      const queued = await claim(unverifiedToken, id, UNVERIFIED);
+      expect(queued.statusCode).toBe(202);
+      const decided = await app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        headers: bearer(reviewerToken),
+        // New clients send an empty decision; legacy clients cannot opt out of verification.
+        payload: verifyOrganization === undefined ? {} : { verifyOrganization },
+      });
+      expect(decided.statusCode, decided.body).toBe(200);
+      expect(decided.json().message).toMatch(/auto-approve/);
+      const organization = (
+        await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+      )[0];
+      expect(organization?.verified).toBe(true);
+      const row = (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0];
+      expect(row).toMatchObject({ sourcePublisher: UNVERIFIED, submittedBy: null });
+      const write = await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(unverifiedToken),
+        payload: submission(`${UNVERIFIED}:after-claim-${verifyOrganization}`, UNVERIFIED),
+      });
+      expect(write.statusCode, write.body).toBe(201);
+      expect(write.json().reviewStatus).toBe("approved");
+    },
+  );
+
+  it("also ignores the legacy false flag for direct service callers", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("service-verification", [HOST], []);
     const queued = await claim(unverifiedToken, id, UNVERIFIED);
-    expect(queued.statusCode).toBe(202);
+    expect(queued.statusCode, queued.body).toBe(202);
+    const result = await new ClaimService(db, { notificationQueue: { enqueue: () => {} } }).decide(
+      reviewerId,
+      queued.json().claimId,
+      { approve: true, verifyOrganization: false },
+    );
+    expect(result.outcome).toBe("granted");
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0]
+        ?.verified,
+    ).toBe(true);
+  });
 
-    const decided = await app.inject({
-      method: "POST",
-      url: `/v1/review/claims/${queued.json().claimId}/approve`,
-      headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
-    });
-    expect(decided.statusCode).toBe(200);
-    expect(decided.json().message).toMatch(/NOT verified/);
-
-    // Ownership moved…
-    const row = (
-      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+  it("rolls back verification, membership, ownership, decision, notifications and audit together", async () => {
+    const beforeOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
+    await db
+      .delete(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, strangerId),
+          eq(orgMemberships.organizationId, beforeOrg.id),
+        ),
+      );
+    const id = await seedEntry("atomic-approval", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const claimId = queued.json().claimId as number;
+    const beforeEntry = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id))
     )[0];
-    expect(row?.sourcePublisher).toBe(UNVERIFIED);
-
-    // …and the new publisher's next write still lands pending, which is exactly what the message
-    // said would happen.
-    const write = await app.inject({
-      method: "POST",
-      url: "/v1/opportunities",
-      headers: bearer(unverifiedToken),
-      payload: submission(`${UNVERIFIED}:after-claim`, UNVERIFIED),
+    const beforeNotifications = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.accountId, strangerId));
+    const enqueue = vi.fn();
+    const original = AuditRepository.prototype.record;
+    const audit = vi.spyOn(AuditRepository.prototype, "record").mockImplementation(function (
+      this: AuditRepository,
+      input,
+    ) {
+      if (input.subjectKind === "opportunity" && input.action === "grant_publisher")
+        throw new Error("forced failure after all approval writes");
+      return original.call(this, input);
     });
-    expect(write.json().reviewStatus).toBe("pending");
+    try {
+      await expect(
+        new ClaimService(db, { notificationQueue: { enqueue } }).decide(reviewerId, claimId, {
+          approve: true,
+          verifyOrganization: false,
+        }),
+      ).rejects.toThrow("forced failure");
+    } finally {
+      audit.mockRestore();
+    }
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0],
+    ).toEqual(beforeEntry);
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (await db.select().from(opportunityClaims).where(eq(opportunityClaims.id, claimId)))[0]
+        ?.status,
+    ).toBe("pending");
+    expect(
+      await db
+        .select()
+        .from(orgMemberships)
+        .where(
+          and(
+            eq(orgMemberships.accountId, strangerId),
+            eq(orgMemberships.organizationId, beforeOrg.id),
+          ),
+        ),
+    ).toEqual([]);
+    expect(
+      await db.select().from(notifications).where(eq(notifications.accountId, strangerId)),
+    ).toEqual(beforeNotifications);
+    expect(
+      await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.subjectKind, "claim"),
+            eq(auditLog.subjectId, claimId),
+            eq(auditLog.action, "approve"),
+          ),
+        ),
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.subjectKind, "organization"),
+            eq(auditLog.subjectId, beforeOrg.id),
+            eq(auditLog.action, "verify_organization"),
+          ),
+        ),
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ patch: expect.objectContaining({ reason: `claim:${claimId}` }) }),
+      ]),
+    );
+  });
+
+  it("only reviewer sessions can approve and verify", async () => {
+    const beforeOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("approval-authority", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const key = await mintApiKeyFor(reviewerId, ["read", "write", "publish"]);
+    for (const token of [strangerToken, key, undefined]) {
+      const refused = await app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        ...(token ? { headers: bearer(token) } : {}),
+        payload: {},
+      });
+      expect(refused.statusCode, refused.body).toBe(token ? 403 : 401);
+    }
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (
+        await db
+          .select()
+          .from(opportunityClaims)
+          .where(eq(opportunityClaims.id, queued.json().claimId))
+      )[0]?.status,
+    ).toBe("pending");
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]
+        ?.sourcePublisher,
+    ).toBe(HOST);
+  });
+
+  it("rejection leaves verification, membership and ownership unchanged", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const id = await seedEntry("reject-unverified", [HOST], []);
+    const queued = await claim(strangerToken, id, UNVERIFIED);
+    const beforeOrg = (
+      await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED))
+    )[0];
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/reject`,
+      headers: bearer(reviewerToken),
+    });
+    expect(rejected.statusCode, rejected.body).toBe(200);
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.slug, UNVERIFIED)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      (await db.select().from(opportunities).where(eq(opportunities.publicId, id)))[0]
+        ?.sourcePublisher,
+    ).toBe(HOST);
+    expect(
+      await db.select().from(orgMemberships).where(eq(orgMemberships.accountId, strangerId)),
+    ).toEqual([]);
   });
 
   /**
@@ -696,15 +1199,22 @@ run("M3CLAIM ownership claims", () => {
     });
     expect(approved.statusCode, approved.body).toBe(200);
 
-    const queued = await claim(insiderToken, id, CLAIMED);
-    expect(queued.statusCode, queued.body).toBe(202);
-    const decided = await app.inject({
-      method: "POST",
-      url: `/v1/review/claims/${queued.json().claimId}/approve`,
-      headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
+    // Recreate a legacy granted transfer. New claims on account-owned programs are now forbidden.
+    const original = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id))
+    )[0];
+    if (!original) throw new Error("missing historical submission");
+    await db
+      .update(opportunities)
+      .set({ sourcePublisher: CLAIMED })
+      .where(eq(opportunities.id, original.id));
+    await db.insert(auditLog).values({
+      subjectKind: "opportunity",
+      subjectId: original.id,
+      action: "grant_publisher",
+      actorKind: "user",
+      patch: { organizationSlug: CLAIMED },
     });
-    expect(decided.statusCode, decided.body).toBe(200);
 
     const row = (
       await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
@@ -732,6 +1242,31 @@ run("M3CLAIM ownership claims", () => {
     // over it — and it does not move when a claim is granted. So an aggregator that filed the entry
     // used to keep PUT on it forever, editing something now published in the claimant's name.
     const id = await submitThenHandOver("submitter-loses-put", submitterToken);
+
+    const access = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(submitterToken),
+    });
+    expect(access.json()).toEqual({
+      canViewManagement: true,
+      canEdit: false,
+      canAssumeSubmission: false,
+      canAssignSubmission: false,
+      canClaim: false,
+    });
+    const reviewerAccess = await app.inject({
+      method: "GET",
+      url: `/v1/me/opportunities/${id}/access`,
+      headers: bearer(reviewerToken),
+    });
+    expect(reviewerAccess.json()).toEqual({
+      canViewManagement: true,
+      canEdit: true,
+      canAssumeSubmission: false,
+      canAssignSubmission: false,
+      canClaim: false,
+    });
 
     const res = await replace(submitterToken, id, "Edited by the former owner");
     expect(res.statusCode, res.body).toBe(403);
@@ -794,21 +1329,19 @@ run("M3CLAIM ownership claims", () => {
     });
     expect(published.statusCode, published.body).toBe(200);
 
-    // AWAY: `OPERATOR` is verified and operates it, so this grants immediately.
-    const away = await claim(operatorToken, id, OPERATOR);
-    expect(away.statusCode, away.body).toBe(200);
-    expect(away.json().outcome).toBe("granted");
-
-    // BACK: `HOST` is unverified, so its member's claim queues and a reviewer returns it.
-    const back = await claim(hostMemberToken, id, HOST);
-    expect(back.statusCode, back.body).toBe(202);
-    const returned = await app.inject({
-      method: "POST",
-      url: `/v1/review/claims/${back.json().claimId}/approve`,
-      headers: bearer(reviewerToken),
-      payload: { verifyOrganization: false },
-    });
-    expect(returned.statusCode, returned.body).toBe(200);
+    // Legacy round-trip grants remain durable ownership markers; the current claim API forbids them.
+    const original = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id))
+    )[0];
+    if (!original) throw new Error("missing historical submission");
+    for (const slug of [OPERATOR, HOST])
+      await db.insert(auditLog).values({
+        subjectKind: "opportunity",
+        subjectId: original.id,
+        action: "grant_publisher",
+        actorKind: "user",
+        patch: { organizationSlug: slug },
+      });
 
     const row = (
       await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
@@ -893,6 +1426,16 @@ run("M3CLAIM ownership claims", () => {
   });
 
   it("unlocks auto-approval when the reviewer verifies the organisation as part of the approval", async () => {
+    await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const beforeNotifications = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.accountId, unverifiedId),
+          eq(notifications.kind, "publisher_verified"),
+        ),
+      );
     const id = await seedEntry("queued-verify", [HOST], [UNVERIFIED]);
     const queued = await claim(unverifiedToken, id, UNVERIFIED);
     const decided = await app.inject({
@@ -913,7 +1456,7 @@ run("M3CLAIM ownership claims", () => {
           eq(notifications.kind, "publisher_verified"),
         ),
       );
-    expect(verifiedEmails).toHaveLength(1);
+    expect(verifiedEmails).toHaveLength(beforeNotifications.length + 1);
 
     const write = await app.inject({
       method: "POST",

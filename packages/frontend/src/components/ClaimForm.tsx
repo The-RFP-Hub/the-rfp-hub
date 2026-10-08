@@ -4,14 +4,16 @@
  * Claiming publisher ownership on an organization's behalf.
  *
  * The API answers 200 (granted) or 202 (queued) and returns a `message` saying what the outcome
- * means for FUTURE writes — an approval on an unverified organization transfers ownership without
- * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
- * paraphrase is exactly where a dashboard would start promising something the API did not.
+ * means for future writes. Reviewer approval verifies the organization, grants claimant membership
+ * when needed and transfers publisher ownership in one transaction. The sentence is shown verbatim.
  */
 import { ActionNote, type ActionNoteValue, actionErrorNote } from "@/components/states";
-import { useApi, useSession } from "@/lib/session";
-import type { Me } from "@/lib/types";
-import { type ReactNode, useState } from "react";
+import { ApiError } from "@/lib/api";
+import { useResource } from "@/lib/resource";
+import { type SessionState, useApi, useSession } from "@/lib/session";
+import type { ClaimResult, Me } from "@/lib/types";
+import Link from "next/link";
+import { useCallback, useId, useState } from "react";
 
 const CLAIM_SUMMARY = "This is my program — claim it";
 const OTHER_ORGANIZATION = "\u0000other";
@@ -22,26 +24,82 @@ export interface ClaimOrganization {
   name: string;
 }
 
-export function ClaimForm({
+type ClaimFormProps = { id: string; me: Me; organizations?: ClaimOrganization[] };
+
+export function ClaimForm(props: ClaimFormProps) {
+  return <ClaimControl key={props.id} {...props} />;
+}
+
+/** Both entry points share one access check and one request flow. */
+function ClaimControl({
   id,
-  me,
+  me: suppliedMe = null,
   organizations = [],
-}: {
-  id: string;
-  me: Me;
-  organizations?: ClaimOrganization[];
-}) {
+  session,
+}: Omit<ClaimFormProps, "me"> & { me?: Me | null; session?: SessionState }) {
+  const api = useApi();
+  const me = session
+    ? session.authenticated && session.me.status === "ready"
+      ? session.me.data
+      : null
+    : suppliedMe;
+  const enabled = !session || (session.ready && (!session.authenticated || me !== null));
+  const accountId = me?.accountId ?? null;
+  const load = useCallback(
+    async () => ({
+      id,
+      accountId,
+      ...(accountId !== null
+        ? await api.me.opportunityAccess(id)
+        : {
+            canEdit: false,
+            canViewManagement: false,
+            ...(await api.opportunities.claimStatus(id)),
+          }),
+    }),
+    [api, id, accountId],
+  );
+  const { state, reload } = useResource(load, { enabled });
   const [open, setOpen] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
-  const submission = useClaimSubmission(id);
+  const submission = useClaimSubmission(id, accountId, reload);
   const cancel = () => {
     setOpen(false);
     setDraftKey((current) => current + 1);
     submission.reset();
   };
 
+  if (session?.error)
+    return (
+      <ActionNote
+        note={{ kind: "error", message: "Sign-in is unavailable right now.", error: session.error }}
+      />
+    );
+  if (session?.authenticated && session.me.status === "error")
+    return <AccessError error={session.me.error} retry={session.reloadMe} />;
+  if (state.status === "error") return <AccessError error={state.error} retry={reload} />;
+  if (
+    !enabled ||
+    state.status !== "ready" ||
+    state.stale ||
+    state.data.id !== id ||
+    state.data.accountId !== accountId
+  )
+    return <output className="muted footnote">Checking your program access…</output>;
+  if (state.data.canViewManagement || state.data.canEdit)
+    return <ManagementActions id={id} canEdit={state.data.canEdit} />;
+  if (!state.data.canClaim) return null;
+  if (submission.outcome === "granted") return <ManagementActions id={id} canEdit />;
+  if (submission.outcome)
+    return (
+      <div className="card">
+        <ClaimNextStep outcome={submission.outcome} />
+        <ActionNote note={submission.result} />
+      </div>
+    );
+
   return (
-    <details className="card" open={open}>
+    <details className="card claim-form" open={open}>
       <summary
         onClick={(event) => {
           event.preventDefault();
@@ -55,44 +113,92 @@ export function ClaimForm({
       >
         {CLAIM_SUMMARY}
       </summary>
-      <ClaimFields
-        key={draftKey}
-        me={me}
-        organizations={organizations}
-        submission={submission}
-        onCancel={cancel}
-      />
+      {me ? (
+        <ClaimFields
+          key={`${accountId}:${draftKey}`}
+          me={me}
+          organizations={organizations}
+          submission={submission}
+          onCancel={cancel}
+        />
+      ) : (
+        <>
+          <p className="muted footnote">Sign in to manage your program or request access.</p>
+          <button type="button" onClick={session?.login}>
+            Sign in to claim
+          </button>
+        </>
+      )}
       <ActionNote note={submission.result} />
     </details>
   );
 }
 
+function AccessError({
+  error,
+  retry,
+}: { error: Parameters<typeof actionErrorNote>[0]; retry: () => void }) {
+  return (
+    <div className="card">
+      <ActionNote note={actionErrorNote(error, "Could not check your program access.")} />
+      <button type="button" onClick={retry}>
+        Check access again
+      </button>
+    </div>
+  );
+}
+
 interface ClaimSubmission {
   busy: boolean;
+  outcome: ClaimResult["outcome"] | null;
   result: ActionNoteValue | null;
   submit: (body: { organizationSlug: string; note: string | null }) => Promise<void>;
   reset: () => void;
 }
 
-function useClaimSubmission(id: string): ClaimSubmission {
+function useClaimSubmission(
+  id: string,
+  accountId: number | null,
+  onAccessChanged: () => void,
+): ClaimSubmission {
   const api = useApi();
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<ActionNoteValue | null>(null);
+  const [answer, setAnswer] = useState<{
+    accountId: number | null;
+    outcome: ClaimResult["outcome"] | null;
+    note: ActionNoteValue;
+  } | null>(null);
 
   const submit = async (body: { organizationSlug: string; note: string | null }) => {
+    if (busy) return;
     setBusy(true);
-    setResult(null);
+    setAnswer(null);
     try {
       const claim = await api.opportunities.claim(id, body);
-      setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
+      setAnswer({
+        accountId,
+        outcome: claim.outcome,
+        note: { kind: "ok", message: claim.message },
+      });
     } catch (error) {
-      setResult(actionErrorNote(error, "The claim could not be filed."));
+      setAnswer({
+        accountId,
+        outcome: null,
+        note: actionErrorNote(error, "The claim could not be filed."),
+      });
+      if (error instanceof ApiError && error.code === "already_claimed") onAccessChanged();
     } finally {
       setBusy(false);
     }
   };
 
-  return { busy, result, submit, reset: () => setResult(null) };
+  return {
+    busy,
+    result: answer?.accountId === accountId ? answer.note : null,
+    outcome: answer?.accountId === accountId ? answer.outcome : null,
+    submit,
+    reset: () => setAnswer(null),
+  };
 }
 
 function ClaimFields({
@@ -106,6 +212,7 @@ function ClaimFields({
   submission: ClaimSubmission;
   onCancel: () => void;
 }) {
+  const fieldId = useId();
   const memberSlugs = new Set(me.memberships.map((membership) => membership.slug));
   const suggested = organizations.filter(
     (org, index, all) =>
@@ -123,22 +230,17 @@ function ClaimFields({
   return (
     <>
       <p className="muted footnote">
-        {member ? (
-          <>
-            Granted immediately when the organization is verified <em>and</em> appears among the
-            listing&rsquo;s operating organizations. Sponsorship is not operation, so a
-            sponsor&rsquo;s claim is queued for a reviewer instead.
-          </>
-        ) : (
-          <>
-            Anyone signed in can file a claim for an organization in the directory. A reviewer
-            decides it, and approving it adds you as a member of that organization.
-          </>
-        )}
+        {member
+          ? "Verified operating organization members can claim immediately. Other requests go to review."
+          : "A reviewer checks your request. Approval adds you as a publisher in this organization."}
       </p>
       <div className="field">
-        <label htmlFor="claim-org">Organization</label>
-        <select id="claim-org" value={choice} onChange={(event) => setChoice(event.target.value)}>
+        <label htmlFor={`${fieldId}-org`}>Organization</label>
+        <select
+          id={`${fieldId}-org`}
+          value={choice}
+          onChange={(event) => setChoice(event.target.value)}
+        >
           {me.memberships.map((membership) => (
             <option key={membership.slug} value={membership.slug}>
               {membership.name} — {membership.slug}{" "}
@@ -155,9 +257,9 @@ function ClaimFields({
       </div>
       {choice === OTHER_ORGANIZATION ? (
         <div className="field">
-          <label htmlFor="claim-org-slug">Organization slug</label>
+          <label htmlFor={`${fieldId}-org-slug`}>Organization slug</label>
           <input
-            id="claim-org-slug"
+            id={`${fieldId}-org-slug`}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             placeholder="The slug shown on the organization's page"
@@ -165,11 +267,9 @@ function ClaimFields({
         </div>
       ) : null}
       <div className="field">
-        <label htmlFor="claim-note">
-          {member ? "Note for the reviewer (optional)" : "Note for the reviewer"}
-        </label>
+        <label htmlFor={`${fieldId}-note`}>Note for the reviewer (optional)</label>
         <input
-          id="claim-note"
+          id={`${fieldId}-note`}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="Anything that helps a reviewer confirm the connection"
@@ -191,88 +291,39 @@ function ClaimFields({
   );
 }
 
-/**
- * The public page cannot assume an account, but claiming is still discoverable beside the listing.
- * Session and account reads stay inside this small secondary control so restoring either never
- * withholds the public opportunity from an anonymous reader.
- */
-export function PublicClaimControl({
-  id,
-  organizations = [],
-}: {
-  id: string;
-  organizations?: ClaimOrganization[];
-}) {
-  const session = useSession();
-  const [open, setOpen] = useState(false);
-  const [draftKey, setDraftKey] = useState(0);
-  const submission = useClaimSubmission(id);
-  const cancel = () => {
-    setOpen(false);
-    setDraftKey((current) => current + 1);
-    submission.reset();
-  };
-  let content: ReactNode;
-
-  if (session.error) {
-    content = (
-      <ActionNote
-        note={{ kind: "error", message: "Sign-in is unavailable right now.", error: session.error }}
-      />
-    );
-  } else if (!session.ready) {
-    content = <p className="muted footnote">Restoring your session…</p>;
-  } else if (!session.authenticated) {
-    content = (
-      <>
-        <p className="muted footnote">Sign in to file a claim. A reviewer decides every claim.</p>
-        <button type="button" onClick={session.login}>
-          Sign in to claim
-        </button>
-      </>
-    );
-  } else if (session.me.status === "idle" || session.me.status === "loading") {
-    content = <p className="muted footnote">Loading your organizations…</p>;
-  } else if (session.me.status === "error") {
-    content = (
-      <>
-        <ActionNote
-          note={actionErrorNote(session.me.error, "Could not load your organizations.")}
-        />
-        <button type="button" onClick={session.reloadMe}>
-          Try again
-        </button>
-      </>
-    );
-  } else {
-    content = (
-      <ClaimFields
-        key={draftKey}
-        me={session.me.data}
-        organizations={organizations}
-        submission={submission}
-        onCancel={cancel}
-      />
-    );
-  }
-
+function ManagementActions({ id, canEdit }: { id: string; canEdit: boolean }) {
+  const href = `/listings/${encodeURIComponent(id)}`;
   return (
-    <details className="card" open={open}>
-      <summary
-        onClick={(event) => {
-          event.preventDefault();
-          setOpen((current) => !current);
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          setOpen((current) => !current);
-        }}
-      >
-        {CLAIM_SUMMARY}
-      </summary>
-      {content}
-      <ActionNote note={submission.result} />
-    </details>
+    <div className="card">
+      <p>
+        {canEdit
+          ? "You can manage this program."
+          : "You have access to this program’s management details."}
+      </p>
+      <div className="row">
+        {canEdit ? (
+          <Link className="button" href={`${href}/edit`}>
+            Edit program
+          </Link>
+        ) : null}
+        <Link href={href}>View management details</Link>
+      </div>
+    </div>
   );
+}
+
+function ClaimNextStep({ outcome }: { outcome: ClaimResult["outcome"] }) {
+  return (
+    <p className="muted footnote">
+      {outcome === "queued"
+        ? "Your request is awaiting review. You do not need to submit it again."
+        : "No changes were made. Refresh the page to check your current access."}
+    </p>
+  );
+}
+
+/** Keep the control mounted while the session refreshes, so a queued response is not lost. */
+export function PublicClaimControl(props: Omit<ClaimFormProps, "me">) {
+  const session = useSession();
+  return <ClaimControl key={props.id} {...props} session={session} />;
 }

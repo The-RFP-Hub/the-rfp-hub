@@ -1,3 +1,4 @@
+import { markAsImportedClaimFixture } from "../src/db-seed.js";
 /**
  * M3-9 — the labelled way back, and the state it has to preserve.
  *
@@ -77,6 +78,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
   test("from the review queue's claims tab, and back to the claims tab", async ({
     stack,
     api,
+    db,
     contextAs,
     opportunityFixture,
   }) => {
@@ -92,6 +94,8 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     });
     const id = document.id as string;
     expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
+
+    await markAsImportedClaimFixture(db, id, `${stack.namespaces.publisher}-import`);
 
     const filed = await outsider.post<{ status: string }>(
       `/v1/opportunities/${encodeURIComponent(id)}/claim`,

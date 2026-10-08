@@ -2,12 +2,15 @@ import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
 import { AccountService } from "../../services/auth/account.service.js";
+import { ClaimEligibilityService } from "../../services/claims/claim-eligibility.service.js";
 import { NotificationService } from "../../services/notifications/notification.service.js";
 import {
   ManagedOpportunityService,
   type PublisherStatus,
 } from "../../services/opportunities/managed-opportunity.service.js";
 import { OpportunityMetaService } from "../../services/opportunities/opportunity-meta.service.js";
+import { OpportunitySubmitterService } from "../../services/opportunities/opportunity-submitter.service.js";
+import { OpportunityWriteService } from "../../services/opportunities/opportunity-write.service.js";
 import type {
   ManagedOpportunityListView,
   MeView,
@@ -19,9 +22,12 @@ import { effectiveCaps } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
 import { bodyOf, handled, idParam, paramsOf, queryOf } from "../../shared/route-helpers.js";
 
+const claims = new ClaimEligibilityService();
 const accountsService = new AccountService();
 const managed = new ManagedOpportunityService();
 const meta = new OpportunityMetaService();
+const writes = new OpportunityWriteService();
+const submitters = new OpportunitySubmitterService();
 const notifications = new NotificationService();
 
 async function view(request: FastifyRequest): Promise<MeView> {
@@ -80,6 +86,25 @@ export const meController = {
     }>(request);
     const page = await managed.listOwned(principal, query);
     return page satisfies ManagedOpportunityListView;
+  }),
+
+  opportunityAccess: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    const row = await managed.findAny(id);
+    const canViewManagement = Boolean(
+      row && (effectiveCaps(principal).canReview || (await managed.findOwned(principal, id))),
+    );
+    if (!row || (!canViewManagement && (row.reviewStatus !== "approved" || !row.isListed))) {
+      throw notFound(`no opportunity ${JSON.stringify(id)}.`);
+    }
+    return {
+      canViewManagement,
+      canEdit: await writes.canEdit(principal, row),
+      canAssumeSubmission: await submitters.canAssume(principal, row),
+      canAssignSubmission: effectiveCaps(principal).canAdmin && row.mergedIntoId === null,
+      canClaim: await claims.canClaim(row),
+    };
   }),
 
   findOpportunity: handled(async (request: FastifyRequest) => {

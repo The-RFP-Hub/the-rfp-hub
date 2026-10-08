@@ -3,7 +3,7 @@ import ListingPage from "@/app/listings/[id]/page";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session, listingQuery } = vi.hoisted(() => ({
@@ -74,6 +74,13 @@ function client(managedOpportunity: ManagedOpportunity = managed, currentMe: Me 
     baseUrl: "https://api.example.com",
     me: {
       get: async () => currentMe,
+      opportunityAccess: async () => ({
+        canEdit: true,
+        canViewManagement: true,
+        canAssumeSubmission: false,
+        canAssignSubmission: false,
+        canClaim: false,
+      }),
       opportunity: async () => entry,
       opportunities: async () => ({
         items: [managedOpportunity],
@@ -143,7 +150,80 @@ beforeEach(() => {
   document.title = "acme:old | RFPSear.ch";
 });
 
+it("does not offer editing to an account with management read access only", async () => {
+  const api = client({ ...managed, mergedInto: null });
+  api.me.opportunityAccess = async () => ({
+    canViewManagement: true,
+    canEdit: false,
+    canAssumeSubmission: false,
+    canAssignSubmission: false,
+    canClaim: false,
+  });
+  mount(<ListingPage />, api);
+  await screen.findByRole("navigation", { name: "Listing detail" });
+  expect(screen.queryByRole("link", { name: "Edit" })).toBeNull();
+});
+
+it("lets an organization manager confirm taking over the submission and reloads its details", async () => {
+  const other = {
+    ...managed,
+    mergedInto: null,
+    submittedBy: "someone-else",
+    submittedByAccountId: 3,
+  };
+  const api = client(other);
+  api.me.opportunityAccess = async () => ({
+    canViewManagement: true,
+    canEdit: true,
+    canAssumeSubmission: true,
+    canAssignSubmission: false,
+    canClaim: false,
+  });
+  const assume = vi.fn(async () => {
+    other.submittedBy = "publisher";
+    other.submittedByAccountId = me.accountId;
+    return entry;
+  });
+  api.opportunities.assumeSubmission = assume;
+  mount(<ListingPage />, api);
+  fireEvent.click(await screen.findByRole("button", { name: "Use my name as submitter" }));
+  expect(assume).not.toHaveBeenCalled();
+  expect(
+    screen.getByText(/authorized members keep their editing and analytics access/),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(assume).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Use my name as submitter" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use my name" }));
+  await waitFor(() => expect(assume).toHaveBeenCalledWith("acme:old"));
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Use my name as submitter" })).toBeNull(),
+  );
+});
+
 describe("merged listing detail and edit routes", () => {
+  it("offers the global administrator a single action to select a submitter", async () => {
+    const api = client(
+      { ...managed, mergedInto: null },
+      { ...me, role: "admin", canReview: true, canAdmin: true },
+    );
+    api.me.opportunityAccess = async () => ({
+      canViewManagement: true,
+      canEdit: true,
+      canAssumeSubmission: true,
+      canAssignSubmission: true,
+      canClaim: false,
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ListingPage />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Change submitter" }));
+    expect(screen.getByLabelText("Find an account")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Use my name as submitter" })).toBeNull();
+  });
+
   it("shows one publisher state by the title and keeps application stage separate", async () => {
     const hidden = {
       ...managed,

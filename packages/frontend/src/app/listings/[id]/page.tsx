@@ -19,6 +19,7 @@ import { DocumentTitle } from "@/components/DocumentTitle";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
 import { SectionNav } from "@/components/SectionNav";
+import { AdminSubmitterTransfer, SubmitterTransfer } from "@/components/SubmitterTransfer";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import {
   ListedBadge,
@@ -73,11 +74,12 @@ function Listing({ id, me }: { id: string; me: Me }) {
   // the queue, a claim or a duplicate pair is by definition not theirs. See `loadOpportunity`.
   const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
   const loadWithMetadata = useCallback(async () => {
-    const [entry, managed] = await Promise.all([
+    const [entry, managed, access] = await Promise.all([
       load(),
       loadManagedOpportunity(api, id, me.canReview),
+      api.me.opportunityAccess(id),
     ]);
-    return { entry, managed };
+    return { entry, managed, access };
   }, [api, id, load, me.canReview]);
   const { state, reload } = useResource(loadWithMetadata);
   const loadDuplicates = useCallback(() => api.opportunities.duplicates(id), [api, id]);
@@ -97,13 +99,37 @@ function Listing({ id, me }: { id: string; me: Me }) {
       {/* Renders only when a review surface sent the reader here and said where from. */}
       <ReturnLink />
       <ResourceView resource={state} what="this listing" onRetry={reload}>
-        {({ entry, managed }) => (
+        {({ entry, managed, access }) => (
           <>
             <DocumentTitle title={entry.title} fallback={id} />
             {managed.mergedInto ? (
               <MergedOpportunityBanner mergedInto={managed.mergedInto} />
             ) : null}
-            <Header entry={entry} id={id} managed={managed} />
+            <Header entry={entry} id={id} managed={managed} canEdit={access.canEdit} />
+
+            {entry.id === id && access.canAssignSubmission ? (
+              <AdminSubmitterTransfer
+                key={id}
+                id={id}
+                currentName={managed.submittedBy}
+                currentAccountId={managed.submittedByAccountId}
+                onTransferred={reload}
+              />
+            ) : null}
+
+            {entry.id === id &&
+            access.canAssumeSubmission &&
+            !access.canAssignSubmission &&
+            (managed.submittedByAccountId !== me.accountId ||
+              managed.submittedBy !== (me.handle ?? me.displayName)) ? (
+              <SubmitterTransfer
+                key={id}
+                id={id}
+                name={me.handle ?? me.displayName ?? "your account"}
+                currentName={managed.submittedBy}
+                onTransferred={reload}
+              />
+            ) : null}
 
             <SectionNav
               label="Listing detail"
@@ -138,10 +164,12 @@ function Header({
   entry,
   id,
   managed,
+  canEdit,
 }: {
   entry: Opportunity;
   id: string;
   managed: ManagedOpportunity;
+  canEdit: boolean;
 }) {
   const api = useApi();
   const source = entry.source ?? {};
@@ -154,7 +182,7 @@ function Header({
           </h1>
           <PublisherStatusBadge source={managed} />
         </div>
-        {managed.mergedInto ? null : (
+        {managed.mergedInto || !canEdit ? null : (
           <Link className="button" href={`/listings/${encodeURIComponent(id)}/edit`}>
             Edit
           </Link>

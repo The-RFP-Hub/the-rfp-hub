@@ -3,14 +3,22 @@ import { principalOf } from "../../../plugins/auth.js";
 import { AdminService } from "../../services/admin/admin.service.js";
 import { JOB_NAMES } from "../../services/jobs/registry.js";
 import { UnknownJobError, runJob } from "../../services/jobs/runner.js";
+import { OpportunitySubmitterService } from "../../services/opportunities/opportunity-submitter.service.js";
 import { VerificationService } from "../../services/verification/verification.service.js";
 import { notFound } from "../../shared/http-error.js";
 import { bodyOf, handled, idParam, paramsOf } from "../../shared/route-helpers.js";
 
+const submitters = new OpportunitySubmitterService();
 const admins = new AdminService();
 const verification = new VerificationService();
 
 export const adminController = {
+  assignSubmitter: handled(async (request: FastifyRequest) => {
+    const { id } = paramsOf<{ id: string }>(request);
+    const { accountId, reason } = bodyOf<{ accountId: number; reason: string }>(request);
+    return submitters.assign(principalOf(request), id, accountId, reason);
+  }),
+
   assignRole: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);

@@ -1,0 +1,20 @@
+.root {
+  margin-block: var(--space-3);
+  max-width: 46rem;
+}
+
+.root fieldset {
+  min-inline-size: 0;
+}
+
+.root input,
+.root select,
+.root textarea {
+  font-size: 1rem;
+}
+
+.root input,
+.root select,
+.root button {
+  min-height: var(--control-touch);
+}

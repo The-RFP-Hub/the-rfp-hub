@@ -169,3 +169,18 @@ export async function ageEntry(
   if (sets.length === 0) return;
   await pool.query(`UPDATE opportunities SET ${sets.join(", ")} WHERE public_id = $1`, values);
 }
+
+/** Claim fixtures represent imported programs with no account owner, never user-owned submissions. */
+export async function markAsImportedClaimFixture(
+  pool: pg.Pool,
+  publicId: string,
+  publisher?: string,
+): Promise<void> {
+  const result = await pool.query(
+    `UPDATE opportunities SET submitted_by = NULL,
+    ingested_via = 'import', source_publisher = COALESCE($2, source_publisher)
+    WHERE public_id = $1 AND review_status = 'approved' AND is_listed = true`,
+    [publicId, publisher ?? null],
+  );
+  if (result.rowCount !== 1) throw new Error(`missing public claim fixture ${publicId}`);
+}

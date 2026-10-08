@@ -7,12 +7,19 @@
  *
  * Isolation tag: `M3CLAIMCONC` / `m3claimconc-host:`.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { opportunities } from "../../src/db/schema.js";
+import {
+  auditLog,
+  notifications,
+  opportunities,
+  opportunityClaims,
+  orgMemberships,
+  organizations,
+} from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
   bearer,
@@ -46,6 +53,8 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
   let penderToken: string;
   let reviewerToken: string;
   let operatorOrgId: number;
+  let penderAccountId: number;
+  let penderOrgId: number;
   const userIds: string[] = [];
 
   /** One approved, listed entry published under `HOST` and operated by everyone who claims it. */
@@ -100,6 +109,8 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
     await grantMembership(operator.account.id, operatorOrg.id);
     await grantMembership(pender.account.id, penderOrg.id);
     operatorOrgId = operatorOrg.id;
+    penderAccountId = pender.account.id;
+    penderOrgId = penderOrg.id;
 
     operatorToken = operator.token;
     penderToken = pender.token;
@@ -193,5 +204,223 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
     expect(decided.statusCode, decided.body).toBe(200);
     expect(decided.json().outcome).toBe("granted");
     expect((await publisherOf(id))?.publisher).toBe(PENDER);
+  }, 30_000);
+  it("serializes approval behind verification withdrawal and restores verification atomically", async () => {
+    await seedOrganization({ slug: PENDER, verified: false });
+    const id = await seedEntry("approval-reverification");
+    const queued = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(penderToken),
+      payload: { organizationSlug: PENDER },
+    });
+    expect(queued.statusCode, queued.body).toBe(202);
+    await seedOrganization({ slug: PENDER, verified: true });
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("update organizations set verified = false where id = $1", [penderOrgId]);
+      const pending = app.inject({
+        method: "POST",
+        url: `/v1/review/claims/${queued.json().claimId}/approve`,
+        headers: bearer(reviewerToken),
+        payload: { verifyOrganization: false },
+      });
+      await barrier.waitForWaiters(1);
+      await barrier.commit();
+      const approved = await pending;
+      expect(approved.statusCode, approved.body).toBe(200);
+      expect(
+        (await db.select().from(organizations).where(eq(organizations.id, penderOrgId)))[0]
+          ?.verified,
+      ).toBe(true);
+      expect((await publisherOf(id))?.publisher).toBe(PENDER);
+    } finally {
+      await barrier.rollback();
+    }
+  }, 30_000);
+
+  it("keeps an already-verified organization unchanged when two reviewers race", async () => {
+    // Not an operator of this listing, so the verified organization's claim still queues.
+    await seedOrganization({ slug: PENDER, verified: true });
+    const id = await seedEntry("approval-race");
+    await db
+      .update(opportunities)
+      .set({ operatingOrganizations: [{ name: HOST, slug: HOST }] })
+      .where(eq(opportunities.publicId, id));
+    const queued = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(penderToken),
+      payload: { organizationSlug: PENDER },
+    });
+    expect(queued.statusCode, queued.body).toBe(202);
+    const beforeOrg = (
+      await db.select().from(organizations).where(eq(organizations.id, penderOrgId))
+    )[0];
+    const beforeEmails = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.accountId, penderAccountId));
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("select id from opportunities where public_id = $1 for update", [id]);
+      const requests = [1, 2].map(() =>
+        app.inject({
+          method: "POST",
+          url: `/v1/review/claims/${queued.json().claimId}/approve`,
+          headers: bearer(reviewerToken),
+          payload: {},
+        }),
+      );
+      await barrier.waitForWaiters(2);
+      await barrier.commit();
+      const responses = await Promise.all(requests);
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+      expect(responses.find((response) => response.statusCode === 409)?.json().error).toBe(
+        "claim_decided",
+      );
+    } finally {
+      await barrier.rollback();
+    }
+    expect(
+      (await db.select().from(organizations).where(eq(organizations.id, penderOrgId)))[0],
+    ).toEqual(beforeOrg);
+    expect(
+      await db.select().from(notifications).where(eq(notifications.accountId, penderAccountId)),
+    ).toEqual(beforeEmails);
+    expect(
+      await db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.subjectKind, "claim"),
+            eq(auditLog.subjectId, queued.json().claimId),
+            eq(auditLog.action, "approve"),
+          ),
+        ),
+    ).toHaveLength(1);
+    expect(
+      (
+        await db
+          .select()
+          .from(opportunityClaims)
+          .where(eq(opportunityClaims.id, queued.json().claimId))
+      )[0]?.status,
+    ).toBe("approved");
+  }, 30_000);
+
+  it("refuses an immediate grant after membership revocation commits", async () => {
+    const id = await seedEntry("membership-revoked");
+    const barrier = await openLockBarrier();
+    try {
+      const member = (
+        await db
+          .select()
+          .from(orgMemberships)
+          .where(eq(orgMemberships.organizationId, operatorOrgId))
+      )[0];
+      if (!member) throw new Error("missing operator membership");
+      await barrier.run("delete from org_memberships where id = $1", [member.id]);
+      const pending = app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/claim`,
+        headers: bearer(operatorToken),
+        payload: { organizationSlug: OPERATOR },
+      });
+      await barrier.waitForWaiters(1);
+      await barrier.commit();
+      const refused = await pending;
+      expect(refused.statusCode, refused.body).toBe(403);
+      expect(refused.json().error).toBe("claim_not_grantable");
+      expect((await publisherOf(id))?.publisher).toBe(HOST);
+      await grantMembership(member.accountId, operatorOrgId, member.role);
+    } finally {
+      await barrier.rollback();
+    }
+  }, 30_000);
+
+  it("rejects a queued claim whose request started before ownership was granted", async () => {
+    const id = await seedEntry("stale-filing");
+    const row = await publisherOf(id);
+    if (!row) throw new Error("missing fixture");
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("select id from opportunities where id = $1 for update", [row.id]);
+      const pending = app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/claim`,
+        headers: bearer(penderToken),
+        payload: { organizationSlug: PENDER },
+      });
+      await barrier.waitForWaiters(1);
+      await barrier.run("update opportunities set source_publisher = $1 where id = $2", [
+        OPERATOR,
+        row.id,
+      ]);
+      await barrier.run(
+        "insert into audit_log (subject_kind, subject_id, action, actor_kind, patch) values ('opportunity', $1, 'grant_publisher', 'user', '{}')",
+        [row.id],
+      );
+      await barrier.commit();
+      const response = await pending;
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json().error).toBe("already_claimed");
+    } finally {
+      await barrier.rollback();
+    }
+  }, 30_000);
+
+  it("allows only one immediate grant when two claims race", async () => {
+    const id = await seedEntry("one-grant");
+    const results = await Promise.all(
+      [1, 2].map(() =>
+        app.inject({
+          method: "POST",
+          url: `/v1/opportunities/${id}/claim`,
+          headers: bearer(operatorToken),
+          payload: { organizationSlug: OPERATOR },
+        }),
+      ),
+    );
+    expect(results.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    expect(results.find((response) => response.statusCode === 409)?.json().error).toBe(
+      "already_claimed",
+    );
+  });
+  it("serializes an account's pending cap across different opportunities", async () => {
+    await seedOrganization({ slug: PENDER, verified: false });
+    for (let index = 0; index < 9; index++) {
+      const id = await seedEntry(`cap-existing-${index}`);
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/opportunities/${id}/claim`,
+        headers: bearer(penderToken),
+        payload: { organizationSlug: PENDER },
+      });
+      expect(response.statusCode, response.body).toBe(202);
+    }
+    const ids = await Promise.all([seedEntry("cap-first"), seedEntry("cap-second")]);
+    const barrier = await openLockBarrier();
+    try {
+      await barrier.run("select id from accounts where id = $1 for update", [penderAccountId]);
+      const requests = ids.map((id) =>
+        app.inject({
+          method: "POST",
+          url: `/v1/opportunities/${id}/claim`,
+          headers: bearer(penderToken),
+          payload: { organizationSlug: PENDER },
+        }),
+      );
+      await barrier.waitForWaiters(2);
+      await barrier.commit();
+      const responses = await Promise.all(requests);
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([202, 409]);
+      expect(responses.find((response) => response.statusCode === 409)?.json().error).toBe(
+        "too_many_pending_claims",
+      );
+    } finally {
+      await barrier.rollback();
+    }
   }, 30_000);
 });

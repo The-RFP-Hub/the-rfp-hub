@@ -383,9 +383,9 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "approveClaim",
         tags: ["review"],
-        summary: "Approve a claim, deciding explicitly whether to verify the organization",
+        summary: "Approve a claim and verify its organization",
         description:
-          "`verifyOrganization: false` transfers publisher ownership but does NOT unlock auto-approval — that requires a verified organization, so the publisher's future writes keep landing pending. The response states which of the two happened.",
+          "Atomically verifies the organization, adds the claimant as a publisher if needed, and transfers publisher ownership without changing personal submission attribution. Future writes by authorized members auto-approve. The deprecated `verifyOrganization` field is accepted but ignored, including `false`.",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -394,9 +394,14 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         },
         body: {
           type: "object",
-          required: ["verifyOrganization"],
           additionalProperties: false,
-          properties: { verifyOrganization: { type: "boolean" } },
+          properties: {
+            verifyOrganization: {
+              type: "boolean",
+              deprecated: true,
+              description: "Ignored for compatibility. Approval always verifies the organization.",
+            },
+          },
         },
         response: {
           429: RATE_LIMITED,

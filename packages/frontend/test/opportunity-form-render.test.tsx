@@ -78,7 +78,9 @@ function stub(result: SubmissionResult | Error = outcome()) {
     if (result instanceof Error) throw result;
     return result;
   };
-  const create = vi.fn(respond);
+  const create = vi.fn(async (_document: unknown, _options?: { attribution: "unassigned" }) =>
+    respond(),
+  );
   const replace = vi.fn(respond);
   return {
     create,
@@ -97,6 +99,7 @@ function mount(
     mode?: "create" | "edit";
     initial?: OpportunityFormState;
     accountId?: number;
+    canCreateUnassigned?: boolean;
     result?: SubmissionResult | Error;
   } = {},
 ) {
@@ -108,6 +111,7 @@ function mount(
         <OpportunityForm
           mode={options.mode ?? "create"}
           accountId={options.accountId}
+          canCreateUnassigned={options.canCreateUnassigned}
           initial={initial}
           authority={{ verifiedNamespaces: ["acme"], directCreate: false }}
         />
@@ -1286,4 +1290,31 @@ describe("advisory warnings", () => {
     submit();
     await waitFor(() => expect(api.create).toHaveBeenCalled());
   });
+});
+
+describe("administrative catalog attribution", () => {
+  it.each([false, true])(
+    "lets a super admin explicitly choose personal attribution: %s",
+    async (personal) => {
+      const api = mount({}, { canCreateUnassigned: true });
+      const checkbox = screen.getByRole("checkbox", {
+        name: "Link this opportunity to my account",
+      }) as HTMLInputElement;
+      expect(checkbox.checked).toBe(false);
+      if (personal) fireEvent.click(checkbox);
+      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+      if (personal) expect(api.create.mock.calls[0]).toHaveLength(1);
+      else expect(api.create.mock.calls[0]?.[1]).toEqual({ attribution: "unassigned" });
+    },
+  );
+  it.each(["create", "edit"] as const)(
+    "does not offer an ownership switch outside admin creates, mode: %s",
+    (mode) => {
+      mount({}, { mode, canCreateUnassigned: mode === "edit" });
+      expect(
+        screen.queryByRole("checkbox", { name: "Link this opportunity to my account" }),
+      ).toBeNull();
+    },
+  );
 });

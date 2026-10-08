@@ -118,6 +118,8 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   customFields: "Additional details",
   reviewStatus: "Review decision",
   isListed: "Public visibility",
+  submittedBy: "Submission attribution",
+  submittedByAccountId: "Submitting account",
   reason: "Reason",
   actorRole: "Acting role",
   merged: "Merged listing",
