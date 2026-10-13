@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-12T11:02:30.681Z",
+  "generatedAt": "2026-10-13T10:46:03.879Z",
   "count": 170,
   "opportunities": [
     {
@@ -281,7 +281,7 @@
       "fundingType": "hackathon",
       "title": "Colosseum Crypto World's Fair",
       "description": "Crypto World's Fair is an online hackathon run by Colosseum — the organisation behind the Solana-ecosystem Colosseum accelerator and venture fund, and previously known for its Solana-only Breakout hackathons — bringing together, in its own words, \"builders and founders across all crypto ecosystems to launch breakout startups.\" It is Colosseum's first competition open to builders across every blockchain ecosystem rather than Solana alone; per Colosseum's announcement, the organisers state their \"accelerator and venture fund will continue focusing on investing in Solana founders,\" while the hackathon itself is deliberately multichain. Registration runs September 14 through October 12, 2026, with submissions due by the same October 12 deadline.\n\nThe event carries $840,000 in total prizes plus $2.5 million in seed funding available through the accompanying accelerator pathway. General awards, open to all submissions regardless of ecosystem, are: a $30,000 Grand Prize; $300,000 shared across the next 20 best projects ($15,000 per project); a $5,000 Public Good Prize; and a $5,000 University Prize.\n\nOn top of the general awards, eight ecosystem tracks each carry a dedicated, independently sponsored prize pool, confirmed live on Colosseum's site: Solana ($100,000; 10 projects × $10,000, presented by Solana), Tempo ($100,000; 10 × $10,000, presented by Tempo), Zcash ($100,000; 10 × $10,000, presented by Zcash), and Hyperliquid ($100,000; 10 × $10,000, presented by Hydromancer) each carry the larger pool; Ethereum L1 ($25,000; 5 × $5,000), Base ($25,000; 5 × $5,000), Arbitrum ($25,000; 5 × $5,000) and Robinhood Chain ($25,000; 5 × $5,000) each carry the smaller pool, with the Ethereum, Base, Arbitrum and Robinhood Chain tracks all presented by Ethlabs (Arbitrum and Base additionally co-presented by their own foundations). Track prizes are awarded in addition to, not instead of, the general awards above, so a single project can in principle win both a track prize and a general award.\n\nAll Hackathon winners are interviewed and considered for Colosseum's accelerator programme, which offers $250,000 in pre-seed funding, mentorship, network access, and a 12-week in-person residency at Colosseum's San Francisco office. Judging is led by Colosseum's own founding team (Clay Robbins, Matty Taylor, Nate Levine) plus named track judges drawn from ecosystem partners (including representatives tied to Phantom, Base, Ethlabs, Espresso Systems, Arcium, Anza, Realms, MetaDAO and Drift, among others). Live workshops stream on Colosseum's Discord, including a Tempo-specific workshop (Sep 16) and an Ethereum Foundation session (Sep 22, details announced separately).\n\nModelling note: this is a Solana-ecosystem organiser running a genuinely multichain hackathon, not an Ethereum-native program — but four of its eight tracks (Ethereum L1, Base, Arbitrum, Robinhood Chain) are real, separately funded Ethereum-and-L2 tracks worth $100,000 in aggregate, which is why this entry is in scope for the Hub despite the organiser's Solana roots.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Colosseum",
