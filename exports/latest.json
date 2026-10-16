@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-15T08:26:06.850Z",
+  "generatedAt": "2026-10-16T08:18:28.159Z",
   "count": 170,
   "opportunities": [
     {
@@ -7021,7 +7021,7 @@
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — Ecosystem Program",
       "description": "A Request for Proposals run by the Ethereum Foundation's Ecosystem Support Program (ESP) in the run-up to Devcon 8 (3–6 November 2026, Jio World Centre, Bandra Kurla Complex, Mumbai, India).\n\nThe program \"supports grassroots initiatives that contribute to the Ethereum ecosystem's growth and resilience ahead of Devcon 8… empowering local projects, builders, and ecosystem contributors to create meaningful spaces for learning, experimentation, and coordination, both online and in-person.\" Supported formats are \"meetups, bootcamps, hackathons, roundtables, academic collaborations, and other formats\" that bring new people into Ethereum, strengthen connections across open source communities and the broader technology ecosystem, and encourage hands-on participation and knowledge sharing around CROPS.\n\nStated need: expanding access to Ethereum for new and diverse audiences and lowering barriers to entry through education, experimentation and local initiatives; bridging Ethereum with open source communities; and \"Promoting and putting into practice Ethereum's core values, including: Censorship Resistance, Open Source, Privacy, and Security, through hands-on experiences\" — the CROPS acronym the RFP tests applicants against.\n\nSupport on offer: \"Up to $300 USD in financial support\"; \"Visibility and amplification across Devcon channels\"; \"Non-financial support (connections, guidance, coordination)\"; and \"Limited Devcon tickets (free or discounted), based on contribution and availability\", capped at 5 per request. \"Approved grants under this initiative are paid on-chain in ETH by default.\" Estimated project duration is listed as N/A. ESP tags the RFP \"Community Growth\" and \"Ecosystem\".\n\nApplication window: Opens Jul 3, 2026 · Closes Aug 14, 2026. Applicants apply through the ESP RFP apply route and are asked to follow the published Google Docs submission form.\n\n**The window on this record is a re-run.** The same RFP page first opened on 25 March 2026 and closed on 20 April 2026 — that first opening is what `postedAt` records, which is why it precedes the July–August window above.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Ethereum Foundation — Ecosystem Support Program (ESP)",
@@ -7139,7 +7139,7 @@
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — University Program",
       "description": "The academic counterpart to the Road to Devcon 8 India Ecosystem Program, run by the Ethereum Foundation's Ecosystem Support Program (ESP) ahead of Devcon 8 (3–6 November 2026, Jio World Centre, Bandra Kurla Complex, Mumbai, India).\n\nIt \"supports student groups, professors, and academic institutions in building meaningful engagement with Ethereum ahead of Devcon 8… fostering research, education, and student-led initiatives that contribute to Ethereum's long-term ecosystem growth\" and \"empowering universities and academic communities to create spaces for learning, exploration, and collaboration, both on-campus and online.\"\n\nSupported initiatives are \"campus workshops, research seminars, lecture series, student clubs, hackathons, reading groups, and academic collaborations\" that introduce students and researchers to Ethereum, encourage deeper exploration of Ethereum's technical, economic and social dimensions, build long-term academic engagement and research capacity, and create pathways for students to participate in the broader Ethereum ecosystem and Devcon.\n\nStated need: \"Universities are home to future builders, researchers, and thought leaders, yet structured pathways connecting academia to Ethereum remain limited.\" The program aims to expand Ethereum's reach into universities, build research capacity that outlasts a single event, and bridge academic inquiry with hands-on ecosystem involvement.\n\nCaps: \"Financial support requests may not exceed $500 USD; ticket requests may not exceed 5.\" \"Approved grants under this initiative are paid on-chain in ETH by default.\" Estimated project duration is listed as N/A. ESP tags the RFP \"Community Growth\" and \"Ecosystem\".\n\nApplication window: Opens Apr 20, 2026 · Closes Sep 30, 2026.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Ethereum Foundation — Ecosystem Support Program (ESP)",
