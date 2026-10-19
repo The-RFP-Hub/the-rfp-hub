@@ -77,6 +77,7 @@ export function cardAward(item: OpportunitySummary): string | null {
 export function summarizeLanding(
   items: readonly OpportunitySummary[],
   now: Date = new Date(),
+  verified: ReadonlySet<string> = new Set(),
 ): LandingSummary {
   const orgs = new Set<string>();
   const byType: Record<string, number> = {};
@@ -118,7 +119,7 @@ export function summarizeLanding(
     closingSoonTotal: closing.length,
     byType,
     featured,
-    hand: dealHand(items),
+    hand: dealHand(items, verified),
   };
 }
 
@@ -127,9 +128,15 @@ export function summarizeLanding(
  * that type states one, the largest stated USD pool; else the first by title. A pool is a whole
  * program's budget, not what one award can reach, so it is never ranked against a ceiling. A type
  * with no open listing is skipped, never invented.
+ *
+ * VERIFIED ORGANIZATIONS COME FIRST. `verified` holds the slugs `GET /v1/publishers` lists; a listing
+ * any of them operates or sponsors is dealt ahead of a larger one from an unverified organization,
+ * and the rule above ranks within that group. A type with no such listing, or an empty set (the
+ * read failed), falls back to the rule above over every listing of the type.
  */
 export function dealHand(
   items: readonly OpportunitySummary[],
+  verified: ReadonlySet<string> = new Set(),
   types: readonly string[] = HAND_TYPES,
 ): OpportunitySummary[] {
   const byTitle = (a: OpportunitySummary, b: OpportunitySummary) => a.title.localeCompare(b.title);
@@ -137,16 +144,22 @@ export function dealHand(
     (amount: (item: OpportunitySummary) => number | null) =>
     (a: OpportunitySummary, b: OpportunitySummary) =>
       (amount(b) ?? 0) - (amount(a) ?? 0) || byTitle(a, b);
+  const pick = (list: OpportunitySummary[]) =>
+    [...list.filter((item) => headlineAmountUsd(item) !== null)].sort(
+      largest(headlineAmountUsd),
+    )[0] ??
+    [...list.filter((item) => poolUsd(item) !== null)].sort(largest(poolUsd))[0] ??
+    [...list].sort(byTitle)[0];
+  const isVerified = (item: OpportunitySummary) =>
+    [...item.operatingOrganizations, ...(item.sponsoringOrganizations ?? [])].some((org) =>
+      verified.has(org.slug),
+    );
   const out: OpportunitySummary[] = [];
   for (const type of types) {
     const ofType = items.filter((item) => item.fundingType === type);
-    const ceilings = ofType.filter((item) => headlineAmountUsd(item) !== null);
-    const pools = ofType.filter((item) => poolUsd(item) !== null);
-    const pick =
-      [...ceilings].sort(largest(headlineAmountUsd))[0] ??
-      [...pools].sort(largest(poolUsd))[0] ??
-      [...ofType].sort(byTitle)[0];
-    if (pick) out.push(pick);
+    const backed = ofType.filter(isVerified);
+    const chosen = pick(backed.length > 0 ? backed : ofType);
+    if (chosen) out.push(chosen);
   }
   return out;
 }

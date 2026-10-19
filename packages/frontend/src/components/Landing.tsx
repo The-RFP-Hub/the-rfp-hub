@@ -4,6 +4,7 @@ import { OpportunityCard } from "@/components/OpportunityCard";
 import { TypePills } from "@/components/TypePills";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ResourceView } from "@/components/states";
+import type { ApiClient } from "@/lib/api";
 import { DEFAULT_SELECTION, selectionToHref } from "@/lib/directory";
 import { formatCount } from "@/lib/format";
 import {
@@ -33,6 +34,10 @@ import type { OpportunitySummary } from "@/lib/types";
  * directory reads. Nothing is hand-entered and nothing is an estimate: `lib/landing.ts` does the
  * arithmetic and a unit test pins it. The open set is small (about a hundred) so it fits in one or
  * two pages of the list route; the loop below stops at a hard cap either way.
+ *
+ * The hand also reads `GET /v1/publishers`, the public list of verified organizations, so it can
+ * deal their listings first (see `dealHand`). That read is a preference, not a dependency: if it
+ * fails the hand is dealt by award size alone and the rest of the page is unaffected.
  */
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
@@ -42,7 +47,10 @@ import { type CSSProperties, type FormEvent, useCallback, useState } from "react
 export function Landing() {
   const api = useApi();
 
-  const load = useCallback(async () => summarizeLanding(await loadOpenSet(api)), [api]);
+  const load = useCallback(async () => {
+    const [items, verified] = await Promise.all([loadOpenSet(api), verifiedSlugs(api)]);
+    return summarizeLanding(items, new Date(), verified);
+  }, [api]);
   const { state, reload } = useResource(load);
 
   return (
@@ -68,6 +76,19 @@ export function Landing() {
       </div>
     </div>
   );
+}
+
+/**
+ * The verified organizations' slugs, or none when the read fails: the hand then ranks by award
+ * size alone.
+ */
+async function verifiedSlugs(api: ApiClient): Promise<ReadonlySet<string>> {
+  try {
+    const { items } = await api.publishers.list();
+    return new Set(items.map((publisher) => publisher.slug));
+  } catch {
+    return new Set();
+  }
 }
 
 function Hero({ summary, loading }: { summary: LandingSummary | null; loading: boolean }) {

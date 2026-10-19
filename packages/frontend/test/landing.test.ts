@@ -158,6 +158,96 @@ describe("the hero's hand", () => {
     ]);
   });
 
+  describe("verified organizations first", () => {
+    const org = (slug: string) =>
+      [{ slug, name: slug }] as OpportunitySummary["operatingOrganizations"];
+    const hand = [
+      entry({ id: "g:big", title: "Big grant", fundingInfo: { currency: "USD", maxAward: 2e6 } }),
+      entry({
+        id: "g:ver-small",
+        title: "Verified small grant",
+        operatingOrganizations: org("ver"),
+        fundingInfo: { currency: "USD", maxAward: 5_000 },
+      }),
+      entry({
+        id: "g:ver-pool",
+        title: "Verified pool grant",
+        operatingOrganizations: org("ver"),
+        fundingInfo: { currency: "USD", budget: 1e7 },
+      }),
+      entry({
+        id: "g:ver-mid",
+        title: "Verified mid grant",
+        operatingOrganizations: org("other-ver"),
+        fundingInfo: { currency: "USD", maxAward: 40_000 },
+      }),
+      entry({
+        id: "h:big",
+        fundingType: "hackathon",
+        title: "Big hack",
+        fundingInfo: { currency: "USD", budget: 400_000 },
+      }),
+      entry({
+        id: "h:sponsored",
+        fundingType: "hackathon",
+        title: "Sponsored hack",
+        sponsoringOrganizations: org("ver"),
+        fundingInfo: { currency: "USD", budget: 90_000 },
+      }),
+      entry({
+        id: "b:big",
+        fundingType: "bounty",
+        title: "Big bounty",
+        fundingInfo: { currency: "USD", maxAward: 16e6 },
+      }),
+      entry({
+        id: "b:small",
+        fundingType: "bounty",
+        title: "Small bounty",
+        fundingInfo: { currency: "USD", maxAward: 1e6 },
+      }),
+    ];
+    const verified = new Set(["ver", "other-ver"]);
+
+    it("deals a verified organization's listing ahead of a larger unverified one", () => {
+      expect(dealHand(hand, verified)[0]?.id).toBe("g:ver-mid");
+    });
+
+    it("ranks within the verified group by the usual rule: ceiling, then pool, then title", () => {
+      // Both verified ceilings outrank the verified pool, however large the pool is.
+      expect(dealHand(hand, verified)[0]?.id).toBe("g:ver-mid");
+      const pools = hand.filter((item) => item.id !== "g:ver-mid" && item.id !== "g:ver-small");
+      expect(dealHand(pools, verified)[0]?.id).toBe("g:ver-pool");
+      const tie = [
+        entry({ id: "v:b", title: "B", operatingOrganizations: org("ver") }),
+        entry({ id: "v:a", title: "A", operatingOrganizations: org("ver") }),
+        entry({ id: "u:0", title: "0", fundingInfo: { currency: "USD", maxAward: 9e6 } }),
+      ];
+      expect(dealHand(tie, verified)[0]?.id).toBe("v:a");
+    });
+
+    it("counts a verified sponsor as well as a verified operator", () => {
+      expect(dealHand(hand, verified)[1]?.id).toBe("h:sponsored");
+    });
+
+    it("falls back to the usual rule in a type with no verified listing", () => {
+      expect(dealHand(hand, verified)[2]?.id).toBe("b:big");
+    });
+
+    it("falls back to the usual rule everywhere when no organization is known to be verified", () => {
+      expect(dealHand(hand).map((item) => item.id)).toEqual(["g:big", "h:big", "b:big"]);
+      expect(dealHand(hand, new Set()).map((item) => item.id)).toEqual(["g:big", "h:big", "b:big"]);
+    });
+
+    it("is passed through the summary", () => {
+      expect(summarizeLanding(hand, NOW, verified).hand.map((item) => item.id)).toEqual([
+        "g:ver-mid",
+        "h:sponsored",
+        "b:big",
+      ]);
+    });
+  });
+
   it("reads a pool only when it is stated in USD", () => {
     expect(poolUsd(entry({ id: "x", fundingInfo: { budget: 45_000 } }))).toBe(45_000);
     expect(poolUsd(entry({ id: "x", fundingInfo: { currency: "ETH", budget: 45 } }))).toBeNull();
