@@ -1,4 +1,4 @@
-import { nextFixedDeadline } from "./format";
+import { formatShortDate, hasRollingDeadline, nextFixedDeadline } from "./format";
 /**
  * PURE aggregation for the front page: every open listing in, the numbers on the hero out.
  *
@@ -11,6 +11,8 @@ import type { OpportunitySummary } from "./types";
 export const CLOSING_SOON_DAYS = 30;
 export const CLOSING_SOON_LIMIT = 6;
 export const FEATURED_LIMIT = 3;
+/** The hero's hand: one open listing of each, in this order. */
+export const HAND_TYPES = ["grant", "hackathon", "bounty"] as const;
 
 export interface LandingSummary {
   open: number;
@@ -22,6 +24,8 @@ export interface LandingSummary {
   closingSoonTotal: number;
   byType: Record<string, number>;
   featured: OpportunitySummary[];
+  /** One listing per `HAND_TYPES` entry that has an open listing, in that order. See `dealHand`. */
+  hand: OpportunitySummary[];
 }
 
 /**
@@ -45,6 +49,14 @@ export function compactUsd(value: number): string {
   }
   if (value >= 1_000) return `$${Math.round(value / 1_000)}k`;
   return `$${Math.round(value)}`;
+}
+
+/** A stated USD pool (`budget`), or null. Never a ceiling: see `headlineAmountUsd`. */
+export function poolUsd(item: OpportunitySummary): number | null {
+  const funding = item.fundingInfo;
+  if (!funding || (funding.currency ?? "USD").toUpperCase() !== "USD") return null;
+  const value = funding.budget ?? null;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /** The award line on a card. Prefers the ceiling; a range is shown as one. */
@@ -106,7 +118,63 @@ export function summarizeLanding(
     closingSoonTotal: closing.length,
     byType,
     featured,
+    hand: dealHand(items),
   };
+}
+
+/**
+ * The hero's three cards: for each type, the largest stated USD award ceiling; when no listing of
+ * that type states one, the largest stated USD pool; else the first by title. A pool is a whole
+ * program's budget, not what one award can reach, so it is never ranked against a ceiling. A type
+ * with no open listing is skipped, never invented.
+ */
+export function dealHand(
+  items: readonly OpportunitySummary[],
+  types: readonly string[] = HAND_TYPES,
+): OpportunitySummary[] {
+  const byTitle = (a: OpportunitySummary, b: OpportunitySummary) => a.title.localeCompare(b.title);
+  const largest =
+    (amount: (item: OpportunitySummary) => number | null) =>
+    (a: OpportunitySummary, b: OpportunitySummary) =>
+      (amount(b) ?? 0) - (amount(a) ?? 0) || byTitle(a, b);
+  const out: OpportunitySummary[] = [];
+  for (const type of types) {
+    const ofType = items.filter((item) => item.fundingType === type);
+    const ceilings = ofType.filter((item) => headlineAmountUsd(item) !== null);
+    const pools = ofType.filter((item) => poolUsd(item) !== null);
+    const pick =
+      [...ceilings].sort(largest(headlineAmountUsd))[0] ??
+      [...pools].sort(largest(poolUsd))[0] ??
+      [...ofType].sort(byTitle)[0];
+    if (pick) out.push(pick);
+  }
+  return out;
+}
+
+/**
+ * Where a card's figure sits between its smallest and largest size: 0 at $100 or below (and for any
+ * amount not stated in USD), 1 at $10M and above, on a log scale so $16M visibly outweighs $85k.
+ */
+export function awardScale(item: OpportunitySummary): number {
+  const value = headlineAmountUsd(item) ?? poolUsd(item);
+  if (!value) return 0;
+  return Math.min(1, Math.max(0, (Math.log10(value) - 2) / 5));
+}
+
+/** `cardAward`'s line split so the amount can be set large: "Up to" · "$16M", "$85k" · "pool". */
+export function awardParts(award: string): { before?: string; figure: string; after?: string } {
+  const lead = /^(Up to|From|.+ to) (.+)$/.exec(award);
+  if (lead?.[1] && lead[2]) return { before: lead[1], figure: lead[2] };
+  const pool = /^(.+) pool$/.exec(award);
+  if (pool?.[1]) return { figure: pool[1], after: "pool" };
+  return { figure: award };
+}
+
+/** A hero card's date line: "submission · Oct 30" for the next fixed date, "Rolling", or null. */
+export function handDate(item: OpportunitySummary, now: Date = new Date()): string | null {
+  const next = nextFixedDeadline(item.deadlines, now);
+  if (next?.date) return `${next.label?.trim() || "date"} · ${formatShortDate(next.date, now)}`;
+  return hasRollingDeadline(item.deadlines) ? "Rolling" : null;
 }
 
 /** "1 day", "8 days", "today". */
