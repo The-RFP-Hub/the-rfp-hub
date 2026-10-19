@@ -239,6 +239,29 @@ describe("the hero's hand", () => {
       expect(dealHand(hand, new Set()).map((item) => item.id)).toEqual(["g:big", "h:big", "b:big"]);
     });
 
+    it("deals a verified listing with a stated value ahead of a verified one without", () => {
+      const tiers = [
+        entry({ id: "v:none", title: "A first by title", operatingOrganizations: org("ver") }),
+        entry({
+          id: "v:pool",
+          title: "Z pool",
+          operatingOrganizations: org("ver"),
+          fundingInfo: { currency: "USD", budget: 20_000 },
+        }),
+        entry({ id: "u:big", title: "Big", fundingInfo: { currency: "USD", maxAward: 9e6 } }),
+      ];
+      expect(dealHand(tiers, verified)[0]?.id).toBe("v:pool");
+    });
+
+    it("still deals a verified listing without a value ahead of an unverified one with a value", () => {
+      const tiers = [
+        entry({ id: "v:none", title: "No value", operatingOrganizations: org("ver") }),
+        entry({ id: "u:big", title: "Big", fundingInfo: { currency: "USD", maxAward: 9e6 } }),
+      ];
+      expect(dealHand(tiers, verified)[0]?.id).toBe("v:none");
+      expect(dealHand(tiers)[0]?.id).toBe("u:big");
+    });
+
     it("is passed through the summary", () => {
       expect(summarizeLanding(hand, NOW, verified).hand.map((item) => item.id)).toEqual([
         "g:ver-mid",

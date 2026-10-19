@@ -129,10 +129,11 @@ export function summarizeLanding(
  * program's budget, not what one award can reach, so it is never ranked against a ceiling. A type
  * with no open listing is skipped, never invented.
  *
- * VERIFIED ORGANIZATIONS COME FIRST. `verified` holds the slugs `GET /v1/publishers` lists; a listing
- * any of them operates or sponsors is dealt ahead of a larger one from an unverified organization,
- * and the rule above ranks within that group. A type with no such listing, or an empty set (the
- * read failed), falls back to the rule above over every listing of the type.
+ * VERIFIED ORGANIZATIONS COME FIRST, AND THOSE WITH A STATED VALUE FIRST AMONG THEM. `verified`
+ * holds the slugs `GET /v1/publishers` lists, and a listing counts as verified when any of them
+ * operates or sponsors it. Each type is dealt from the first non-empty tier: verified with a stated
+ * USD ceiling or pool, then verified with neither, then every listing of the type. The rule above
+ * ranks within the tier. An empty set (the read failed) leaves only the last tier.
  */
 export function dealHand(
   items: readonly OpportunitySummary[],
@@ -150,6 +151,8 @@ export function dealHand(
     )[0] ??
     [...list.filter((item) => poolUsd(item) !== null)].sort(largest(poolUsd))[0] ??
     [...list].sort(byTitle)[0];
+  const hasValue = (item: OpportunitySummary) =>
+    headlineAmountUsd(item) !== null || poolUsd(item) !== null;
   const isVerified = (item: OpportunitySummary) =>
     [...item.operatingOrganizations, ...(item.sponsoringOrganizations ?? [])].some((org) =>
       verified.has(org.slug),
@@ -158,7 +161,8 @@ export function dealHand(
   for (const type of types) {
     const ofType = items.filter((item) => item.fundingType === type);
     const backed = ofType.filter(isVerified);
-    const chosen = pick(backed.length > 0 ? backed : ofType);
+    const tiers = [backed.filter(hasValue), backed.filter((item) => !hasValue(item)), ofType];
+    const chosen = pick(tiers.find((tier) => tier.length > 0) ?? []);
     if (chosen) out.push(chosen);
   }
   return out;
