@@ -1,19 +1,19 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "runId": "beec74128059dca65a4442cc2712fa2e",
-  "generatedAt": "2026-10-19T09:03:40.738Z",
+  "runId": "2783796e1cbf2e4ffec8766858e68284",
+  "generatedAt": "2026-10-20T08:41:01.408Z",
   "count": 170,
   "artifacts": [
     {
       "format": "json",
-      "href": "opportunities-2026-10-19-902bcea5fad1.json",
-      "sha256": "902bcea5fad1b66354cf391b92506aef6b2510704910571d27433e0f094d57bd",
+      "href": "opportunities-2026-10-20-95532a35d6a5.json",
+      "sha256": "95532a35d6a5b8e8e04f4603f884c8b261593e0b4a4d63c84f64d0f02a5af025",
       "count": 170
     },
     {
       "format": "csv",
-      "href": "opportunities-2026-10-19-946848a02f8e.csv",
+      "href": "opportunities-2026-10-20-946848a02f8e.csv",
       "sha256": "946848a02f8e62dd2832c82bfc70071c1ca12094e87f3e3c0f37fb25d5589e79",
       "count": 170
     }
