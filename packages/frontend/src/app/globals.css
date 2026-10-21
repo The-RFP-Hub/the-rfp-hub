@@ -39,8 +39,11 @@
   --line-faint: #e8e6e1;
   --line: #d6d3ce;
   --panel: #f4f3f0;
-  /* The landing's hero band, behind the header, headline and figures. */
-  --hero: #f4f4eb;
+  /* The landing's hero band, behind the header, headline, hand and figures, and the two olive inks
+     that read on it: secondary text on the band (7.9:1), and on a hand card (7.2:1). */
+  --hero: #d7e46a;
+  --hero-ink-soft: #3c3f1d;
+  --hero-card-ink-soft: #57564f;
   /* Secondary ink: a neutral mid-grey. 3.95:1 on paper — below AA for small text, by choice. */
   --ink-soft: #7e7e7e;
   --ink-faint: #a8a29e;
@@ -92,10 +95,13 @@
   --text-h1: 1.95rem;
   --text-metric: 1.6rem;
   /* The landing and the facts strip: display numbers, and the mono state chip on an org card. */
-  --text-hero: clamp(2.4rem, 5vw, 3.9rem);
+  --text-hero: clamp(2.5rem, 4.4vw, 4.1rem);
   --text-tally: clamp(1.9rem, 3.2vw, 2.6rem);
   --text-hero-sub: clamp(1.1rem, 1.6vw, 1.3rem);
   --text-tile: 2.4rem;
+  /* A hand card's figure: this size at $100 or less, plus up to the span at $10M (see awardScale). */
+  --text-award: 1.2rem;
+  --text-award-span: 2.4rem;
   --text-state: 0.62rem;
 
   /* A 4px-unit spacing scale. Zero and auto remain layout semantics, not design tokens. */
@@ -2423,159 +2429,69 @@ pre.code-block {
 /* ------------------------------------------------------------- landing --- */
 
 /*
- * THE FRONT PAGE. Headline, tally, two doors, search; then closing-soon cards, four type tiles and
- * the largest awards. Nothing here introduces a colour the rest of the sheet does not already own:
- * the one olive number on the tally is `--accent-ink`, the same step a textual link uses.
+ * THE FRONT PAGE. Headline, search and type pills beside a hand of three real listings, the tally
+ * under both; then closing-soon cards and the largest awards. The band is `--hero`, run edge to
+ * edge and up behind the header; its two olive inks are the only colours it adds.
  */
-/* Centred: headline, line and search on one axis. */
 /*
- * The hero is framed by equal space: 96px from the navigation to the headline (the main area's
- * 32px, this margin and this padding) and 96px from the pills to the figures (this padding plus the
- * tally's margin).
+ * Two columns: the copy and the search on the left, the hand on the right, sharing one centre line.
+ * Below 60rem they stack.
  */
 .landing-hero {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  text-align: center;
-  margin-top: var(--space-8);
-  padding: var(--space-8) 0;
-}
-
-.landing-hero-copy {
-  position: relative;
-  width: 100%;
-  max-width: 48rem;
-}
-
-/*
- * The arcs and marks behind the hero, filling the hero box exactly and spilling into the page
- * gutters. The SVG stretches with the box and the marks are placed in percent of the same box, so
- * each mark stays on the arc it was computed from; the arcs fade out at the top and bottom edges.
- */
-.landing-decor {
-  position: absolute;
-  inset: 0 calc(var(--space-8) * -1);
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.landing-decor svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
-}
-
-.landing-decor circle {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.landing-mark-tile {
-  position: absolute;
   display: grid;
-  place-items: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  transform: translate(-50%, -50%);
-  background: #fff;
-  border: 1px solid var(--line-faint);
-  border-radius: 0.875rem;
-  box-shadow: 0 1px 2px rgb(26 25 23 / 0.04), 0 4px 12px rgb(26 25 23 / 0.05);
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+  padding: var(--space-6) 0;
+  color: var(--ink);
 }
 
-.landing-mark-logo {
-  width: 1.5rem;
-  height: 1.5rem;
-  background: var(--mark) center / contain no-repeat;
-}
-
-/* Three a side, on the 450 and 570 arcs, offset so the two sides do not mirror. */
-.landing-mark-tile[data-mark="ethereum"] {
-  --mark: url("/hero-logos/ethereum.svg");
-  left: 16.4%;
-  top: 11.7%;
-}
-
-.landing-mark-tile[data-mark="uniswap"] {
-  --mark: url("/hero-logos/uniswap.svg");
-  left: 4%;
-  top: 52.3%;
-}
-
-.landing-mark-tile[data-mark="chainlink"] {
-  --mark: url("/hero-logos/chainlink.svg");
-  left: 15.9%;
-  top: 85%;
-}
-
-.landing-mark-tile[data-mark="morpho"] {
-  --mark: url("/hero-logos/morpho.svg");
-  left: 84.1%;
-  top: 15%;
-}
-
-.landing-mark-tile[data-mark="optimism"] {
-  --mark: url("/hero-logos/optimism.svg");
-  left: 95.7%;
-  top: 63.6%;
-}
-
-.landing-mark-tile[data-mark="ens"] {
-  --mark: url("/hero-logos/ens.svg");
-  left: 83.6%;
-  top: 88.4%;
-}
-
-.landing-hero .landing-sub {
-  margin-inline: auto;
+.landing-hero ::selection {
+  background: var(--ink);
+  color: var(--hero);
 }
 
 .landing-hero h1 {
+  margin: 0;
   font-size: var(--text-hero);
+  font-weight: 800;
   letter-spacing: -0.035em;
-  line-height: 1.02;
+  line-height: 0.98;
   text-wrap: balance;
 }
 
 .landing-sub {
-  max-width: 36rem;
+  max-width: 30rem;
   font-size: var(--text-hero-sub);
   line-height: 1.45;
-  color: var(--ink-soft);
+  color: var(--hero-ink-soft);
   margin: var(--space-4) 0 0;
 }
 
-/* One field with the action inset: icon, input and the primary button share a single border. */
+/* One field with the action inset: a white field on the band, an ink button. */
 .landing-search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  max-width: 40rem;
-  margin: var(--space-8) auto 0;
-  text-align: left;
+  max-width: 34rem;
+  margin-top: var(--space-6);
   padding: var(--space-1);
   padding-left: var(--space-4);
   background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgb(26 25 23 / 0.04);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
 }
 
 .landing-search:focus-within {
-  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--hero), 0 0 0 5px var(--ink);
 }
 
 .landing-search-icon {
   flex: none;
   width: 1.25rem;
   height: 1.25rem;
-  color: var(--ink-soft);
+  color: var(--hero-ink-soft);
 }
 
 .landing-search input {
@@ -2583,60 +2499,229 @@ pre.code-block {
   min-width: 0;
   border: 0;
   background: transparent;
+  color: var(--ink);
 }
 
 .landing-search input:focus {
   outline: none;
 }
 
-/* Under the search and flush with its left edge; slimmer than the directory's filter pills. */
-.landing-hero .type-pills {
-  max-width: 40rem;
-  margin: var(--space-3) auto 0;
-  justify-content: flex-start;
-}
-
-.landing-hero .type-pills button {
-  border-color: #eaeaea;
-  min-block-size: 2rem;
-  padding-block: var(--space-1);
-  padding-inline: var(--space-3);
-  font-size: var(--text-sm);
-}
-
-/* Below this width the side marks would crowd the search column, so the decoration steps out. */
-@media (max-width: 72rem) {
-  .landing-decor {
-    display: none;
-  }
+.landing-search input::placeholder {
+  color: var(--hero-card-ink-soft);
+  opacity: 1;
 }
 
 .landing-search .button-primary {
   flex: none;
   padding-inline: var(--space-6);
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 800;
 }
 
-/* The index at a glance: four figures on the page itself, no panel, hairlines between. */
+.landing-search .button-primary:hover {
+  background: #2c2b20;
+}
+
+.landing-search .button-primary:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Under the search and flush with its left edge; slimmer than the directory's, white on the band. */
+.landing-hero .type-pills {
+  max-width: 34rem;
+  margin-top: var(--space-3);
+}
+
+.landing-hero .type-pills button {
+  min-block-size: 2.25rem;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  border: 1px solid rgb(26 25 23 / 0.35);
+  background: rgb(255 255 255 / 0.7);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.landing-hero .type-pills button:hover {
+  border-color: var(--ink);
+  background: #fff;
+}
+
+.landing-hero .type-pills button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.landing-hero .type-pill-icon,
+.landing-hero .type-pill-count {
+  color: var(--hero-ink-soft);
+}
+
+/* Dealt, not stacked: three cards side by side, each turned a little and touching at the edge, so
+   every title and every amount stays whole. */
+.landing-hand {
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  padding: var(--space-6) 0;
+  list-style: none;
+}
+
+.landing-hand > li {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  transition: transform 180ms ease;
+}
+
+.landing-hand > li + li {
+  margin-inline-start: calc(-1 * var(--space-2));
+}
+
+.landing-hand > li[data-slot="0"] {
+  transform: rotate(-3deg) translateY(var(--space-4));
+}
+
+.landing-hand > li[data-slot="1"] {
+  z-index: 1;
+  transform: rotate(1deg);
+}
+
+.landing-hand > li[data-slot="2"] {
+  transform: rotate(3deg) translateY(var(--space-6));
+}
+
+.landing-hand > li:hover,
+.landing-hand > li:focus-within {
+  z-index: 3;
+  transform: translateY(calc(-1 * var(--space-2)));
+}
+
+.landing-hand-wait {
+  align-self: center;
+  justify-self: center;
+  margin: 0;
+  color: var(--hero-ink-soft);
+}
+
+.landing-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-block-size: 14.5rem;
+  padding: var(--space-4);
+  border: 1px solid rgb(26 25 23 / 0.12);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgb(26 25 23 / 0.12), 0 18px 34px -16px rgb(26 25 23 / 0.45);
+}
+
+.landing-card:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.landing-card:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.landing-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.landing-card-when {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--hero-card-ink-soft);
+}
+
+.landing-card-title {
+  margin-top: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.landing-card-org {
+  font-size: var(--text-sm);
+  color: var(--hero-card-ink-soft);
+}
+
+/* The figure is the loudest thing on the card and grows with the amount, on the log scale
+   `awardScale` sets; its "Up to" or "pool" stays at text size beside it. */
+.landing-card-award {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px dashed rgb(26 25 23 / 0.25);
+  line-height: 1;
+}
+
+.landing-card-word {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--hero-card-ink-soft);
+}
+
+.landing-card-figure + .landing-card-word {
+  margin-inline-start: 0.3em;
+}
+
+.landing-card-award:has(.landing-card-word + .landing-card-figure) .landing-card-word {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+.landing-card-figure {
+  font-family: var(--font-display);
+  font-size: calc(var(--text-award) + var(--text-award-span) * var(--award-scale, 0));
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hand > li {
+    transition: none;
+  }
+}
+
+/* The index at a glance: four figures under both columns, left-aligned, hairlines between. */
 .landing-tally {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: calc(var(--space-8) * 2) 0 0;
+  margin: var(--space-8) 0 0;
+  border-top: 2px solid var(--ink);
 }
 
-/* Centred, to sit on the hero's axis. */
 .landing-tally-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-1);
-  padding: 0 var(--space-6);
-  text-align: center;
+  padding: var(--space-3) var(--space-4) 0;
 }
 
-/* Hairline dividers that fade out at both ends, like the arcs above them. */
+.landing-tally-item:first-child {
+  padding-left: 0;
+}
+
 .landing-tally-item + .landing-tally-item {
-  background: linear-gradient(to bottom, transparent, var(--line) 30%, var(--line) 70%, transparent)
-    left / 1px 100% no-repeat;
+  border-left: 1px solid rgb(26 25 23 / 0.25);
 }
 
 .landing-tally-value {
@@ -2652,7 +2737,91 @@ pre.code-block {
 
 .landing-tally-unit {
   font-size: var(--text-sm);
-  color: var(--ink-soft);
+  font-weight: 600;
+  color: var(--hero-ink-soft);
+}
+
+@media (max-width: 60rem) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Phone: the copy and the search first, then the hand as a row you swipe, the first card and its
+   figure inside the fold; the figures two by two. */
+@media (max-width: 40rem) {
+  .landing-hero {
+    gap: var(--space-4);
+    margin-top: 0;
+    padding: var(--space-2) 0 0;
+  }
+
+  .landing-sub {
+    margin-top: var(--space-3);
+    font-size: var(--text-base);
+  }
+
+  /* The button under the field, so the placeholder reads whole. */
+  .landing-search {
+    flex-wrap: wrap;
+    margin-top: var(--space-4);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  }
+
+  .landing-search input {
+    flex-basis: calc(100% - 2.5rem);
+    min-block-size: var(--control-touch);
+  }
+
+  .landing-search .button-primary {
+    flex: 1 1 100%;
+  }
+
+  .landing-hand {
+    gap: var(--space-3);
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-1) var(--space-4) var(--space-3);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--space-4);
+  }
+
+  .landing-hand > li[data-lead] {
+    order: -1;
+  }
+
+  .landing-hand > li,
+  .landing-hand > li[data-slot],
+  .landing-hand > li:hover,
+  .landing-hand > li:focus-within {
+    flex: 0 0 78%;
+    margin-inline-start: 0;
+    transform: none;
+    scroll-snap-align: start;
+  }
+
+  .landing-card {
+    min-block-size: 0;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .landing-card-title {
+    margin-top: var(--space-2);
+  }
+
+  .landing-tally {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: var(--space-4);
+  }
+
+  .landing-tally-item:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .landing-tally-item:nth-child(n + 3) {
+    padding-top: var(--space-4);
+  }
 }
 
 /*
@@ -2661,6 +2830,12 @@ pre.code-block {
  */
 body:has(.landing) {
   background: var(--hero);
+}
+
+/* The header's one action is olive on paper (5.06:1) but only 3.76:1 on the band, so on the
+   landing it takes the band's dark olive (7.91:1). */
+body:has(.landing) .shell-submit {
+  color: var(--hero-ink-soft);
 }
 
 /*
@@ -3117,21 +3292,6 @@ body:has(.landing) {
 }
 
 @media (max-width: 56rem) {
-  .landing-hero {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-    padding-top: var(--space-6);
-  }
-
-  .landing-tally {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: var(--space-6);
-  }
-
-  .landing-tally-item:nth-child(odd) {
-    background: none;
-  }
-
   .landing-featured,
   .facts-strip,
   .acts {
