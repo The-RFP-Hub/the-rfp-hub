@@ -17,7 +17,7 @@
 # Each needs data the server does not: the Drizzle migrations, the seed
 # corpus, and a writable directory to export into. Those are copied below.
 
-FROM node:22-bookworm-slim AS builder
+FROM node:22.23.4-bookworm-slim AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
@@ -30,7 +30,7 @@ RUN pnpm -r --if-present build
 RUN pnpm -r --if-present typecheck
 
 # ----- runtime -----
-FROM node:22-bookworm-slim AS runtime
+FROM node:22.23.4-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
