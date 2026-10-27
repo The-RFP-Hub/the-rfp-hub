@@ -35,10 +35,10 @@
     "prepublishOnly": "pnpm -w build"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.3.1",
     "@the-rfp-hub/standard": "workspace:*",
     "rfphub-validate": "workspace:*",
-    "zod": "^4.2.0"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
