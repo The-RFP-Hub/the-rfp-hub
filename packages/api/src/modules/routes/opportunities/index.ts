@@ -88,6 +88,20 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
           properties: { id: { type: "string", description: "Public id, e.g. fundingmap:1459" } },
           required: ["id"],
         },
+        // DELIBERATELY OPEN (no `additionalProperties: false`). This route never declared a
+        // querystring, so it has always ignored one — a cache-buster, a tracking parameter a client
+        // forwards — and closing it now would turn those reads into 400s.
+        querystring: {
+          type: "object",
+          properties: {
+            count: {
+              type: "boolean",
+              default: true,
+              description:
+                "`false` serves the same record without recording a detail view. For a read that is not somebody reading the listing — the frontend's leaving page, which already counted the click that sent the reader there. It can only lower a count, like `DNT: 1`.",
+            },
+          },
+        },
         response: {
           200: { $ref: "Opportunity#" },
           404: {

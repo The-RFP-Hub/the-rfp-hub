@@ -1,0 +1,5 @@
+---
+"@the-rfp-hub/api": minor
+---
+
+Reviewers can keep a live listing open by hand. `POST /v1/review/opportunities/:id/confirm-open` (optional body `{"note": "…"}`, at most 500 characters) sets `last_seen_at` to now under a row lock and audits it as an `update` with `lastSeenAt` before/after and the note (or a default) as `reason`. Nothing else changes — not `updated_at`, not the content, not the reviewed link pins — and anything that is not approved, listed, open and unmerged is a `409` (`not_approved`, `not_listed`, `not_open`, `opportunity_merged`). `GET /v1/review/closing-soon?days=30&limit=100` lists the approved, listed, open entries the staleness job would close for inactivity within the window, soonest first, each with its `closesAt`, computed by the job's own rule (now shared in `modules/shared/staleness.ts`) so an entry with a future fixed deadline or a past-due one is never listed. `GET /v1/opportunities/:id?count=false` serves the record without recording a detail view, for reads such as the frontend's leaving page that are not somebody reading the listing. No migration.
