@@ -8,9 +8,13 @@ ALTER TABLE "opportunities" ADD COLUMN "link_landing_final_url" text;--> stateme
 -- (`verification.service.ts`: `applied && http_status IS NOT NULL && final_url IS NOT NULL`). That
 -- includes answered refusals (a content type it would not read, a redirect it stopped following),
 -- which carry an `error` but did land somewhere; so the filter is not `error IS NULL`. It excludes
--- the runs that were not verdicts, by the markers the verifier has written into `error` since they
--- existed (`stale_result:` since 2026-08-24, `not_a_verdict:` since 2026-08-26, unchanged since); a
--- transient run never has an HTTP status in any case. Comparing against the run log at runtime
+-- the runs that were not verdicts by the marker the verifier PUTS FIRST in `error` — it has always
+-- joined `[stale, transient, failure]` in that order, so a stale run's error starts with
+-- `stale_result:` (since 2026-08-24) and a transient one's with `not_a_verdict:` (since
+-- 2026-08-26), both unchanged since. A PREFIX test, never a substring one: an applied run's error
+-- is the failure text alone, and that text quotes what the remote server sent (a malformed
+-- `Location`, say), so a site could otherwise put a marker inside it and drop a real landing from
+-- the baseline. A transient run never has an HTTP status in any case. Comparing against the run log at runtime
 -- instead would let exactly those runs stand in for the baseline, which is what this column fixes.
 -- No URL filter: the verifier compares only when the baseline's requested URL equals the URL it is
 -- about to request (the trimmed `application_url`), so a baseline for an older URL is simply not
@@ -25,8 +29,8 @@ FROM (
   WHERE "http_status" IS NOT NULL
     AND "final_url" IS NOT NULL
     AND "requested_url" IS NOT NULL
-    AND position('stale_result:' in coalesce("error", '')) = 0
-    AND position('not_a_verdict:' in coalesce("error", '')) = 0
+    AND NOT starts_with(coalesce("error", ''), 'stale_result:')
+    AND NOT starts_with(coalesce("error", ''), 'not_a_verdict:')
   ORDER BY "opportunity_id", "run_at" DESC, "id" DESC
 ) AS r
 WHERE r."opportunity_id" = o."id";

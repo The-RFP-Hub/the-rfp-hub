@@ -599,6 +599,55 @@ run("M5LINK link-outs vouch only for reviewed destinations", () => {
       expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
       await expectLinkOut(id, "apply", leaving(id, "apply", "landing_changed"));
     });
+
+    it.each([
+      ["stale_result:", "marker-stale"],
+      ["not_a_verdict:", "marker-transient"],
+    ])(
+      "0017's baseline backfill keeps an applied run whose failure text merely quotes %s",
+      async (marker, slug) => {
+        // An applied, answered refusal whose message quotes what the remote server sent — here a
+        // malformed `Location` a site chose to fill with the marker. The verifier keeps it as the
+        // baseline; only a marker at the START of `error` means the run was not a verdict.
+        const id = `${NS}:baseline-${slug}`;
+        const url = `https://go.m5link-short.example/${slug}`;
+        await seedImport(id, { applicationUrl: url, website: SITE_URL });
+        const { id: rowId } = await rowOf(id);
+        await db
+          .update(opportunities)
+          .set({ linkLandingRequestedUrl: null, linkLandingFinalUrl: null })
+          .where(eq(opportunities.id, rowId));
+        await db.insert(verificationRuns).values({
+          opportunityId: rowId,
+          runAt: new Date(Date.UTC(2026, 9, 1)),
+          requestedUrl: url,
+          finalUrl: siteA,
+          httpStatus: 302,
+          existsAtSource: false,
+          matched: false,
+          error: `redirect_malformed: HTTP 302 to "http://[${marker}", which is not a URL`,
+        });
+
+        const migration = readFileSync(
+          new URL(
+            "../../src/db/migrations/0017_link_out_reviewed_destinations.sql",
+            import.meta.url,
+          ),
+          "utf8",
+        );
+        const backfill = migration
+          .split("--> statement-breakpoint")
+          .find((chunk) => chunk.includes('"link_landing_requested_url" = r."requested_url"'))
+          ?.trim();
+        await pool.query(`${backfill?.replace(/;$/, "")} AND o."id" = $1`, [rowId]);
+
+        expect((await rowOf(id)).linkLandingFinalUrl).toBe(siteA);
+        await verifier(
+          fixtureTransport({ [url]: { status: 302, headers: { location: siteB } }, [siteB]: page }),
+        ).verify(rowId);
+        expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+      },
+    );
   });
 
   it("builds the leaving page from APP_BASE_URL and percent-encodes the id's colon", async () => {

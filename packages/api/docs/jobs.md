@@ -641,9 +641,14 @@ that are not verdicts, and it is pruned to the newest `VERIFICATION_RUNS_KEEP`. 
 - A, then a timeout, then B was compared with the timeout.
 - A, then a stale fetch of B, then B was compared with B.
 
-A transient or stale run neither compares nor moves the baseline. Migration `0017` backfills it
-from each row's last answered, applied run of its current URL (`error IS NULL`). A row without one
-starts comparing from its first answered check after deploy.
+A transient or stale run neither compares nor moves the baseline.
+
+Migration `0017` backfills the baseline from each row's latest run that the verifier itself would
+have kept: one with an HTTP status and a final URL, answered refusals included. That means an
+applied run, recognized by its `error` not starting with `stale_result:` or `not_a_verdict:`, the
+markers the verifier always writes first. It does not filter by today's URL, because a baseline for
+another URL is simply not compared and gets replaced. A row without such a run starts comparing from
+its first answered check after deploy.
 
 ### What staleness deliberately does not touch
 
