@@ -13,7 +13,7 @@
 import LeavingPage from "@/app/leaving/[id]/page";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import { REASON_COPY, UNKNOWN_REASON_COPY, readLeavingQuery } from "@/lib/leaving";
+import { CLOSED_NOTICE, SECURITY_NOTICE, readLeavingQuery } from "@/lib/leaving";
 import type { Opportunity } from "@/lib/types";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,7 +96,7 @@ describe("the leaving page, offering the stored link", () => {
       await screen.findByRole("heading", { level: 1, name: "You’re leaving RFPSear.ch" }),
     ).toBeTruthy();
     // The host without its `www.`, as the large line under "Where it goes".
-    const host = await screen.findByText("typeform.com", { selector: ".leaving-host *" });
+    const host = await screen.findByText("www.typeform.com", { selector: ".leaving-host *" });
     expect(host).toBeTruthy();
     // The whole URL, verbatim, and as text rather than as a second link.
     const full = screen.getByText(APPLY_URL);
@@ -111,7 +111,7 @@ describe("the leaving page, offering the stored link", () => {
     open("link=apply&reason=unreviewed");
 
     const go = await continueLink();
-    expect(go.textContent).toBe("Continue to typeform.com");
+    expect(go.textContent).toBe("Continue to www.typeform.com");
     expect(go.getAttribute("href")).toBe(APPLY_URL);
     expect(go.getAttribute("rel")).toBe("noopener noreferrer nofollow");
     expect(go.getAttribute("target")).toBeNull();
@@ -178,50 +178,45 @@ describe("the leaving page, offering the stored link", () => {
   });
 });
 
-describe("the reason the reader was sent here", () => {
-  it.each([
-    [
-      "closed",
-      /^This program is closed\. The link may no longer work, or the site behind it may have changed hands\.$/,
-    ],
-    [
-      "landing_changed",
-      /^When we last checked this link, it sent visitors to a different site than it did before\.$/,
-    ],
-  ] as const)(
-    "explains reason=%s in its own words, under the security notice",
-    async (reason, copy) => {
-      open(`link=apply&reason=${reason}`);
-
-      await continueLink();
-      expect(REASON_COPY[reason]).toMatch(copy);
-      const callout = screen.getByText("Security notice").closest(".leaving-reason");
-      expect(within(callout as HTMLElement).getByText(copy)).toBeTruthy();
-      expect(screen.queryByText(UNKNOWN_REASON_COPY)).toBeNull();
-      // Still one click from the destination: a caution, never a stop.
-      expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
-    },
-  );
+describe("what the security notice says", () => {
+  const notice = async () => {
+    await continueLink();
+    return screen.getByText("Security notice").closest(".leaving-reason") as HTMLElement;
+  };
 
   it.each([
+    ["closed", "link=apply&reason=closed"],
+    ["landing_changed", "link=apply&reason=landing_changed"],
     ["unreviewed", "link=apply&reason=unreviewed"],
     ["missing", "link=apply"],
     ["unknown", "link=apply&reason=compromised"],
-    ["differently cased", "link=apply&reason=CLOSED"],
-  ])("shows only the plain security notice when the reason is %s", async (_, query) => {
+  ])("states no fact the listing does not back when the reason is %s", async (_, query) => {
+    // An OPEN listing: whatever the query claims, the page only shows the plain notice.
     open(query);
 
-    await continueLink();
-    const callout = screen.getByText("Security notice").closest(".leaving-reason");
-    expect(within(callout as HTMLElement).getByText(UNKNOWN_REASON_COPY)).toBeTruthy();
-    expect(REASON_COPY.unreviewed).toBe(UNKNOWN_REASON_COPY);
-    for (const copy of [REASON_COPY.closed, REASON_COPY.landing_changed]) {
-      expect(screen.queryByText(copy)).toBeNull();
-    }
-    // A notice, not a verdict: nothing on the page says the link went unchecked or unreviewed.
-    expect(document.body.textContent).not.toMatch(/review|checked it|vouch/i);
+    expect(within(await notice()).getByText(SECURITY_NOTICE)).toBeTruthy();
+    expect(screen.queryByText(CLOSED_NOTICE)).toBeNull();
+    expect(document.body.textContent).not.toMatch(
+      /is closed|different site|review|checked it|vouch/i,
+    );
+    // Still one click from the destination: a caution, never a stop.
     expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
   });
+
+  it.each([
+    ["closed", "link=apply&reason=closed"],
+    ["archived", "link=apply&reason=unreviewed"],
+    ["closed", "link=apply"],
+  ] as const)(
+    "says the program is closed when the listing itself is %s (%s)",
+    async (status, query) => {
+      open(query, client(async () => ({ ...entry, status })).api);
+
+      expect(within(await notice()).getByText(CLOSED_NOTICE)).toBeTruthy();
+      expect(screen.queryByText(SECURITY_NOTICE)).toBeNull();
+      expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
+    },
+  );
 });
 
 describe("a query carrying a destination of its own", () => {

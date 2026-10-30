@@ -1073,9 +1073,10 @@ describe("the public opportunity page", () => {
     });
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
-    const apply = await screen.findByRole("link", { name: "Apply on typeform.com" });
+    const apply = await screen.findByRole("link", { name: "Apply on www.typeform.com" });
     expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
-    expect(screen.getByRole("link", { name: "Program site acme.example.com" })).toBeTruthy();
+    // The whole host, `www.` included: trimming it can turn one registrable name into another.
+    expect(screen.getByRole("link", { name: "Program site www.acme.example.com" })).toBeTruthy();
   });
 
   it("names the host the browser will reach, not the one a URL's text leads with", async () => {

@@ -41,8 +41,8 @@ import {
   LINK_WORDS,
   type LeavingLink,
   leavingDestination,
+  noticeCopy,
   readLeavingQuery,
-  reasonCopy,
 } from "@/lib/leaving";
 import { DIRECTORY } from "@/lib/links";
 import { useResource } from "@/lib/resource";
@@ -70,7 +70,7 @@ function BackToListing({ id }: { id: string }) {
 
 export function LeavingNotice({ id }: { id: string }) {
   const api = useApi();
-  const { link, reason } = readLeavingQuery(useSearchParams());
+  const { link } = readLeavingQuery(useSearchParams());
   const load = useCallback(() => api.directory.find(id), [api, id]);
   const { state, reload } = useResource(load);
 
@@ -135,7 +135,7 @@ export function LeavingNotice({ id }: { id: string }) {
         <p className="empty-title">
           <IconLabel icon={ExclamationTriangleIcon}>Security notice</IconLabel>
         </p>
-        <p>{reasonCopy(reason)}</p>
+        <p>{noticeCopy(entry)}</p>
       </div>
 
       <p className="row leaving-actions">

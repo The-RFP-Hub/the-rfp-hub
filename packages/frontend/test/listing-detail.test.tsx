@@ -173,7 +173,9 @@ it("names each counted link-out by the host it reaches, keeping the API hop as t
   });
   mount(<ListingPage />, api);
 
-  const apply = await screen.findByRole("link", { name: "Open the application page on tally.so" });
+  const apply = await screen.findByRole("link", {
+    name: "Open the application page on www.tally.so",
+  });
   expect(apply.getAttribute("href")).toBe("https://api.example.com/v1/r/acme%3Aold/apply");
   const site = screen.getByRole("link", { name: "Open the program site on acme.example.org" });
   expect(site.getAttribute("href")).toBe("https://api.example.com/v1/r/acme%3Aold/source");
