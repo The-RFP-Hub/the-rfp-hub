@@ -8,7 +8,7 @@ import { handleOAuthUserInfo } from "better-auth/oauth2";
  * an address means controlling the mailbox — so an OAuth provider asserting a verified address it
  * also controls is a second proof of the same thing, and joining them is right. That is a policy,
  * written out in `createAuth`, and its failure mode is silent: a library minor that started
- * creating a SECOND identity, or that stopped scoping accounts by issuer, would not break a build.
+ * creating a SECOND identity, or that changed how it keys accounts, would not break a build.
  * It would fork one person into two accounts, and the second one would arrive with no role, no
  * memberships and no history.
  *
@@ -71,12 +71,8 @@ run("M3LINK linking a second provider", () => {
         account: {
           providerId: "google",
           accountId: providerAccountId,
-          // SUPPLIED BY THE CALLER, not derived by the library — verified in
-          // `dist/oauth2/link-account.mjs`, which reads `account.issuer` and never computes one.
-          // `local:oauth:<provider>` is the shape the OAuth routes use; it is the scope that makes
-          // `accountId` unique (see src/db/auth-schema.ts) and getting it wrong here would make
-          // this test assert against a key nothing else writes.
-          issuer: "local:oauth:google",
+          // No `issuer`: since better-auth 1.7.3 the account key is `(providerId, accountId)` and
+          // `dist/oauth2/link-account.mjs` matches on exactly those two (see src/db/auth-schema.ts).
           scope: "openid email profile",
         },
       } as Parameters<typeof handleOAuthUserInfo>[1],
@@ -112,7 +108,8 @@ run("M3LINK linking a second provider", () => {
       .where(eq(authAccount.userId, established.userId));
     expect(linked).toHaveLength(1);
     expect(linked[0]?.providerId).toBe("google");
-    expect(linked[0]?.issuer).toBe("local:oauth:google");
+    // The legacy 1.7.0–1.7.2 column is not written any more — nothing may start depending on it.
+    expect(linked[0]?.issuer).toBeNull();
 
     // ONE application account, the same row as before, with its role intact. This is the assertion
     // that a fork would break: a second identity would provision a second `accounts` row on its
@@ -143,23 +140,17 @@ run("M3LINK linking a second provider", () => {
       .select()
       .from(authAccount)
       .where(
-        and(
-          eq(authAccount.issuer, "local:oauth:google"),
-          eq(authAccount.accountId, "google-subject-1"),
-        ),
+        and(eq(authAccount.providerId, "google"), eq(authAccount.accountId, "google-subject-1")),
       );
     await arriveFromProvider(EMAILS.linked, "google-subject-1");
     const after = await db
       .select()
       .from(authAccount)
       .where(
-        and(
-          eq(authAccount.issuer, "local:oauth:google"),
-          eq(authAccount.accountId, "google-subject-1"),
-        ),
+        and(eq(authAccount.providerId, "google"), eq(authAccount.accountId, "google-subject-1")),
       );
-    // The `(issuer, accountId)` unique index is what makes this true rather than a race — see
-    // src/db/auth-schema.ts, where its absence from the generator's draft is recorded.
+    // The `(providerId, accountId)` unique index is what makes this true rather than a race — see
+    // src/db/auth-schema.ts.
     expect(after).toHaveLength(before.length);
   }, 60_000);
 
