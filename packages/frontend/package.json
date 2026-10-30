@@ -15,7 +15,7 @@
   "dependencies": {
     "@heroicons/react": "2.2.0",
     "@the-rfp-hub/standard": "workspace:*",
-    "better-auth": "1.7.1",
+    "better-auth": "1.7.14",
     "next": "^16.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

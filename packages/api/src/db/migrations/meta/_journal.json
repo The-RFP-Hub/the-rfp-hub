@@ -127,6 +127,13 @@
       "when": 1793330545490,
       "tag": "0017_link_out_reviewed_destinations",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793366221078,
+      "tag": "0018_better_auth_account_provider_key",
+      "breakpoints": true
     }
   ]
 }

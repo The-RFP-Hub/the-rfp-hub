@@ -4,20 +4,26 @@
  * WHERE THIS CAME FROM. `npx @better-auth/cli generate` was run once against a config mirroring
  * the real composition (`emailOTP`, `bearer({requireSignature:true})`, `oneTimeToken`,
  * `drizzleAdapter(db,{provider:"pg"})`, the `auth_*` `modelName`s below) and then HAND-CORRECTED
- * against the schema the installed `better-auth@1.7.1` runtime actually builds
- * (`@better-auth/core/db/get-tables.mjs`, via `buildAuthTables`) — the CLI package
- * (`@better-auth/cli`, latest published release `1.4.21`) trails the pinned `1.7.1` core and its
- * generated draft was WRONG in two ways this file does not repeat:
+ * against the schema the installed `better-auth` runtime actually builds
+ * (`@better-auth/core/db/get-tables.mjs`, via `buildAuthTables`). It was last re-read against
+ * `1.7.14`.
  *
- *   1. It omitted `auth_account.issuer` entirely. 1.7.1 scopes account identity by
- *      `(issuer, accountId)`, not `(providerId, accountId)` — see the runtime's own upgrade note,
- *      "account identity is scoped by issuer". `issuer` is a synthetic string the library derives
- *      per provider (`local:<providerId>` for credential-style providers, `local:oauth:<providerId>`
- *      for OAuth ones) — never supplied by a caller, so it needs no default here.
- *   2. It emitted no unique constraint on `auth_account` at all. `buildAuthTables` declares
- *      `{ fields: ["issuer", "accountId"], unique: true }` as a table-level index — this is the
- *      constraint `linkAccount`/`findAccountOwnerByKey` rely on, and the one the plan's Risk 3
- *      tripwire (`integration/account-linking.test.ts`, a later phase) exists to keep honest.
+ * ACCOUNT IDENTITY IS `(providerId, accountId)` AGAIN. `1.7.0`–`1.7.2` (this file was first cut
+ * against `1.7.1`) scoped account identity by a synthetic, required `issuer` column and a unique
+ * `(issuer, accountId)` index. `1.7.3` reverted that to the 1.6 shape — accounts are recognized by
+ * `(providerId, accountId)` and `issuer` is never written — and since `1.7.3` the adapter validates
+ * this schema at initialization and rejects every auth request on a mismatch ("Required columns
+ * Better Auth never writes: account.issuer"). Migration `0018` follows the library's upgrade guide
+ * ("Account identity keeps the provider key"):
+ *
+ *   1. `auth_account.issuer` is NULLABLE, not dropped. New rows leave it NULL. Keeping the column
+ *      is what keeps a rollback to a `1.7.1` build working — that runtime still writes it — and
+ *      dropping it is separate cleanup for once the `1.7.1` image is out of the rollback window.
+ *   2. The unique index moves from `(issuer, accountId)` to `(providerId, accountId)`: the key the
+ *      runtime now looks accounts up by, and the constraint that keeps a provider identity arriving
+ *      twice from linking twice (`integration/account-linking.test.ts`). It cannot collide with
+ *      existing rows, because `issuer` was derived from `providerId` one-to-one
+ *      (`local:oauth:<providerId>`), so the old index already implied this one.
  *
  * None of the three plugins wired in (`emailOTP`, `bearer`, `oneTimeToken`) add a table or a field
  * of their own — verified by reading their plugin definitions; only `emailOTP`'s OpenAPI response
@@ -86,17 +92,17 @@ export const authAccount = pgTable(
   {
     id: text().primaryKey(),
     /**
-     * The provider-scoped subject. On its own it is NOT globally unique — see `issuer` below, and
-     * the header comment on why `(issuer, accountId)` is the real key.
+     * The provider-scoped subject. On its own it is NOT globally unique — `(providerId, accountId)`
+     * is the real key; see the header comment.
      */
     accountId: text().notNull(),
     providerId: text().notNull(),
     /**
-     * The scope `accountId` is unique WITHIN. Synthetic and library-derived (`local:credential`,
-     * `local:oauth:google`, …) — never client-supplied. See the header comment for why 1.7.1 added
-     * this column and what the CLI's stale draft got wrong by omitting it.
+     * LEGACY, written only by `1.7.0`–`1.7.2` (`local:oauth:google`, …). Current runtimes never set
+     * it, so it is nullable and nothing reads it; it stays only so a rollback to a `1.7.1` build
+     * keeps working. See the header comment.
      */
-    issuer: text().notNull(),
+    issuer: text(),
     userId: text()
       .notNull()
       .references(() => authUser.id, { onDelete: "cascade" }),
@@ -113,8 +119,8 @@ export const authAccount = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // THE constraint `linkAccount`/`findAccountOwnerByKey` depend on — see the header comment.
-    uniqueIndex("ux_auth_account_issuer_account").on(t.issuer, t.accountId),
+    // THE constraint that keeps one provider identity linked once — see the header comment.
+    uniqueIndex("ux_auth_account_provider_account").on(t.providerId, t.accountId),
     index("ix_auth_account_user").on(t.userId),
   ],
 );
