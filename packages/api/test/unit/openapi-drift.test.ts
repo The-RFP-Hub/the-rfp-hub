@@ -46,6 +46,8 @@ import type {
   ClaimListView,
   ClaimResultView,
   ClaimSummaryView,
+  ClosingSoonItemView,
+  ClosingSoonListView,
   DuplicateListView,
   DuplicateMatchView,
   DuplicateNotificationPayloadView,
@@ -69,6 +71,7 @@ import type {
   NotificationListView,
   NotificationReadAllView,
   NotificationView,
+  OpenConfirmationView,
   OrganizationListView,
   OrganizationSummaryView,
   OwnedDuplicateListView,
@@ -286,6 +289,8 @@ describe("closed response components vs their producers", () => {
       "ClaimList",
       "ClaimResult",
       "ClaimSummary",
+      "ClosingSoonItem",
+      "ClosingSoonList",
       "DatasetExport",
       "DuplicateList",
       "DuplicateMatch",
@@ -313,6 +318,7 @@ describe("closed response components vs their producers", () => {
       "Notification",
       "NotificationList",
       "NotificationReadAll",
+      "OpenConfirmation",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
@@ -639,6 +645,17 @@ describe("M3 closed components vs their view types", () => {
     readAt: null,
   };
 
+  const closingSoonItem: ClosingSoonItemView = {
+    id: "example-org:one",
+    title: "One",
+    namespace: "example-org",
+    applicationUrl: "https://example.org/apply",
+    website: "https://example.org/",
+    lastSeenAt: null,
+    updatedAt: "2026-08-14T00:00:00.000Z",
+    closesAt: "2026-11-12T00:00:00.000Z",
+  };
+
   const samples: Record<string, object> = {
     SubmissionResult: submissionResult,
     AuditEntry: auditEntry,
@@ -690,6 +707,20 @@ describe("M3 closed components vs their view types", () => {
     ClaimResult: claimResult,
     ClaimSummary: claimSummary,
     ClaimList: { items: [claimSummary] } satisfies ClaimListView,
+    ClosingSoonItem: closingSoonItem,
+    ClosingSoonList: {
+      items: [closingSoonItem],
+      windowDays: 30,
+      inactiveDays: 90,
+      asOf: "2026-10-30T00:00:00.000Z",
+      truncated: false,
+    } satisfies ClosingSoonListView,
+    OpenConfirmation: {
+      id: "example-org:one",
+      lastSeenAt: "2026-10-30T00:00:00.000Z",
+      previousLastSeenAt: null,
+      closesAt: "2027-01-28T00:00:00.000Z",
+    } satisfies OpenConfirmationView,
     Publisher: publisher,
     PublisherList: { items: [publisher], total: 1 } satisfies PublisherListView,
     MeMembership: meMembership,

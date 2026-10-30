@@ -949,7 +949,8 @@ held to containment on replace — a foreign-operated one is still rejected.
   **Rolling-only entries have `next_deadline_at = NULL` and therefore ARE eligible for the
   inactivity close.** That is intended: a rolling program nobody has touched or re-verified for
   ninety days is exactly the stale listing this rule exists to close, and any publisher write,
-  granted claim or successful verification resets `last_seen_at`. The `next_deadline_at IS NULL`
+  granted claim, approval, successful verification or reviewer's "confirm still open" resets
+  `last_seen_at`. The `next_deadline_at IS NULL`
   clause is load-bearing for the opposite reason — an entry with a known future deadline is never
   closed for inactivity. The predicate lives in `src/modules/shared/deadlines.ts`.
 

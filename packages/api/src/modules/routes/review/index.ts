@@ -198,6 +198,60 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   );
 
   router.post(
+    "/opportunities/:id/confirm-open",
+    {
+      onRequest: metered(),
+      schema: {
+        operationId: "confirmOpportunityOpen",
+        tags: ["review"],
+        summary: "Confirm by hand that a live listing is still open",
+        description:
+          "Sets `last_seen_at` to now and audits it (`update`, with `lastSeenAt` before/after and a `reason`: the reviewer's `note`, or a default). This is the staleness job's inactivity clock, so the listing gets a fresh `STALENESS_INACTIVE_DAYS`. Nothing else changes: not `updatedAt`, not the content, not the reviewed link pins. 409 `not_approved`, `not_listed`, `not_open` or `opportunity_merged` for anything that is not an approved, listed, open, unmerged entry. A past-due entry is still closed on its deadlines: `closesAt` is null for it.",
+        security: [{ bearerAuth: [] }],
+        params: idParams,
+        body: {
+          // Nullable so a bare POST with no body at all is the plain "confirmed, no note" call.
+          type: ["object", "null"],
+          additionalProperties: false,
+          properties: { note: { type: ["string", "null"], maxLength: 500 } },
+        },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "OpenConfirmation#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
+      },
+    },
+    reviewController.confirmOpen,
+  );
+
+  router.get(
+    "/closing-soon",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "listClosingSoon",
+        tags: ["review"],
+        summary: "Live listings the staleness job will close for inactivity soon",
+        description:
+          "Approved, listed, open, unmerged entries that the staleness job's inactivity rule would close within `days` (default 30), soonest first, each with its `closesAt`. Computed by the job's own rule, so an entry with a future fixed deadline (never closed for inactivity) and a past-due one (closed on its deadlines whatever its clock says) are not listed.",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            days: { type: "integer", minimum: 1, maximum: 365, default: 30 },
+            limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },
+          },
+        },
+        response: { 200: { $ref: "ClosingSoonList#" }, ...errors },
+      },
+    },
+    reviewController.closingSoon,
+  );
+
+  router.post(
     "/opportunities/:id/verify",
     {
       // The one review action that reaches the network, so the limit is also what stops this

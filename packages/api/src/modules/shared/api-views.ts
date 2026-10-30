@@ -431,6 +431,45 @@ export interface ReviewDecisionView {
   isListed: boolean;
 }
 
+/**
+ * One live listing the staleness job would close for inactivity within the requested window.
+ *
+ * `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, computed by the job's
+ * own rule (`modules/shared/staleness.ts`); the job closes the entry on its first nightly run after
+ * that instant, so a `closesAt` already in the past means the next run.
+ */
+export interface ClosingSoonItemView {
+  id: string;
+  title: string;
+  /** The source namespace (`source_publisher`), or null for a community submission. */
+  namespace: string | null;
+  applicationUrl: string | null;
+  website: string | null;
+  lastSeenAt: string | null;
+  updatedAt: string;
+  closesAt: string;
+}
+
+export interface ClosingSoonListView {
+  items: ClosingSoonItemView[];
+  /** The window asked for, in days from `asOf`. */
+  windowDays: number;
+  /** `STALENESS_INACTIVE_DAYS` on this deployment. */
+  inactiveDays: number;
+  asOf: string;
+  /** More entries fall inside the window than `limit` allowed to be returned. */
+  truncated: boolean;
+}
+
+/** The result of a reviewer confirming by hand that a listing is still open. */
+export interface OpenConfirmationView {
+  id: string;
+  lastSeenAt: string;
+  previousLastSeenAt: string | null;
+  /** When the inactivity pass would now close it, or null when that pass does not decide it. */
+  closesAt: string | null;
+}
+
 export interface AccountSummaryView {
   id: number;
   handle: string | null;

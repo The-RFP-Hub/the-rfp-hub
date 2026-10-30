@@ -452,6 +452,56 @@ export class OpportunityRepository {
     return rows[0]?.value ?? 0;
   }
 
+  /**
+   * Live entries whose inactivity clock is at or before `clockAtOrBefore`, the stalest first — the
+   * read behind the reviewer's "closing soon" list.
+   *
+   * THE JOB'S OWN CANDIDATE SCOPE, narrowed to what the public can see. `stalenessCandidateScope`
+   * is the predicate the staleness walk uses, so nothing the job would never examine can appear
+   * here; `approved AND is_listed` is added because an entry nobody can read is not one a reviewer
+   * is being asked to keep open. The clock bound is only a pruning predicate: the caller applies
+   * `inactivityClosesAt` (`modules/shared/staleness.ts`), the job's rule, to every row it keeps,
+   * which is what drops a past-due row or one whose stored `next_deadline_at` is stale.
+   *
+   * OFFSET-paged rather than keyset-paged on the clock: `updated_at` carries microseconds a JS
+   * `Date` cannot hold, so a cursor rebuilt from a returned row would compare below that row and
+   * serve it again. The list is bounded and read at human pace; OFFSET is the honest tool.
+   */
+  async listClosingSoonCandidates(
+    now: Date,
+    clockAtOrBefore: Date,
+    offset: number,
+    limit: number,
+  ): Promise<OpportunityRow[]> {
+    const clock = sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`;
+    return this.exec
+      .select()
+      .from(opportunities)
+      .where(
+        and(
+          this.stalenessCandidateScope(now),
+          eq(opportunities.reviewStatus, "approved"),
+          eq(opportunities.isListed, true),
+          sql`${clock} <= ${clockAtOrBefore}`,
+        ),
+      )
+      .orderBy(asc(clock), asc(opportunities.id))
+      .offset(offset)
+      .limit(limit);
+  }
+
+  /**
+   * A reviewer's "confirm still open": `last_seen_at` and NOTHING ELSE.
+   *
+   * Its own statement rather than `update(id, {lastSeenAt})` so the property is visible where it is
+   * kept: `updated_at` is absent (it would re-queue the row for a source check, see
+   * `pendingVerificationFilter`), and so are the reviewer pins — a hand check vouches that the
+   * programme is still running, not for whatever its links point at.
+   */
+  async touchLastSeen(id: number, at: Date): Promise<void> {
+    await this.exec.update(opportunities).set({ lastSeenAt: at }).where(eq(opportunities.id, id));
+  }
+
   async updateNextDeadline(id: number, nextDeadlineAt: Date | null): Promise<void> {
     await this.exec.update(opportunities).set({ nextDeadlineAt }).where(eq(opportunities.id, id));
   }
@@ -764,11 +814,15 @@ export class OpportunityRepository {
   }
 
   private stalenessCandidateFilter(now: Date, afterId: number): SQL | undefined {
+    return and(this.stalenessCandidateScope(now), gt(opportunities.id, afterId));
+  }
+
+  /** What the staleness job may close at all. Shared with `listClosingSoonCandidates`. */
+  private stalenessCandidateScope(now: Date): SQL | undefined {
     return and(
       eq(opportunities.status, "open"),
       isNull(opportunities.mergedIntoId),
       or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, now)),
-      gt(opportunities.id, afterId),
     );
   }
 }

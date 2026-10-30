@@ -1023,6 +1023,63 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "ClosingSoonItem",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, by the job's own rule; the job closes it on its first run after that instant.",
+    required: [
+      "id",
+      "title",
+      "namespace",
+      "applicationUrl",
+      "website",
+      "lastSeenAt",
+      "updatedAt",
+      "closesAt",
+    ],
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      namespace: { type: ["string", "null"] },
+      applicationUrl: { type: ["string", "null"] },
+      website: { type: ["string", "null"] },
+      lastSeenAt: { type: ["string", "null"], format: "date-time" },
+      updatedAt: { type: "string", format: "date-time" },
+      closesAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "ClosingSoonList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "windowDays", "inactiveDays", "asOf", "truncated"],
+    properties: {
+      items: { type: "array", items: { $ref: "ClosingSoonItem" } },
+      windowDays: { type: "integer" },
+      inactiveDays: { type: "integer" },
+      asOf: { type: "string", format: "date-time" },
+      truncated: { type: "boolean" },
+    },
+  },
+  {
+    $id: "OpenConfirmation",
+    type: "object",
+    additionalProperties: false,
+    required: ["id", "lastSeenAt", "previousLastSeenAt", "closesAt"],
+    properties: {
+      id: { type: "string" },
+      lastSeenAt: { type: "string", format: "date-time" },
+      previousLastSeenAt: { type: ["string", "null"], format: "date-time" },
+      closesAt: {
+        type: ["string", "null"],
+        format: "date-time",
+        description:
+          "When the inactivity pass would now close it; null when that pass does not decide it (a future fixed deadline, or a past-due entry the job closes on its deadlines).",
+      },
+    },
+  },
+  {
     $id: "AccountSummary",
     type: "object",
     additionalProperties: false,

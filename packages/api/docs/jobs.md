@@ -524,9 +524,11 @@ why), so the moment `verified_at` is stamped, `verified_at < updated_at` is fals
 A seeded entry nobody ever edits was checked once, in the week it was imported, and never again.
 
 That is not merely a stale flag. `staleness` closes an entry with no future fixed deadline once
-`coalesce(last_seen_at, updated_at)` is `STALENESS_INACTIVE_DAYS` old, and the only thing that
-refreshes `last_seen_at` is a **matched** check. One check, then silence, then the whole rolling and
-no-deadline half of the corpus auto-closing ninety days after it was seeded.
+`coalesce(last_seen_at, updated_at)` is `STALENESS_INACTIVE_DAYS` old, and for a seeded entry
+nobody edits, the only automated thing that refreshes `last_seen_at` is a **matched** check (a
+reviewer can also confirm one by hand — see "Keeping a listing open by hand" below). One check,
+then silence, then the whole rolling and no-deadline half of the corpus auto-closing ninety days
+after it was seeded.
 
 So the predicate gains a third clause — `verified_at < now() - VERIFY_RECHECK_DAYS` — and with it
 three consequences worth stating:
@@ -649,6 +651,32 @@ applied run, recognized by its `error` not starting with `stale_result:` or `not
 markers the verifier always writes first. It does not filter by today's URL, because a baseline for
 another URL is simply not compared and gets replaced. A row without such a run starts comparing from
 its first answered check after deploy.
+
+### Keeping a listing open by hand: a reviewer's "confirm still open"
+
+`last_seen_at` is refreshed by a matched source check, a publisher write, a granted claim, a review
+approval — and by a **reviewer confirming by hand that the listing is still open**. That last one
+exists for pages the automated check cannot read (a bot wall, a sign-in, a form that does not carry
+the programme's title): before it, such a listing closed for inactivity on schedule however alive
+the programme was, and the only remedy was setting `last_seen_at` in SQL against production.
+
+* `GET /v1/review/closing-soon?days=30&limit=100` lists approved, listed, open, unmerged entries
+  this job would close for inactivity within `days` (default 30, at most 365), soonest first, each
+  with its `closesAt` = `coalesce(last_seen_at, updated_at) + STALENESS_INACTIVE_DAYS`. It is the
+  job's own rule (`modules/shared/staleness.ts`, which `closureReason` calls), applied to the job's
+  own candidate scope, so an entry with a future fixed deadline and a past-due one never appear —
+  the first is never closed for inactivity, the second is closed on its deadlines whatever its clock
+  says. The job closes an entry on its first run after `closesAt`; a past `closesAt` means tonight.
+* `POST /v1/review/opportunities/{id}/confirm-open` with an optional `{"note": "…"}` (≤ 500
+  characters) sets `last_seen_at = now()` under a row lock and audits it as `update`, with the
+  reviewer as actor: `{"lastSeenAt": {"before": …, "after": …}, "reason": "<note, or a default>"}`.
+  **It changes nothing else** — not `updated_at` (that would re-queue a source check and claim an
+  edit nobody made), not the content, not the reviewer link pins. `409` `not_approved`,
+  `not_listed`, `not_open` or `opportunity_merged` for anything that is not a live, open entry.
+
+Both are on the reviewer page, under **Closing soon**. A confirmation buys one more
+`STALENESS_INACTIVE_DAYS`, not a permanent exemption: if the programme is still running when the
+listing comes round again, it is confirmed again.
 
 ### What staleness deliberately does not touch
 
@@ -986,6 +1014,10 @@ mutation. The patch names the job and its reason:
 has passed" and "nobody has re-asserted this listing in ninety days" — which are different things to
 tell a publisher. The public trail shows the changed field names and the actor `job`; the entry's
 submitter, its publisher and T3+ see the full patch.
+
+A reviewer's "confirm still open" is not a job write: it is an `update` row with `actor_kind='user'`
+and the reviewer's account, carrying `lastSeenAt` before/after and a `reason` (§3, "Keeping a
+listing open by hand").
 
 Notification delivery is operational telemetry, not an authority-bearing change, so it does not
 append an audit action. The notification row itself carries `email_dispatched_at` or

@@ -51,12 +51,16 @@ import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow } from "../../../db/schema.js";
 import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
-import { isPastDue, nextDeadlineAt } from "../../shared/deadlines.js";
+import { nextDeadlineAt } from "../../shared/deadlines.js";
+import {
+  type StalenessReason,
+  inactiveBeforeOf,
+  stalenessClosureReason,
+} from "../../shared/staleness.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
 import type { JobResult } from "./types.js";
 
-/** Why an entry was closed. Recorded verbatim in the audit patch. */
-export type StalenessReason = "past_due" | "inactive";
+export type { StalenessReason };
 
 /** How many candidates one invocation will examine before reporting the rest as remaining. */
 const DEFAULT_LIMIT = 5000;
@@ -142,7 +146,7 @@ export class StalenessService {
   async runBatch(options: StalenessOptions = {}): Promise<JobResult> {
     const now = options.now ?? new Date();
     const limit = options.limit ?? DEFAULT_LIMIT;
-    const inactiveBefore = new Date(now.getTime() - this.config.stalenessInactiveDays * 86_400_000);
+    const inactiveBefore = inactiveBeforeOf(now, this.config.stalenessInactiveDays);
 
     let examined = 0;
     let processed = 0;
@@ -295,17 +299,19 @@ export class StalenessService {
     });
   }
 
-  /** The two rules, in the order they are applied. `null` when the entry stays open. */
+  /**
+   * The two rules, in the order they are applied. `null` when the entry stays open.
+   *
+   * The rule is `modules/shared/staleness.ts`, shared with the reviewer's "closing soon" list so
+   * the date that list shows is the date this job keeps.
+   */
   private closureReason(
     row: OpportunityRow,
     next: Date | null,
     now: Date,
     inactiveBefore: Date,
   ): StalenessReason | null {
-    if (isPastDue(row.deadlines, now)) return "past_due";
-    if (next !== null) return null;
-    const touched = row.lastSeenAt ?? row.updatedAt;
-    return touched.getTime() < inactiveBefore.getTime() ? "inactive" : null;
+    return stalenessClosureReason(row, next, now, inactiveBefore);
   }
 
   private async candidates(now: Date, afterId: number, limit: number): Promise<OpportunityRow[]> {
