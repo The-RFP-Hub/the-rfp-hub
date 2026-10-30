@@ -534,10 +534,12 @@ export class OpportunityWriteService {
    * somebody else's entry is not its submitter and did not ingest it, so re-deriving attribution
    * from the acting principal would publicly reattribute the whole submission to whoever last
    * touched it — and after approval that credit is what the public detail route serves. So on an
-   * editorial write every attribution member comes off the stored row instead. `publisher` needs no
-   * branch: on a replace `namespace` IS the row's `source_publisher` (`authorizationNamespace`),
-   * and `submittedAt` needs none either — it was already preserved for everybody, because when an
-   * entry first arrived is a fact about the entry rather than about the most recent edit.
+   * editorial write every attribution member comes off the stored row instead — `publisher`
+   * included. On a replace `namespace` is the row's `source_publisher` only when it HAS one; an
+   * imported row has none, `authorizationNamespace` falls back to the id's prefix, and stamping that
+   * would publish `curated:x` as published by an organization called `curated` (and, being a
+   * content change, send the entry back to review). `submittedAt` likewise: an import that never
+   * recorded one keeps none, rather than gaining the date somebody fixed a typo.
    */
   private applyProvenance(
     document: Opportunity,
@@ -566,11 +568,14 @@ export class OpportunityWriteService {
       ...document,
       source: {
         ...(document.source ?? {}),
-        publisher: namespace,
+        publisher: editorial ? (existing?.sourcePublisher ?? undefined) : namespace,
         submittedBy,
         // Preserved across an update: when the entry first arrived is a fact about the entry, not
-        // about the most recent edit.
-        submittedAt: (existing?.sourceSubmittedAt ?? now).toISOString(),
+        // about the most recent edit. An import that never recorded one keeps not having one — an
+        // editorial write is not when it arrived.
+        submittedAt: editorial
+          ? existing?.sourceSubmittedAt?.toISOString()
+          : (existing?.sourceSubmittedAt ?? now).toISOString(),
         ingestedVia: editorial
           ? (existing?.ingestedVia ?? undefined)
           : principal.credentialKind === "api_key"
