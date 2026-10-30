@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { metadata as leavingMetadata } from "@/app/leaving/[id]/layout";
 import { generateMetadata as listingMetadata } from "@/app/listings/[id]/layout";
 import { metadata as listingsMetadata } from "@/app/listings/layout";
 import { generateMetadata as opportunityMetadata } from "@/app/opportunities/[id]/layout";
@@ -56,6 +57,7 @@ const NOINDEX_ROUTES = [
   "/dashboard",
   "/duplicates",
   "/keys",
+  "/leaving/[id]",
   "/listings",
   "/listings/[id]",
   "/listings/[id]/edit",
@@ -99,6 +101,7 @@ describe("route metadata", () => {
       "/duplicates",
       "/how-it-works",
       "/keys",
+      "/leaving/[id]",
       "/listings",
       "/listings/[id]",
       "/listings/[id]/edit",
@@ -158,6 +161,8 @@ describe("route metadata", () => {
       title: { default: "Your listings", template: "%s | RFPSear.ch" },
       robots: NOINDEX_ROBOTS,
     });
+    // The link-out step: a static title and never indexed — it is a door, not a destination.
+    expect(leavingMetadata).toEqual({ title: "You’re leaving", robots: NOINDEX_ROBOTS });
   });
 
   // The root layout's `index: true` cascades to every route that does not override it.
@@ -201,6 +206,8 @@ describe("route metadata", () => {
       "/dashboard": "dashboard/layout.tsx",
       "/duplicates": "duplicates/layout.tsx",
       "/keys": "keys/layout.tsx",
+      // Like `/auth`, the prefix has no layout of its own: `/leaving/[id]` is its only route.
+      "/leaving": "leaving/[id]/layout.tsx",
       "/listings": "listings/layout.tsx",
       "/notifications": "notifications/layout.tsx",
       "/organisations": "organisations/[[...rest]]/layout.tsx",

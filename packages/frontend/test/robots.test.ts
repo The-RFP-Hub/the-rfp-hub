@@ -47,6 +47,15 @@ describe("robots.txt", () => {
     });
   });
 
+  it("disallows the link-out step on the canonical origin, for a crawler that ignores noindex", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
+
+    const file = await robots();
+    const rules = file.rules as { disallow: string[] };
+    expect(rules.disallow).toContain("/leaving");
+  });
+
   it("points at this deployment's own sitemap on the canonical origin", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
     await mockHost("rfpsear.ch");
