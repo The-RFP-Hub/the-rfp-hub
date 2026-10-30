@@ -11,6 +11,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
   bearer,
   grantMembership,
@@ -25,6 +26,8 @@ import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3write";
 const OTHER_NS = "m3write-other";
+/** Operates the imported entry, so its upsert never touches the verified `NS` row. */
+const LEGACY_ORG = "m3write-legacy-org";
 const EMAILS = {
   submitter: "m3write-submitter@rfphub.invalid",
   publisher: "m3write-publisher@rfphub.invalid",
@@ -76,7 +79,7 @@ run("M3WRITE submissions", () => {
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3write",
-      organizationSlugs: [NS, OTHER_NS],
+      organizationSlugs: [NS, OTHER_NS, LEGACY_ORG],
       userIds,
       emails: Object.values(EMAILS),
     });
@@ -536,6 +539,54 @@ run("M3WRITE submissions", () => {
       );
     expect(editorial?.action).toBe("update");
     expect(editorial?.patch.actorRole).toBe("reviewer");
+  });
+
+  it("leaves an imported entry unattributed when a reviewer edits it", async () => {
+    // An import carries no publisher, so a replace authorizes against the id's prefix. Stamping
+    // that prefix as `source.publisher` would have published `curated:x` as "published by its
+    // organization" — an organization called `curated` — and, as a content change, sent an
+    // unchanged re-save back to the review queue.
+    const id = `${NS}-import:legacy`;
+    await new OpportunityService().upsertFromStandard(
+      submission(id, LEGACY_ORG) as unknown as Opportunity,
+      { reviewStatus: "approved", isListed: true, sourceSystem: `${NS}-import` },
+    );
+    const lastSeen = new Date("2026-08-14T20:36:43Z");
+    await db
+      .update(opportunities)
+      .set({ lastSeenAt: lastSeen, updatedAt: lastSeen })
+      .where(eq(opportunities.publicId, id));
+
+    const stored = await app.inject({
+      url: `/v1/review/opportunities/${id}`,
+      headers: bearer(reviewerToken),
+    });
+    expect(stored.statusCode, stored.body).toBe(200);
+    const document: Record<string, unknown> = stored.json();
+    const resaved = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(reviewerToken),
+      payload: document,
+    });
+    expect(resaved.statusCode, resaved.body).toBe(200);
+    // Nothing changed, so the approval stands — and the re-save is the "still real" signal.
+    expect(resaved.json().reviewStatus).toBe("approved");
+    expect(resaved.json().opportunity.source.publisher).toBeUndefined();
+    expect(resaved.json().opportunity.source.submittedAt).toBeUndefined();
+    const [row] = await db.select().from(opportunities).where(eq(opportunities.publicId, id));
+    expect(row?.sourcePublisher).toBeNull();
+    expect(row?.lastSeenAt?.getTime()).toBeGreaterThan(lastSeen.getTime());
+
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(reviewerToken),
+      payload: { ...document, title: "Corrected by a reviewer" },
+    });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().reviewStatus).toBe("pending");
+    expect(edited.json().opportunity.source.publisher).toBeUndefined();
   });
 
   it("404s a PUT against an entry that does not exist and 403s one owned by somebody else", async () => {
