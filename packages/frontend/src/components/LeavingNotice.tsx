@@ -133,7 +133,7 @@ export function LeavingNotice({ id }: { id: string }) {
 
       <div className="callout leaving-reason">
         <p className="empty-title">
-          <IconLabel icon={ExclamationTriangleIcon}>Why you&rsquo;re seeing this</IconLabel>
+          <IconLabel icon={ExclamationTriangleIcon}>Security notice</IconLabel>
         </p>
         <p>{reasonCopy(reason)}</p>
       </div>

@@ -182,38 +182,44 @@ describe("the reason the reader was sent here", () => {
   it.each([
     [
       "closed",
-      /This program is closed\. The link may no longer work, and the site behind it may have changed hands since the listing was reviewed\./,
-    ],
-    [
-      "unreviewed",
-      /added or changed after the listing was last reviewed, and nobody here has checked it yet/,
+      /^This program is closed\. The link may no longer work, or the site behind it may have changed hands\.$/,
     ],
     [
       "landing_changed",
-      /When we last checked this link, it sent visitors to a different site than it did before\./,
+      /^When we last checked this link, it sent visitors to a different site than it did before\.$/,
     ],
-  ] as const)("explains reason=%s in its own words", async (reason, copy) => {
-    open(`link=apply&reason=${reason}`);
+  ] as const)(
+    "explains reason=%s in its own words, under the security notice",
+    async (reason, copy) => {
+      open(`link=apply&reason=${reason}`);
 
-    await continueLink();
-    expect(REASON_COPY[reason]).toMatch(copy);
-    const callout = screen.getByText("Why you’re seeing this").closest(".leaving-reason");
-    expect(within(callout as HTMLElement).getByText(copy)).toBeTruthy();
-    expect(screen.queryByText(UNKNOWN_REASON_COPY)).toBeNull();
-    // Still one click from the destination: a caution, never a stop.
-    expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
-  });
+      await continueLink();
+      expect(REASON_COPY[reason]).toMatch(copy);
+      const callout = screen.getByText("Security notice").closest(".leaving-reason");
+      expect(within(callout as HTMLElement).getByText(copy)).toBeTruthy();
+      expect(screen.queryByText(UNKNOWN_REASON_COPY)).toBeNull();
+      // Still one click from the destination: a caution, never a stop.
+      expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
+    },
+  );
 
   it.each([
+    ["unreviewed", "link=apply&reason=unreviewed"],
     ["missing", "link=apply"],
     ["unknown", "link=apply&reason=compromised"],
     ["differently cased", "link=apply&reason=CLOSED"],
-  ])("says only that it can't vouch for the link when the reason is %s", async (_, query) => {
+  ])("shows only the plain security notice when the reason is %s", async (_, query) => {
     open(query);
 
     await continueLink();
-    expect(screen.getByText(UNKNOWN_REASON_COPY)).toBeTruthy();
-    for (const copy of Object.values(REASON_COPY)) expect(screen.queryByText(copy)).toBeNull();
+    const callout = screen.getByText("Security notice").closest(".leaving-reason");
+    expect(within(callout as HTMLElement).getByText(UNKNOWN_REASON_COPY)).toBeTruthy();
+    expect(REASON_COPY.unreviewed).toBe(UNKNOWN_REASON_COPY);
+    for (const copy of [REASON_COPY.closed, REASON_COPY.landing_changed]) {
+      expect(screen.queryByText(copy)).toBeNull();
+    }
+    // A notice, not a verdict: nothing on the page says the link went unchecked or unreviewed.
+    expect(document.body.textContent).not.toMatch(/review|checked it|vouch/i);
     expect((await continueLink()).getAttribute("href")).toBe(APPLY_URL);
   });
 });

@@ -52,13 +52,15 @@ describe("what agents are told", () => {
     // its user as a malfunction; both texts say what can actually happen.
     const text = llmsTxt(origins);
     expect(text).toContain(
-      `[Apply link](${origins.apiBaseUrl}/v1/r/{id}/apply): redirects to the program's own application page, or to an RFPSear.ch page that shows the destination first when the link hasn't been reviewed or the program is closed.`,
+      `[Apply link](${origins.apiBaseUrl}/v1/r/{id}/apply): redirects to the program's own application page, or to an RFPSear.ch security notice that shows the destination first.`,
     );
     expect(text).toContain("Link to it rather than copying `applicationUrl`.");
 
     const prompt = agentPrompt(origins);
     expect(prompt).toContain(`${origins.apiBaseUrl}/v1/r/{id}/apply to open myself`);
-    expect(prompt).toContain("to an RFPSear.ch page that shows me the destination first");
+    expect(prompt).toContain(
+      "to an RFPSear.ch security notice that shows me the destination first",
+    );
   });
 
   it("names only the list-valued filters as comma-separated", () => {

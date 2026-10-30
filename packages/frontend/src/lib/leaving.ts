@@ -19,7 +19,7 @@
  * FAILING SAFE MEANS ONE EXTRA CLICK, NEVER A BLOCKED ONE. Every value this module does not
  * recognise degrades to the most general wording rather than to an error: an unknown `link` is the
  * application link (the one the API sends almost every reader through), an unknown or missing
- * `reason` is "we can't vouch for this link right now". A future API that adds a fourth reason
+ * `reason` is the plain security notice. A future API that adds a fourth reason
  * before this page learns it still gets a page that shows the destination and lets the reader on.
  */
 import type { Opportunity } from "@/lib/types";
@@ -56,22 +56,27 @@ export function readLeavingQuery(params: Pick<URLSearchParams, "get">): LeavingQ
 }
 
 /**
- * Why the reader is looking at this page instead of the destination, in the site's own voice.
+ * What the security notice says, in the site's own voice.
  *
- * Each sentence states what we know and stops there. "Unreviewed" does not mean "unsafe" and
- * "landing changed" does not mean "hijacked"; saying more than the check established would teach
- * readers to ignore the page the first time it is wrong.
+ * Each sentence states what we know and stops there. `unreviewed` is the common case and gets the
+ * plain security notice rather than an account of our review queue: "nobody has checked this"
+ * reads as a warning about the program, which it is not, and teaches readers to distrust listings
+ * that are fine. `closed` and `landing_changed` are facts about the link the reader can act on, so
+ * they say them — "landing changed" still does not mean "hijacked", and the copy does not claim it.
+ * An unknown reason gets the same plain notice as `unreviewed`.
  */
+const SECURITY_NOTICE =
+  "For your security, RFPSear.ch shows you where a link goes before you leave the site.";
+
 export const REASON_COPY: Record<LeavingReason, string> = {
   closed:
-    "This program is closed. The link may no longer work, and the site behind it may have changed hands since the listing was reviewed.",
-  unreviewed:
-    "This link was added or changed after the listing was last reviewed, and nobody here has checked it yet.",
+    "This program is closed. The link may no longer work, or the site behind it may have changed hands.",
+  unreviewed: SECURITY_NOTICE,
   landing_changed:
     "When we last checked this link, it sent visitors to a different site than it did before.",
 };
 
-export const UNKNOWN_REASON_COPY = "We can’t vouch for this link right now.";
+export const UNKNOWN_REASON_COPY = SECURITY_NOTICE;
 
 export function reasonCopy(reason: LeavingReason | null): string {
   return reason === null ? UNKNOWN_REASON_COPY : REASON_COPY[reason];
