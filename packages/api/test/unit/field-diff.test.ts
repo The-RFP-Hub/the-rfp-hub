@@ -19,6 +19,7 @@ import {
   isMatched,
   jaccard,
   offDomainRedirect,
+  siteOf,
   tokenize,
 } from "../../src/modules/shared/field-diff.js";
 
@@ -85,6 +86,25 @@ describe("amountForms", () => {
   it("covers bare and thousands-grouped forms", () => {
     expect(amountForms(50000)).toEqual(["50000", "50,000"]);
     expect(amountForms(500)).toEqual(["500"]);
+  });
+});
+
+describe("siteOf", () => {
+  // The ONE definition of "the same site", shared with the source check's landing comparison.
+  it("is the hostname's last two labels, lowercased", () => {
+    expect(siteOf("https://Grants.Example.ORG/apply?x=1")).toBe("example.org");
+    expect(siteOf("https://example.org")).toBe("example.org");
+  });
+
+  // Errs only towards "the same site": two hosts under one registrable domain always agree, so a
+  // multi-label suffix can hide a move but never invent one.
+  it("collapses a multi-label public suffix rather than splitting one site in two", () => {
+    expect(siteOf("https://a.example.co.uk/")).toBe(siteOf("https://www.example.co.uk/"));
+  });
+
+  it("is undefined for a value that is not a URL", () => {
+    expect(siteOf("apply.example.org")).toBeUndefined();
+    expect(siteOf("")).toBeUndefined();
   });
 });
 

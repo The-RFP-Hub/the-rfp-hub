@@ -73,7 +73,7 @@ import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow, VerificationRunRow } from "../../../db/schema.js";
 import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import type { VerificationRunView } from "../../shared/api-views.js";
-import { type FieldDiff, fieldDiff, isMatched } from "../../shared/field-diff.js";
+import { type FieldDiff, fieldDiff, isMatched, siteOf } from "../../shared/field-diff.js";
 import { detectBotChallenge, detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
 import { type AuditActor, SYSTEM_ACTOR } from "../audit/audit.service.js";
@@ -279,7 +279,12 @@ export class VerificationService {
       // (`pruneToLatest`), so a run whose text lived only on a pruned ancestor would carry a digest
       // of bytes nobody stores any more — the snapshot of record has to be on the row that claims
       // it. Nothing is re-fetched to do this; it is the row already in front of us.
-      const previous = fetched ? await repos.verificationRuns.latest(row.id) : undefined;
+      const applied = !stale && !transient;
+      // Read for an APPLIED run that got no page, too: the landing comparison below needs the
+      // previous run whenever this one is a verdict, and a redirect the fetcher stopped following or
+      // a content type it would not read still says where the link went.
+      const previous =
+        fetched !== undefined || applied ? await repos.verificationRuns.latest(row.id) : undefined;
       const unchanged =
         fetched !== undefined &&
         fetched.truncated === false &&
@@ -331,7 +336,6 @@ export class VerificationService {
       await repos.verificationRuns.pruneToLatest([row.id], this.config.verification.runsKeep);
 
       const matched = assessed?.matched ?? false;
-      const applied = !stale && !transient;
       if (applied) {
         await repos.opportunities.applyVerification(row.id, {
           verifiedAgainstSource: matched,
@@ -347,6 +351,14 @@ export class VerificationService {
         });
       }
 
+      // WHERE THE APPLY LINK LANDS, compared with where it landed last time — the one change to a
+      // link-out that a reviewer's pin cannot see, because the stored URL did not move. A verdict
+      // only: a stale run was about content that has since been replaced, and a transient one never
+      // reached anybody. Set once, never cleared here; see `landingMove` and `flagLandingChanged`.
+      const landing = applied ? landingMove(previous, run) : undefined;
+      const landingFlagged =
+        landing !== undefined && (await repos.opportunities.flagLandingChanged(row.id, now));
+
       await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
@@ -359,6 +371,14 @@ export class VerificationService {
               finalUrl: fetched?.finalUrl ?? null,
               httpStatus: fetched?.status ?? failure?.status ?? null,
               ...(failure ? { error: failure.category } : {}),
+              // A before/after pair, because this one DID change the entry: from here its apply
+              // link-out goes through the leaving page until a reviewer pins it again.
+              ...(landingFlagged && landing
+                ? {
+                    linkLandingChangedAt: { before: null, after: now.toISOString() },
+                    landingSite: landing,
+                  }
+                : {}),
             }
           : {
               // No before/after pair in either case: nothing about the entry changed, and a trail
@@ -583,6 +603,43 @@ function wasComplete(extracted: Record<string, unknown> | null): boolean {
 
 function isTransientFailure(failure: SourceFetchError | undefined): boolean {
   return failure !== undefined && TRANSIENT_FETCH_FAILURES.has(failure.category);
+}
+
+/** The three facts about a run that say where its link landed. */
+type Landing = Pick<VerificationRunRow, "requestedUrl" | "finalUrl" | "httpStatus">;
+
+/**
+ * Whether the apply link now lands on a different SITE than it did on the previous check — the
+ * signal behind the `landing_changed` link-out reason (`modules/shared/link-out.ts`).
+ *
+ * THREE CONDITIONS BEYOND "THE SITES DIFFER", each closing a false alarm. A false alarm here is not
+ * free: it sends every reader of that listing through the leaving page until a reviewer saves it.
+ *
+ *   1. **The same requested URL.** An edited link is supposed to land somewhere new, and it is the
+ *      pin's job to notice that, not this one's.
+ *   2. **Both runs got an answer from a server** — an HTTP status, whether the page itself, a
+ *      redirect the fetcher stopped following, or a refused content type. A run without one never
+ *      saw a landing: the transient failures (`timeout`, `transport_failure`, `dns_failure`) never
+ *      carry a status, and a `dns_failure` does not even record a URL. Without this, one timed-out
+ *      check of a vanity link that redirects to its form host would record the vanity host as the
+ *      "landing", and the next good check would flag a move that never happened. The current run's
+ *      own transience is excluded by the caller (only an applied run is compared), the previous
+ *      run's is excluded here.
+ *   3. **"Site" is `siteOf`**, the last two labels — the same notion `offDomainRedirect` reports,
+ *      so `grants.example.org` → `www.example.org` is not a move, and the two signals can never
+ *      disagree about what leaving a site means.
+ */
+export function landingMove(
+  previous: Landing | undefined,
+  current: Landing,
+): { from: string; to: string } | undefined {
+  if (!previous || previous.requestedUrl !== current.requestedUrl) return undefined;
+  if (previous.httpStatus === null || current.httpStatus === null) return undefined;
+  if (previous.finalUrl === null || current.finalUrl === null) return undefined;
+  const from = siteOf(previous.finalUrl);
+  const to = siteOf(current.finalUrl);
+  if (!from || !to || from === to) return undefined;
+  return { from, to };
 }
 
 interface Assessment {

@@ -620,6 +620,18 @@ Conditional requests — `If-None-Match` / `If-Modified-Since`, which would save
 as the storage — are **not** sent. Neither the fetcher's result nor `verification_runs` keeps a
 response's `ETag` or `Last-Modified`, so there is nothing to send them from without a migration.
 
+**A check that sees the link land somewhere new flags it.** When an applied run (not stale, not
+transient) requested the same `applicationUrl` as the previous run, and both got an answer from a
+server, their `final_url`s are compared by site — the same last-two-labels rule as
+`offDomainRedirect`. A different site sets `opportunities.link_landing_changed_at` (once; a later
+check never moves or clears it), and the `verify_source` audit patch carries
+`linkLandingChangedAt` and `landingSite: {from, to}`. From then on `/v1/r/:id/apply` sends readers
+through the frontend's leaving page with `reason=landing_changed` until a reviewer approves or saves
+the listing, which clears the flag. The stored URL did not change, so this is the one link-out
+change a reviewer's pin cannot see; a shortener retargeted to another form is the case it is for.
+A transient failure changes nothing, and is never used as the "previous" landing either: its URL is
+wherever the request gave up, not where the link goes.
+
 ### What staleness deliberately does not touch
 
 `updated_at`. Two things read it, and both break if a maintenance pass moves it: this job's own

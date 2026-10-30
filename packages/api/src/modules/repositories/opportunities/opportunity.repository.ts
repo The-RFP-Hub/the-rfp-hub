@@ -476,6 +476,55 @@ export class OpportunityRepository {
     return rows[0];
   }
 
+  /**
+   * What a link-out needs, and only for an entry the public reads acknowledge.
+   *
+   * THE PUBLIC PREDICATE IS IN THE QUERY, the same `approved AND is_listed` every public read opens
+   * with: a redirect that resolved a pending entry would confirm it exists and hand out its URL.
+   * Narrow on purpose — the stored links, what a reviewer last vouched for, the status and the
+   * landing flag are the whole of the redirect's decision (`modules/shared/link-out.ts`).
+   */
+  async findPublicLinkByPublicId(publicId: string) {
+    const rows = await this.exec
+      .select({
+        publicId: opportunities.publicId,
+        status: opportunities.status,
+        applicationUrl: opportunities.applicationUrl,
+        website: opportunities.website,
+        reviewedApplicationUrl: opportunities.reviewedApplicationUrl,
+        reviewedWebsite: opportunities.reviewedWebsite,
+        linkLandingChangedAt: opportunities.linkLandingChangedAt,
+      })
+      .from(opportunities)
+      .where(
+        and(
+          eq(opportunities.publicId, publicId),
+          eq(opportunities.reviewStatus, "approved"),
+          eq(opportunities.isListed, true),
+        ),
+      )
+      .limit(1);
+    return rows[0];
+  }
+
+  /**
+   * Record that the apply link now lands on a different site — ONCE.
+   *
+   * `IS NULL` in the predicate keeps the FIRST sighting: the flag says since when the destination
+   * has been unvouched, and a later check seeing the same new site must not move that instant.
+   * `updated_at` is deliberately untouched, as in `applyVerification`: bumping it would make the
+   * source check's own write put the entry back in its selection (`verified_at < updated_at`) for
+   * ever. Clearing is not here at all — only a reviewer's pin clears it.
+   */
+  async flagLandingChanged(id: number, at: Date): Promise<boolean> {
+    const rows = await this.exec
+      .update(opportunities)
+      .set({ linkLandingChangedAt: at })
+      .where(and(eq(opportunities.id, id), isNull(opportunities.linkLandingChangedAt)))
+      .returning({ id: opportunities.id });
+    return rows.length > 0;
+  }
+
   async findMergedDestinationByPublicId(publicId: string) {
     const survivor = alias(opportunities, "public_merge_survivor");
     const rows = await this.exec

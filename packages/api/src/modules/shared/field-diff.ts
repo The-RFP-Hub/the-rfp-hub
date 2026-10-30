@@ -169,26 +169,39 @@ export interface FieldDiff {
 }
 
 /**
+ * The "site" a URL is on: its hostname's last two labels, lowercased — or `undefined` when the
+ * value is not a URL at all.
+ *
+ * Deliberately crude, and the ONE definition of it: `grants.example.org` and `www.example.org` are
+ * the same site, and a multi-label public suffix (`example.co.uk`) collapses to `co.uk`, which can
+ * only ever make two different sites look the same and never the reverse. Both readers want that
+ * direction of error — `offDomainRedirect` below, and the source check's landing comparison
+ * (`verification.service.ts`), where a missed change costs nothing new and a false one costs every
+ * reader an extra click until a reviewer clears it. A second copy would eventually disagree with
+ * this one about what "the same site" means.
+ */
+export function siteOf(raw: string): string | undefined {
+  try {
+    return new URL(raw).hostname.toLowerCase().split(".").slice(-2).join(".");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Whether the final URL left the host that was requested.
  *
  * A flag, never a rejection: a foundation legitimately redirects to its grants platform, and a
  * dead programme legitimately redirects to a homepage. Only a reviewer can tell those apart, so
- * this records the fact and says nothing about what it means. Compared on the last two labels so
- * `grants.example.org` → `www.example.org` is not reported as leaving the site.
+ * this records the fact and says nothing about what it means. Compared on the last two labels
+ * (`siteOf`) so `grants.example.org` → `www.example.org` is not reported as leaving the site.
  */
 export function offDomainRedirect(
   requestedUrl: string,
   finalUrl: string,
 ): { from: string; to: string } | undefined {
-  const site = (raw: string): string | undefined => {
-    try {
-      return new URL(raw).hostname.toLowerCase().split(".").slice(-2).join(".");
-    } catch {
-      return undefined;
-    }
-  };
-  const from = site(requestedUrl);
-  const to = site(finalUrl);
+  const from = siteOf(requestedUrl);
+  const to = siteOf(finalUrl);
   if (!from || !to || from === to) return undefined;
   return { from, to };
 }

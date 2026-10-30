@@ -474,6 +474,32 @@ export const opportunities = pgTable(
      */
     mergedFromPublic: boolean().notNull().default(false),
 
+    /**
+     * THE LINK-OUTS A PERSON VOUCHED FOR: the exact `application_url` and `website` a reviewer last
+     * approved or saved, copied verbatim (see `modules/shared/link-out.ts`).
+     *
+     * `/v1/r/:id/apply` and `/source` hop through this project's own domain, and a hop on our
+     * domain reads as an endorsement of wherever it lands. So the redirect sends a reader straight
+     * through only while the stored URL is still the one somebody reviewed; any other value — a
+     * verified publisher's auto-approved edit, a brand-new auto-approved listing, a row nobody has
+     * reviewed since this column existed — gets the frontend's "leaving" page instead. NULL means
+     * "never vouched", which is every row the backfill did not find approved.
+     *
+     * Server bookkeeping, never content: excluded from `comparableOpportunity`, so re-pinning on an
+     * unchanged save is not an edit and does not requeue anything.
+     */
+    reviewedApplicationUrl: text(),
+    reviewedWebsite: text(),
+    /**
+     * Set by the nightly source check when the apply link LANDED on a different site than it did on
+     * the previous check of the same URL — a retargeted shortener, a programme page that now
+     * redirects somewhere else. The stored URL has not changed, so the pin above cannot notice;
+     * this is the half of "still the destination somebody reviewed" that only a fetch can see.
+     *
+     * Set once and left alone by later checks; only a reviewer's pin clears it.
+     */
+    linkLandingChangedAt: timestamp({ withTimezone: true }),
+
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

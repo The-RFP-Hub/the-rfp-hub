@@ -282,7 +282,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `GET /v1/opportunities`, `/:id`, `/schema` | none | public read surface, unchanged |
 | `GET /v1/stats`, `/v1/health`, `/v1/feeds/*`, `/v1/export/*` | none | unchanged |
 | `GET /v1/publishers` | none | verified organizations only |
-| `GET /v1/r/:id/apply`, `/v1/r/:id/source` | none | `302` for approved **and** listed entries only; `404` otherwise |
+| `GET /v1/r/:id/apply`, `/v1/r/:id/source` | none | `302` for approved **and** listed entries only; `404` otherwise. The `302` goes to the stored link only when a reviewer vouched for exactly that link, else to the frontend's leaving page (`APP_BASE_URL/leaving/{id}?link=…&reason=closed\|unreviewed\|landing_changed`) |
 | `GET /v1/opportunities/:id/audit` | optional | redacted for the public; full patch for the owner and T3+ |
 | `GET /v1/opportunities/:id/duplicates` | optional | an unprivileged caller never sees a non-public other side |
 | `GET /v1/opportunities/:id/verification` | optional | 404 when never checked — a real state |

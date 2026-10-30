@@ -120,6 +120,13 @@
       "when": 1790359673787,
       "tag": "0016_spec_version_1_0_1",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793325372431,
+      "tag": "0017_link_out_reviewed_destinations",
+      "breakpoints": true
     }
   ]
 }

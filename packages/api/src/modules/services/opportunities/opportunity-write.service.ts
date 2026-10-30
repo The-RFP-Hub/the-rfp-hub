@@ -69,6 +69,7 @@ import {
   hasVerifiedMembership,
 } from "../../shared/capabilities.js";
 import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
+import { reviewerPins } from "../../shared/link-out.js";
 import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
 import { comparableOpportunity as comparable } from "../../shared/opportunity-content.js";
 import { diffFields } from "../../shared/patch.js";
@@ -791,6 +792,29 @@ export class OpportunityWriteService {
       // A publisher asserting the entry is exactly the "still real" signal the staleness job reads.
       lastSeenAt: now,
       updatedAt: now,
+      /**
+       * THE LINK-OUT PINS MOVE ONLY FOR A REVIEWER (`modules/shared/link-out.ts`).
+       *
+       * A reviewer's save — editorial or of their own entry — is a person looking at the document,
+       * links included, so it pins both to what this write stores and clears the landing flag. That
+       * is also how a reviewer re-vouches for a listing: open it, check where it goes, press Save.
+       * Pins are bookkeeping, not content (`NON_CONTENT`), so an unchanged save stays unchanged and
+       * keeps its approval.
+       *
+       * EVERY OTHER WRITER LEAVES THEM WHERE THEY ARE — absent from `values`, so an update does not
+       * touch them and a create starts at NULL. That includes a verified publisher, whose write is
+       * auto-approved and published without anyone at the hub seeing it.
+       *
+       * THE TRADE-OFF, stated because it is visible: a verified organisation that changes its own
+       * application link sends readers through the leaving page until a reviewer saves the listing,
+       * and a brand-new listing from a verified publisher starts that way. Accepted deliberately.
+       * Auto-approval is trust in the ORGANISATION, and a link is the one field where misplaced trust
+       * turns our domain into a launch pad: a compromised member account needs to change nothing
+       * else. The cost of erring in the cautious direction is one extra click, never a blocked one.
+       * A link they did not change stays vouched through every other edit, because the pin is
+       * compared to the stored URL, not to whoever wrote last.
+       */
+      ...(caps.canReview ? reviewerPins(opp) : {}),
     };
 
     const created = existing === undefined;

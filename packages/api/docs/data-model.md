@@ -264,6 +264,14 @@ CREATE TABLE opportunities (
   -- staleness — ✅ M3
   last_seen_at       TIMESTAMPTZ,                       -- last confirmed-at-source / publisher touch
 
+  -- link-out vouching — ✅ M5. `/v1/r/:id/{apply,source}` goes straight to the stored link only
+  -- while it equals what a reviewer last pinned; otherwise to the frontend's leaving page.
+  -- Pinned by a reviewer's approval or save and by an approved import; never by a publisher's
+  -- write. Server bookkeeping, not content: an unchanged save that re-pins is not an edit.
+  reviewed_application_url TEXT,                        -- the application_url a reviewer last vouched for
+  reviewed_website         TEXT,                        -- the website a reviewer last vouched for
+  link_landing_changed_at  TIMESTAMPTZ,                 -- the source check saw the apply link land on another site; a reviewer's pin clears it
+
   -- full-text search (weighted)
   search_tsv         tsvector GENERATED ALWAYS AS (
                         setweight(to_tsvector('english', coalesce(title,'')), 'A') ||
