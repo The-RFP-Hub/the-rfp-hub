@@ -12,7 +12,7 @@
 import { OrgMark } from "@/components/OrgMark";
 import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
-import { formatCount, formatInstant } from "@/lib/format";
+import { formatCount, formatDate } from "@/lib/format";
 import { PUBLISHERS_DOC } from "@/lib/links";
 import { loadOpenSet } from "@/lib/open-set";
 import { useResource } from "@/lib/resource";
@@ -198,7 +198,7 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       ) : null}
 
       <p className="muted footnote">
-        {publisher.verifiedAt ? `Verified ${formatInstant(publisher.verifiedAt)}` : "Verified"}
+        {publisher.verifiedAt ? `Verified ${formatDate(publisher.verifiedAt)}` : "Verified"}
       </p>
 
       <p>
