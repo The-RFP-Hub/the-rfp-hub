@@ -3492,6 +3492,12 @@ body:has(.landing) .shell-submit {
   margin: 0;
 }
 
+/* The destination host beside a secondary link-out: present, readable, and quieter than the label. */
+.action-host {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
 .share-card-preview {
   display: block;
   inline-size: 100%;

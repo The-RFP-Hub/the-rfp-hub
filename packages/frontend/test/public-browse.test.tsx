@@ -1042,8 +1042,9 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     // NAMED FOR WHERE IT GOES. The action this page exists for is leaving it, and the label says
-    // whose site the reader lands on before they click rather than after.
-    const apply = await screen.findByRole("link", { name: /Apply on .*’s site/ });
+    // which host the reader lands on before they click rather than after — the href is the API's
+    // counted hop, so hovering it would only ever show the API.
+    const apply = await screen.findByRole("link", { name: "Apply on acme.example.com" });
     expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
     expect(apply.getAttribute("target")).toBe("_blank");
     expect(apply.getAttribute("rel")).toBe("noopener noreferrer");
@@ -1051,8 +1052,76 @@ describe("the public opportunity page", () => {
     // It is the one filled control on the page, which is how "this one does the thing" is said
     // without a colour.
     expect(apply.className).toContain("button-primary");
+    // The footnote keeps saying the application happens elsewhere, without claiming the host is
+    // the program's own.
+    expect(screen.getByText("You apply with the program itself, not on RFPSear.ch.")).toBeTruthy();
+    expect(screen.queryByText(/Acme Foundation’s site/)).toBeNull();
 
-    const source = screen.getByRole("link", { name: "Program site" });
+    const source = screen.getByRole("link", { name: "Program site acme.example.com" });
+    expect(source.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/source`);
+  });
+
+  it("names a shared form platform as itself, not as the operator's site", async () => {
+    // Most application links are Typeform, Airtable, Tally or a Google Form; the button says so
+    // rather than vouching that the operator owns the page.
+    const { client } = stub({
+      find: async () => ({
+        ...entry,
+        applicationUrl: "https://www.typeform.com/to/AbC123",
+        website: "https://www.acme.example.com/grants",
+      }),
+    });
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    const apply = await screen.findByRole("link", { name: "Apply on typeform.com" });
+    expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
+    expect(screen.getByRole("link", { name: "Program site acme.example.com" })).toBeTruthy();
+  });
+
+  it("names the host the browser will reach, not the one a URL's text leads with", async () => {
+    const { client } = stub({
+      find: async () => ({ ...entry, applicationUrl: "https://airtable.com@evil.example/form" }),
+    });
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("link", { name: "Apply on evil.example" })).toBeTruthy();
+  });
+
+  it.each([
+    ["has no web host", "mailto:grants@acme.example.com"],
+    ["does not parse", "not a url at all"],
+  ])(
+    "falls back to the wording it used before when the stored URL %s",
+    async (_, applicationUrl) => {
+      const { client } = stub({ find: async () => ({ ...entry, applicationUrl }) });
+      mount(client, <PublicOpportunity id="acme:round-4" />);
+
+      const apply = await screen.findByRole("link", { name: "Apply on Acme Foundation’s site" });
+      // Still the counted hop: the API decides what to do with a value it would not redirect to.
+      expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
+    },
+  );
+
+  it("falls back to the program's site when the operator's name is too long to fit", async () => {
+    const { client } = stub({
+      find: async () => ({
+        ...entry,
+        applicationUrl: "not a url at all",
+        operatingOrganizations: [
+          { name: "The Extremely Long Named Foundation", slug: "long" },
+        ] as Opportunity["operatingOrganizations"],
+      }),
+    });
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("link", { name: "Apply on the program’s site" })).toBeTruthy();
+  });
+
+  it("leaves the program-site link unnamed by host when the stored website has none", async () => {
+    const { client } = stub({ find: async () => ({ ...entry, website: "acme.example.com" }) });
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    const source = await screen.findByRole("link", { name: "Program site" });
     expect(source.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/source`);
   });
 
@@ -1066,7 +1135,9 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByText("This listing states no application link.")).toBeTruthy();
-    const fallback = screen.getByRole("link", { name: /Open the program site/ });
+    const fallback = screen.getByRole("link", {
+      name: "Open the program site on acme.example.com",
+    });
     expect(fallback.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/source`);
     expect(fallback.className).toContain("button-primary");
   });

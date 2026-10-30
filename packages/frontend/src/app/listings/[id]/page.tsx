@@ -40,6 +40,7 @@ import {
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { DuplicateList, ManagedOpportunity, Me, Opportunity } from "@/lib/types";
+import { linkHost } from "@/lib/url-policy";
 import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -218,21 +219,37 @@ function Header({
         </span>
       </div>
 
+      {/*
+       * NAMED BY HOST, like the public page's apply button: the href is the API's counted hop, so
+       * hovering shows the API, and the label is the only place a publisher checking their own
+       * listing can see where it actually sends people.
+       */}
       <div className="row">
         {entry.applicationUrl ? (
           <a href={linkOutUrl(api.baseUrl, id, "apply")} target="_blank" rel="noopener noreferrer">
-            Open the application page
+            <HostedLabel label="Open the application page" url={entry.applicationUrl} />
           </a>
         ) : null}
         {entry.website ? (
           <a href={linkOutUrl(api.baseUrl, id, "source")} target="_blank" rel="noopener noreferrer">
-            Open the program site
+            <HostedLabel label="Open the program site" url={entry.website} />
           </a>
         ) : null}
         <span className="muted">(these links record aggregate outbound clicks)</span>
       </div>
 
       <UntrustedBlock value={entry.description} />
+    </>
+  );
+}
+
+/** "{label} on {host}", or the bare label when the stored value has no web host to name. */
+function HostedLabel({ label, url }: { label: string; url: string }) {
+  const host = linkHost(url);
+  if (!host) return <>{label}</>;
+  return (
+    <>
+      {label} on <UntrustedText value={host} />
     </>
   );
 }
