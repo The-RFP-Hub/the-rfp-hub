@@ -440,7 +440,10 @@ export interface ClosingSoonList {
   windowDays: number;
   inactiveDays: number;
   asOf: string;
+  /** More close inside the window than were returned; the ones returned are the soonest. */
   truncated: boolean;
+  /** False when the API stopped looking before it could prove the list is the soonest. */
+  complete: boolean;
 }
 
 export interface OpenConfirmation {

@@ -714,6 +714,7 @@ describe("M3 closed components vs their view types", () => {
       inactiveDays: 90,
       asOf: "2026-10-30T00:00:00.000Z",
       truncated: false,
+      complete: true,
     } satisfies ClosingSoonListView,
     OpenConfirmation: {
       id: "example-org:one",

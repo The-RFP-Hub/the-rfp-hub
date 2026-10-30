@@ -465,19 +465,23 @@ export class OpportunityRepository {
    * The clock bound holds for every projected close (`closesAt >= clock + days`).
    *
    * Only a pruning predicate: the caller applies `inactivityClosesAt` (`modules/shared/staleness.ts`)
-   * to every row, which is what drops a past-due row, a fixed-only one and one whose last fixed date
-   * lies beyond the horizon, and it is what the caller sorts by — the clock order here is only for a
-   * deterministic cap. ONE BOUNDED READ, `limit` rows at most: no OFFSET walk over rows the caller
-   * then discards.
+   * to every row, which is what drops a past-due row and one whose last fixed date lies beyond the
+   * horizon. ASCENDING CLOCK ORDER IS THE CONTRACT: the caller's early stop
+   * (`services/review/closing-soon.ts`) relies on it.
+   *
+   * KEYSET-PAGED on `(clock, id)`. `clockKey` is the clock as Postgres prints it, and the cursor is
+   * compared as `clockKey::timestamptz` — exact to the microsecond, which a JS `Date` rebuilt from
+   * the row would not be (it would compare below the row and serve it again).
    */
   async listClosingSoonCandidates(
     horizon: Date,
     clockAtOrBefore: Date,
+    after: { clockKey: string; id: number } | null,
     limit: number,
-  ): Promise<OpportunityRow[]> {
+  ): Promise<{ row: OpportunityRow; clockKey: string }[]> {
     const clock = sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`;
     return this.exec
-      .select()
+      .select({ row: opportunities, clockKey: sql<string>`(${clock})::text` })
       .from(opportunities)
       .where(
         and(
@@ -487,6 +491,9 @@ export class OpportunityRepository {
           eq(opportunities.reviewStatus, "approved"),
           eq(opportunities.isListed, true),
           sql`${clock} <= ${clockAtOrBefore}`,
+          after === null
+            ? undefined
+            : sql`(${clock}, ${opportunities.id}) > (${after.clockKey}::timestamptz, ${after.id})`,
         ),
       )
       .orderBy(asc(clock), asc(opportunities.id))

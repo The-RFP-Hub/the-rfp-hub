@@ -51,30 +51,34 @@ export function stalenessClosureReason(
 }
 
 /**
- * `stalenessClosureReason` PROJECTED FORWARD: the instant after which it says `inactive` for this
- * row as it is stored now, or `null` when it never will.
+ * `stalenessClosureReason` PROJECTED: where, on the time line, it first says `inactive` for this row
+ * as it is stored now — or `null` when, from `now` on, it never will.
  *
- * The rule says `inactive` at time `t` when all three hold:
+ * The rule says `inactive` at time `t` exactly when all three hold (the comparisons are the job's
+ * own: `isPastDue` uses `<`, `nextDeadlineAt` uses `>`, the clock test uses `<`):
  *
- *   1. not past due at `t`;
- *   2. no fixed deadline strictly after `t`  — i.e. `t >= latest fixed date`, when there is one;
- *   3. `clock < t - days`                    — i.e. `t > clock + days`.
+ *   1. not past due at `t`        — with a rolling entry, always; otherwise `t <= L`;
+ *   2. no fixed deadline after `t` — `t >= L`, where `L` is the latest fixed date (none: always);
+ *   3. `clock < t - days`          — `t > Q`, where `Q = clock + days`.
  *
- * A FUTURE FIXED DEADLINE ONLY POSTPONES THE INACTIVITY CLOSE; it does not prevent it. Once the last
- * fixed date passes, (2) holds, and an entry that has been quiet the whole time closes at the first
- * run after both (2) and (3) are true: `max(clock + days, latest fixed date)`. What decides whether
- * that ever happens is (1):
+ * So, with `L` and `Q` as above:
  *
- *   - WITH A ROLLING ENTRY the record is never past due, so it is projected as above;
- *   - WITH NO FIXED DATE AT ALL there is nothing to wait for: `clock + days`;
- *   - FIXED DATES AND NO ROLLING ENTRY: while one is ahead, (2) fails; the moment the last one passes,
- *     the record is past due and closes as `past_due` instead. Never `inactive` → `null`. This
- *     includes a record that is past due already: the next run closes it on its deadlines, and
- *     refreshing the clock would not change that, so it is not something a reviewer can keep open.
+ *   - ROLLING, OR NO FIXED DATE: `inactive` on `t >= L and t > Q` — from `max(Q, L)` on. A future fixed
+ *     deadline therefore only POSTPONES the close; it does not prevent it. And a PAST `L` still counts:
+ *     the rule was not `inactive` before it, so a projection that dropped it would name a date on
+ *     which the job did not close the row. At exactly `max(Q, L)` the rule already says `inactive`
+ *     when `L > Q`, and says it from just after when `Q >= L` (the clock test is strict).
+ *   - FIXED DATES AND NO ROLLING ENTRY: (1) and (2) meet at the single instant `t = L`, so the rule is
+ *     `inactive` exactly at `L` when `Q < L`, and `past_due` from just after it. Returned as `L` —
+ *     the projection names the instant the job's predicate names, nothing more. Otherwise `null`:
+ *     past `L` it is past due, which is also the case for a record that is past due already (the
+ *     next run closes it on its deadlines, and refreshing its clock would not change that).
  *
- * The job runs on a schedule, not continuously, so the returned instant is the earliest the rule
- * can say `inactive`; the row closes on the first run after it, and an instant in the past means the
- * next run. Pinned against `stalenessClosureReason` itself by `test/unit/staleness-rule.test.ts`.
+ * The job runs on a schedule, not continuously: the row closes at the first run at or after the
+ * returned instant, and an instant in the past means the next run. Every returned instant is
+ * `>= Q`, which is what lets the "closing soon" scan stop early (`services/review/closing-soon.ts`).
+ * Pinned against `stalenessClosureReason` itself, ±1 ms and exactly, by
+ * `test/unit/staleness-rule.test.ts`.
  */
 export function inactivityClosesAt(
   row: StalenessFacts,
@@ -83,9 +87,10 @@ export function inactivityClosesAt(
 ): Date | null {
   if (isPastDue(row.deadlines, now)) return null;
   const latest = latestFixedDeadlineAt(row.deadlines);
-  if (latest !== null && !hasRollingDeadline(row.deadlines)) return null;
   const quietUntil = inactivityClockOf(row).getTime() + inactiveDays * DAY_MS;
-  // `latest` in the past is already satisfied by any `t` from now on; only a future one waits.
-  const deadlinesUntil = latest !== null && latest.getTime() > now.getTime() ? latest.getTime() : 0;
-  return new Date(Math.max(quietUntil, deadlinesUntil));
+  if (latest !== null && !hasRollingDeadline(row.deadlines)) {
+    // Not past due at `now`, so `latest >= now`: the one instant (1) and (2) both hold is ahead.
+    return quietUntil < latest.getTime() ? latest : null;
+  }
+  return new Date(Math.max(quietUntil, latest?.getTime() ?? quietUntil));
 }

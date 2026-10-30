@@ -1027,7 +1027,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or the last fixed deadline of a rolling programme when that is later — the job's own rule projected forward; the job closes it on its first run after that instant.",
+      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or the last fixed deadline when that is later — the job's own rule projected forward; the job closes it on its first run at or after that instant.",
     required: [
       "id",
       "title",
@@ -1053,13 +1053,21 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     $id: "ClosingSoonList",
     type: "object",
     additionalProperties: false,
-    required: ["items", "windowDays", "inactiveDays", "asOf", "truncated"],
+    required: ["items", "windowDays", "inactiveDays", "asOf", "truncated", "complete"],
     properties: {
       items: { type: "array", items: { $ref: "ClosingSoonItem" } },
       windowDays: { type: "integer" },
       inactiveDays: { type: "integer" },
       asOf: { type: "string", format: "date-time" },
-      truncated: { type: "boolean" },
+      truncated: {
+        type: "boolean",
+        description: "More entries close inside the window than `limit` allowed to return.",
+      },
+      complete: {
+        type: "boolean",
+        description:
+          "False when the safety cap on rows examined stopped the search before it could prove these are the earliest closes: the list may then be missing entries.",
+      },
     },
   },
   {
@@ -1075,7 +1083,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: ["string", "null"],
         format: "date-time",
         description:
-          "When the inactivity pass would now close it — after the last fixed deadline, for a rolling programme that has one; null when that pass never will (an entry with fixed deadlines and no rolling intake closes as past due instead).",
+          "When the inactivity pass would now close it — after the last fixed deadline, for a rolling programme that has one; null when that pass never will (an entry with fixed deadlines and no rolling intake whose clock has not run out by its final deadline closes as past due just after it).",
       },
     },
   },

@@ -12,7 +12,7 @@
  *      decision at the date the list names, and the two cases the job never closes for inactivity —
  *      a future fixed deadline, and a past-due entry — are seeded to prove they are left out.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
@@ -20,7 +20,10 @@ import { db, pool } from "../../src/db/client.js";
 import { type OpportunityRow, auditLog, opportunities } from "../../src/db/schema.js";
 import { StalenessService } from "../../src/modules/services/jobs/staleness.service.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
-import { CONFIRM_OPEN_DEFAULT_REASON } from "../../src/modules/services/review/review.service.js";
+import {
+  CONFIRM_OPEN_DEFAULT_REASON,
+  ReviewService,
+} from "../../src/modules/services/review/review.service.js";
 import { nextDeadlineAt } from "../../src/modules/shared/deadlines.js";
 import { inactiveBeforeOf } from "../../src/modules/shared/staleness.js";
 import { bearer, seedIdentity, seedOrganization, testAuth } from "../helpers/auth.js";
@@ -133,6 +136,7 @@ interface ClosingSoonBody {
   windowDays: number;
   inactiveDays: number;
   truncated: boolean;
+  complete: boolean;
 }
 
 run("M5OPEN a reviewer confirms a listing is still open", () => {
@@ -299,10 +303,13 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
     let overdue: OpportunityRow;
     let later: OpportunityRow;
     let deadlineInWindow: OpportunityRow;
+    let deadlinePassed: OpportunityRow;
     let deadlineBeyond: OpportunityRow;
     let fixedOnly: OpportunityRow;
     let pastDue: OpportunityRow;
     let hidden: OpportunityRow;
+    let tieA: OpportunityRow;
+    let tieB: OpportunityRow;
 
     beforeAll(async () => {
       soon = await seed(`${NS}:cs-soon`, { quietDays: 75 }); // closes in 15 days
@@ -315,22 +322,38 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         quietDays: 100,
         deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() + 10 * DAY))],
       });
+      // Its clock ran out 10 days ago, but its deadline passed only 3 days ago: the rule was not
+      // `inactive` before the deadline, so the projection is the deadline, not the clock.
+      deadlinePassed = await seed(`${NS}:cs-deadline-passed`, {
+        quietDays: 100,
+        deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() - 3 * DAY))],
+      });
       // The same, with the deadline 45 days ahead: outside a 30-day window.
       deadlineBeyond = await seed(`${NS}:cs-deadline-beyond`, {
         quietDays: 100,
         deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() + 45 * DAY))],
       });
-      // Fixed deadlines and no rolling intake: when the last one passes it closes as past due,
-      // never as inactive, and a confirmation could not keep it open.
+      // Fixed deadlines and no rolling intake, quiet throughout: the job's predicate is `inactive`
+      // at exactly the final deadline and `past_due` from just after it — listed at that instant.
       fixedOnly = await seed(`${NS}:cs-fixed-only`, {
         quietDays: 100,
-        deadlines: [fixed(new Date(Date.now() + 10 * DAY))],
+        deadlines: [fixed(new Date(Date.now() + 12 * DAY))],
       });
       pastDue = await seed(`${NS}:cs-past-due`, {
         quietDays: 85,
         deadlines: [fixed(new Date(Date.now() - 10 * DAY))],
       });
       hidden = await seed(`${NS}:cs-hidden`, { quietDays: 85, isListed: false });
+      // Two rows on the SAME clock, to the microsecond: the keyset cursor has to separate them by id.
+      tieA = await seed(`${NS}:cs-tie-a`, { quietDays: 70 });
+      tieB = await seed(`${NS}:cs-tie-b`, { quietDays: 70 });
+      await db
+        .update(opportunities)
+        // `now()` is fixed for the statement and carries microseconds: both rows get the same value.
+        .set({ lastSeenAt: sql`now() - interval '70 days'` })
+        .where(inArray(opportunities.id, [tieA.id, tieB.id]));
+      tieA = await rowOf(tieA.publicId);
+      tieB = await rowOf(tieB.publicId);
     });
 
     it("refuses anybody who is not a reviewer", async () => {
@@ -345,12 +368,17 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       const body = await closingSoon();
       expect(body.windowDays).toBe(30);
       expect(body.inactiveDays).toBe(INACTIVE_DAYS);
+      expect(body.complete).toBe(true);
       const ids = ours(body).map((i) => i.id);
       expect(ids.filter((id) => id.startsWith(`${NS}:cs-`))).toEqual([
         overdue.publicId,
+        deadlinePassed.publicId,
         sooner.publicId,
         deadlineInWindow.publicId,
+        fixedOnly.publicId,
         soon.publicId,
+        tieA.publicId,
+        tieB.publicId,
       ]);
       const item = ours(body).find((i) => i.id === soon.publicId);
       expect(item?.closesAt).toBe(
@@ -359,41 +387,68 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       expect(item?.applicationUrl).toBe(soon.applicationUrl);
     });
 
-    it("lists a quiet rolling programme at its last fixed deadline when that falls in the window", async () => {
-      const item = ours(await closingSoon()).find((i) => i.id === deadlineInWindow.publicId);
-      const deadline = (deadlineInWindow.deadlines ?? []).find((d) => d.deadlineType === "fixed");
-      expect(item?.closesAt).toBe(new Date(String(deadline?.date)).toISOString());
+    it("lists a quiet listing at its last fixed deadline when that decides, passed or not", async () => {
+      const items = ours(await closingSoon());
+      for (const row of [deadlineInWindow, deadlinePassed, fixedOnly]) {
+        const item = items.find((i) => i.id === row.publicId);
+        const deadline = (row.deadlines ?? []).find((d) => d.deadlineType === "fixed");
+        expect(item?.closesAt, row.publicId).toBe(new Date(String(deadline?.date)).toISOString());
+      }
     });
 
-    it("excludes a deadline or a clock beyond the window, fixed-only, past-due and unlisted entries", async () => {
+    it("excludes a deadline or a clock beyond the window, past-due and unlisted entries", async () => {
       const ids = ours(await closingSoon()).map((i) => i.id);
-      for (const row of [deadlineBeyond, later, fixedOnly, pastDue, hidden]) {
+      for (const row of [deadlineBeyond, later, pastDue, hidden]) {
         expect(ids, row.publicId).not.toContain(row.publicId);
       }
-      // A wider window reaches the two that were only out of range, and still never the three the
+      // A wider window reaches the two that were only out of range, and still never the two the
       // job will not close for inactivity.
       const wide = ours(await closingSoon("?days=90")).map((i) => i.id);
       expect(wide).toContain(later.publicId);
       expect(wide).toContain(deadlineBeyond.publicId);
-      for (const row of [fixedOnly, pastDue, hidden]) {
+      for (const row of [pastDue, hidden]) {
         expect(wide, row.publicId).not.toContain(row.publicId);
       }
     });
 
-    it("names the date the staleness job actually keeps", async () => {
+    it("names the date the staleness job actually keeps — before, at and after it", async () => {
       for (const item of ours(await closingSoon("?days=90"))) {
         const row = await rowOf(item.id);
         const at = Date.parse(item.closesAt);
         expect(jobDecides(row, new Date(at - 1000)), `${item.id} just before`).toBeNull();
-        expect(jobDecides(row, new Date(at + 1000)), `${item.id} just after`).toBe("inactive");
+        // Exactly at the instant when a deadline decides it; from just after it when the clock does.
+        const atIt = jobDecides(row, new Date(at));
+        const after = jobDecides(row, new Date(at + 1000));
+        expect([atIt, after], `${item.id} at/after`).toContain("inactive");
       }
-      // And the excluded ones are excluded for the job's reasons: never closed as inactive anywhere
-      // across a 90-day window — the fixed-only one closes as past due once its deadline passes.
+      const final = Date.parse(
+        String((fixedOnly.deadlines ?? []).find((d) => d.deadlineType === "fixed")?.date),
+      );
+      expect(jobDecides(fixedOnly, new Date(final))).toBe("inactive");
+      expect(jobDecides(fixedOnly, new Date(final + 1))).toBe("past_due");
       for (let day = 0; day <= 90; day += 1) {
         const at = new Date(Date.now() + day * DAY);
-        expect(jobDecides(fixedOnly, at), `fixed-only, day ${day}`).not.toBe("inactive");
         expect(jobDecides(pastDue, at), `past-due, day ${day}`).toBe("past_due");
       }
+    });
+
+    it("walks the real query a row at a time and gets the same answer (keyset paging)", async () => {
+      const paged = new ReviewService(db, { closingSoonScan: { pageSize: 1, scanCap: 1_000_000 } });
+      const whole = new ReviewService(db);
+      const now = new Date();
+      const a = await paged.closingSoon(90, 200, now);
+      const b = await whole.closingSoon(90, 200, now);
+      expect(a.complete).toBe(true);
+      expect(a.items).toEqual(b.items);
+      // Both rows sharing a microsecond clock are served, once each.
+      const tieIds = a.items.map((i) => i.id).filter((id) => id.startsWith(`${NS}:cs-tie-`));
+      expect(tieIds).toEqual([tieA.publicId, tieB.publicId]);
+    });
+
+    it("reports an incomplete answer when the safety cap stops the walk", async () => {
+      const capped = new ReviewService(db, { closingSoonScan: { pageSize: 1, scanCap: 1 } });
+      const result = await capped.closingSoon(90, 200);
+      expect(result.complete).toBe(false);
     });
 
     it("drops a listing once a reviewer confirms it, and honours the limit", async () => {

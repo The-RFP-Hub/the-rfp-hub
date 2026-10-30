@@ -666,11 +666,17 @@ the programme was, and the only remedy was setting `last_seen_at` in SQL against
   across the window**. A future fixed deadline only *postpones* an inactivity close: once a rolling
   programme's last fixed date passes, `next_deadline_at` is NULL again and the same clock applies.
   So `closesAt` = `max(coalesce(last_seen_at, updated_at) + STALENESS_INACTIVE_DAYS, last fixed
-  deadline)` for a rolling programme, and the first term alone for one with no fixed deadline. Not
-  listed: a programme whose last fixed deadline is beyond the window; one with fixed deadlines and
-  no rolling intake (when the last passes it closes as `past_due`, not `inactive`); and one already
-  past due. The job closes an entry on its first run after `closesAt`; a past `closesAt` means
-  tonight.
+  deadline)` for a rolling programme — **including a last deadline that has already passed**, since
+  the rule was not `inactive` before it — and the first term alone for one with no fixed deadline.
+  An entry with fixed deadlines and no rolling intake is `inactive` at exactly one instant, its final
+  deadline (there `isPastDue` and `nextDeadlineAt` both say no), and `past_due` from just after it;
+  when it has been quiet throughout it is listed at that deadline, and it closes then whatever a
+  confirmation says. Not listed: a programme whose last fixed deadline is beyond the window, and one
+  already past due. The job closes an entry on its first run at or after `closesAt`; a past
+  `closesAt` means tonight. The list is the true soonest: the scan reads in clock order and stops
+  only once no unread row can close earlier (every `closesAt` is at least `clock + days`). A safety
+  cap on rows examined remains, and if it ever stops the scan the answer says `complete: false` and
+  the reviewer page says the list is incomplete.
 * `POST /v1/review/opportunities/{id}/confirm-open` with an optional `{"note": "…"}` (≤ 500
   characters) sets `last_seen_at = now()` under a row lock and audits it as `update`, with the
   reviewer as actor: `{"lastSeenAt": {"before": …, "after": …}, "reason": "<note, or a default>"}`.

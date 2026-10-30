@@ -67,7 +67,27 @@ describe("the staleness rule", () => {
     expect(closesAt).toEqual(at(10));
     expect(decide(facts, NOW)).toBeNull();
     expect(decide(facts, new Date(at(10).getTime() - 1))).toBeNull();
+    // At the deadline itself no fixed date is left AFTER it, and the clock ran out long ago.
+    expect(decide(facts, at(10))).toBe("inactive");
     expect(decide(facts, new Date(at(10).getTime() + 1))).toBe("inactive");
+  });
+
+  it("keeps a fixed deadline that has ALREADY passed: the job did not close the row before it", () => {
+    // Codex's case. Today is 30 Oct; seen 22 Jul (+90 days = 20 Oct); fixed deadline 29 Oct.
+    const now = new Date("2026-10-30T12:00:00.000Z");
+    const deadline = new Date("2026-10-29T12:00:00.000Z");
+    const facts = row({
+      deadlines: [{ deadlineType: "rolling" }, fixed(deadline)],
+      lastSeenAt: new Date("2026-07-22T12:00:00.000Z"),
+    });
+    const closesAt = inactivityClosesAt(facts, now, DAYS);
+    expect(closesAt).toEqual(deadline);
+    // Not 20 Oct: just after it, the 29 Oct deadline was still ahead and the job kept the row open.
+    expect(decide(facts, new Date("2026-10-20T12:00:00.001Z"))).toBeNull();
+    expect(decide(facts, new Date(deadline.getTime() - 1))).toBeNull();
+    expect(decide(facts, deadline)).toBe("inactive");
+    // A past projection means "the next run": the rule says inactive now.
+    expect(decide(facts, now)).toBe("inactive");
   });
 
   it.each([
@@ -91,14 +111,47 @@ describe("the staleness rule", () => {
       // The job's own predicate, evaluated around the projected instant.
       expect(decide(facts, new Date(closesAt.getTime() - 1))).toBeNull();
       expect(decide(facts, new Date(closesAt.getTime() + 1))).toBe("inactive");
+      // Exactly at it: inactive when the deadline decides (the clock test was already true), not yet
+      // when the clock decides (the clock test is strict).
+      const deadlineDecides = fixedDates.some((d) => Date.parse(d.date) === closesAt.getTime());
+      expect(decide(facts, closesAt)).toBe(deadlineDecides ? "inactive" : null);
     },
   );
 
-  it("names no inactivity date for fixed deadlines without rolling intake: those close as past due", () => {
-    const facts = row({ deadlines: [fixed(at(10))], lastSeenAt: at(-300) });
-    expect(inactivityClosesAt(facts, NOW, DAYS)).toBeNull();
+  it("names the one instant a quiet fixed-only entry is inactive: exactly its final deadline", () => {
+    // `isPastDue` is `latest < t` and `nextDeadlineAt` is `> t`, so at t = L neither holds and the
+    // clock test alone decides. The production predicate is unchanged; the projection follows it.
+    const facts = row({ deadlines: [fixed(at(3)), fixed(at(10))], lastSeenAt: at(-300) });
+    expect(inactivityClosesAt(facts, NOW, DAYS)).toEqual(at(10));
     expect(decide(facts, NOW)).toBeNull();
-    expect(decide(facts, at(11))).toBe("past_due");
+    expect(decide(facts, new Date(at(10).getTime() - 1))).toBeNull();
+    expect(decide(facts, at(10))).toBe("inactive");
+    expect(decide(facts, new Date(at(10).getTime() + 1))).toBe("past_due");
+  });
+
+  it("names nothing for a fixed-only entry whose clock has not run out by its final deadline", () => {
+    const facts = row({ deadlines: [fixed(at(10))], lastSeenAt: at(-50) });
+    expect(inactivityClosesAt(facts, NOW, DAYS)).toBeNull();
+    for (const t of [at(10).getTime() - 1, at(10).getTime(), at(10).getTime() + 1]) {
+      expect(decide(facts, new Date(t))).not.toBe("inactive");
+    }
+  });
+
+  it("never names an instant earlier than clock + days, which the scan's early stop relies on", () => {
+    const shapes = [
+      row({}),
+      row({ deadlines: [] }),
+      row({ deadlines: [{ deadlineType: "rolling" }, fixed(at(-5))], lastSeenAt: at(-120) }),
+      row({ deadlines: [{ deadlineType: "rolling" }, fixed(at(40))], lastSeenAt: at(-10) }),
+      row({ deadlines: [fixed(at(30))], lastSeenAt: at(-200) }),
+    ];
+    for (const facts of shapes) {
+      const closesAt = inactivityClosesAt(facts, NOW, DAYS);
+      expect(closesAt).not.toBeNull();
+      expect((closesAt as Date).getTime()).toBeGreaterThanOrEqual(
+        inactivityClockOf(facts).getTime() + DAYS * DAY,
+      );
+    }
   });
 
   it("names no inactivity date for a past-due entry, which closes on its deadlines instead", () => {

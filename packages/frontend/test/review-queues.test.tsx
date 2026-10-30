@@ -239,13 +239,14 @@ const quiet: ClosingSoonItem = {
   closesAt: "2026-11-12T00:00:00.000Z",
 };
 const closingRows: { current: ClosingSoonItem[] } = { current: [quiet] };
+const closingFlags = { current: { truncated: false, complete: true } };
 const closingSoon = vi.fn(
   async (): Promise<ClosingSoonList> => ({
     items: closingRows.current,
     windowDays: 30,
     inactiveDays: 90,
     asOf: "2026-10-30T00:00:00.000Z",
-    truncated: false,
+    ...closingFlags.current,
   }),
 );
 const confirmOpen = vi.fn(async (id: string): Promise<OpenConfirmation> => {
@@ -312,6 +313,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   inviteRows.current = [];
   closingRows.current = [quiet];
+  closingFlags.current = { truncated: false, complete: true };
   tab.current = null;
 });
 
@@ -422,6 +424,38 @@ describe("listings closing soon", () => {
     mount();
 
     expect(await screen.findByText("Nothing closes in the next 30 days.")).toBeTruthy();
+    expect(screen.queryByText("This list is incomplete.")).toBeNull();
+  });
+
+  it("never says nothing closes when the API stopped looking early, and says the list is incomplete", async () => {
+    closingRows.current = [];
+    closingFlags.current = { truncated: false, complete: false };
+    tab.current = "closing";
+    mount();
+
+    expect(await screen.findByText("This list is incomplete.")).toBeTruthy();
+    expect(screen.queryByText(/Nothing closes/)).toBeNull();
+  });
+
+  it("shows an incomplete list with the warning above it, and marks the tab count as partial", async () => {
+    closingFlags.current = { truncated: false, complete: false };
+    tab.current = "closing";
+    mount();
+
+    expect(await screen.findByText("This list is incomplete.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Quiet Grants" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Closing soon · 1+", current: "page" })).toBeTruthy();
+  });
+
+  it("says the rows are the soonest when more close than were returned", async () => {
+    closingFlags.current = { truncated: true, complete: true };
+    tab.current = "closing";
+    mount();
+
+    expect(
+      await screen.findByText("The 1 soonest of the listings closing within 30 days"),
+    ).toBeTruthy();
+    expect(screen.queryByText("This list is incomplete.")).toBeNull();
   });
 });
 

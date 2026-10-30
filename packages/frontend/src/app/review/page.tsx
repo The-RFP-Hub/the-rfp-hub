@@ -182,6 +182,10 @@ function Review({ me }: { me: Me }) {
     closing: closing.state.status === "ready" ? closing.state.data.items.length : null,
     organizations: null,
   };
+  // "100+" rather than "100" when more close than were returned, or the search stopped early.
+  const closingPartial =
+    closing.state.status === "ready" &&
+    (closing.state.data.truncated || !closing.state.data.complete);
 
   /**
    * The address for a tab, in ONE place.
@@ -217,7 +221,7 @@ function Review({ me }: { me: Me }) {
             counts[item] !== null
               ? item === "duplicates"
                 ? ` · ${counts[item]} open`
-                : ` · ${counts[item]}`
+                : ` · ${counts[item]}${item === "closing" && closingPartial ? "+" : ""}`
               : ""
           }`,
         }))}
@@ -885,142 +889,161 @@ function ClosingSoon({
       </p>
       <ActionNote note={note} />
       <ResourceView resource={closing.state} what="the closing-soon list" onRetry={closing.reload}>
-        {(list) =>
-          list.items.length === 0 ? (
-            <EmptyState
-              title={`Nothing closes in the next ${list.windowDays} days.`}
-              detail="A listing appears here when it has gone quiet and no fixed deadline will keep it open past the next few weeks."
-            />
-          ) : (
-            <div className="table-scroll">
-              <table>
-                <caption>
-                  {list.items.length} closing within {list.windowDays} days
-                  {list.truncated ? " · showing the soonest" : null}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Listing</th>
-                    <th scope="col">Links</th>
-                    <th scope="col">Closes</th>
-                    <th scope="col">Decision</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    // A row and its confirmation panel are two `<tr>`s that belong to one listing.
-                    <Fragment key={item.id}>
-                      <tr>
-                        <th scope="row">
-                          <Link
-                            className="row-title"
-                            href={detailHref("/listings", item.id, origin)}
-                          >
-                            <UntrustedText value={item.title} />
-                          </Link>
-                          <div className="muted">
-                            <code>{item.id}</code>
-                            {item.namespace ? (
-                              <>
-                                {" "}
-                                · <UntrustedText value={item.namespace} />
-                              </>
-                            ) : null}
-                          </div>
-                        </th>
-                        <td>
-                          <div>
-                            <UntrustedLink
-                              href={item.applicationUrl}
-                              label="Application link"
-                              ariaLabel={`Application link for ${item.title}`}
-                            />
-                          </div>
-                          {item.website ? (
+        {(list) => (
+          <>
+            {/*
+             * AN INCOMPLETE LIST SAYS SO, FIRST. The API stops looking after a safety cap on rows
+             * examined, and when it does it cannot promise these are the soonest — or that an empty
+             * list means nothing closes. Neither claim is made here in that case.
+             */}
+            {list.complete ? null : (
+              <div className="callout">
+                <p className="empty-title">This list is incomplete.</p>
+                <p>
+                  The search stopped before it had checked every quiet listing, so other listings
+                  may close sooner than the ones shown here, or as well as them.
+                </p>
+              </div>
+            )}
+            {list.items.length === 0 ? (
+              list.complete ? (
+                <EmptyState
+                  title={`Nothing closes in the next ${list.windowDays} days.`}
+                  detail="A listing appears here when it has gone quiet and no fixed deadline will keep it open past the next few weeks."
+                />
+              ) : null
+            ) : (
+              <div className="table-scroll">
+                <table>
+                  <caption>
+                    {list.truncated && list.complete
+                      ? `The ${list.items.length} soonest of the listings closing within ${list.windowDays} days`
+                      : `${list.items.length} closing within ${list.windowDays} days`}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Listing</th>
+                      <th scope="col">Links</th>
+                      <th scope="col">Closes</th>
+                      <th scope="col">Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.items.map((item) => (
+                      // A row and its confirmation panel are two `<tr>`s that belong to one listing.
+                      <Fragment key={item.id}>
+                        <tr>
+                          <th scope="row">
+                            <Link
+                              className="row-title"
+                              href={detailHref("/listings", item.id, origin)}
+                            >
+                              <UntrustedText value={item.title} />
+                            </Link>
+                            <div className="muted">
+                              <code>{item.id}</code>
+                              {item.namespace ? (
+                                <>
+                                  {" "}
+                                  · <UntrustedText value={item.namespace} />
+                                </>
+                              ) : null}
+                            </div>
+                          </th>
+                          <td>
                             <div>
                               <UntrustedLink
-                                href={item.website}
-                                label="Website"
-                                ariaLabel={`Website for ${item.title}`}
+                                href={item.applicationUrl}
+                                label="Application link"
+                                ariaLabel={`Application link for ${item.title}`}
                               />
                             </div>
-                          ) : null}
-                        </td>
-                        <td>
-                          {closesLabel(item, list.asOf)}
-                          <div className="muted footnote">
-                            last refreshed {formatDate(item.lastSeenAt ?? item.updatedAt)}
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              setConfirmNote("");
-                              setConfirming(confirming === item.id ? null : item.id);
-                            }}
-                          >
-                            Confirm still open…
-                          </button>
-                        </td>
-                      </tr>
-                      {confirming === item.id ? (
-                        <tr>
-                          <td colSpan={4}>
-                            <ConfirmPanel
-                              title={`Confirm “${item.title}” is still open?`}
-                              confirmLabel="Confirm still open"
-                              busyLabel="Confirming…"
-                              busy={busy}
-                              onCancel={() => setConfirming(null)}
-                              onConfirm={() =>
-                                void run(async () => {
-                                  const result = await api.review.confirmOpen(
-                                    item.id,
-                                    confirmNote.trim() || null,
-                                  );
-                                  setConfirming(null);
-                                  setConfirmNote("");
-                                  closing.reload();
-                                  return result.closesAt
-                                    ? `“${item.title}” is confirmed open. It stays open until at least ${formatDate(result.closesAt)}.`
-                                    : `“${item.title}” is confirmed open.`;
-                                })
-                              }
-                            >
-                              <p>
-                                Only confirm after opening the program&rsquo;s own page and seeing
-                                that it still takes applications. The listing stays open for another{" "}
-                                {list.inactiveDays} days, and the confirmation is recorded in its
-                                history under your handle.
-                              </p>
-                              <div className="field">
-                                <label htmlFor={`confirm-open-note-${item.id}`}>
-                                  Note (optional)
-                                </label>
-                                <p className="hint">
-                                  What you checked. Kept in the listing&rsquo;s history.
-                                </p>
-                                <input
-                                  id={`confirm-open-note-${item.id}`}
-                                  value={confirmNote}
-                                  maxLength={500}
-                                  onChange={(event) => setConfirmNote(event.target.value)}
-                                  placeholder="e.g. the form still accepts submissions"
+                            {item.website ? (
+                              <div>
+                                <UntrustedLink
+                                  href={item.website}
+                                  label="Website"
+                                  ariaLabel={`Website for ${item.title}`}
                                 />
                               </div>
-                            </ConfirmPanel>
+                            ) : null}
+                          </td>
+                          <td>
+                            {closesLabel(item, list.asOf)}
+                            <div className="muted footnote">
+                              last refreshed {formatDate(item.lastSeenAt ?? item.updatedAt)}
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setConfirmNote("");
+                                setConfirming(confirming === item.id ? null : item.id);
+                              }}
+                            >
+                              Confirm still open…
+                            </button>
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        }
+                        {confirming === item.id ? (
+                          <tr>
+                            <td colSpan={4}>
+                              <ConfirmPanel
+                                title={`Confirm “${item.title}” is still open?`}
+                                confirmLabel="Confirm still open"
+                                busyLabel="Confirming…"
+                                busy={busy}
+                                onCancel={() => setConfirming(null)}
+                                onConfirm={() =>
+                                  void run(async () => {
+                                    const result = await api.review.confirmOpen(
+                                      item.id,
+                                      confirmNote.trim() || null,
+                                    );
+                                    setConfirming(null);
+                                    setConfirmNote("");
+                                    closing.reload();
+                                    return result.closesAt
+                                      ? `“${item.title}” is confirmed open. It stays open until at least ${formatDate(result.closesAt)}.`
+                                      : `“${item.title}” is confirmed open.`;
+                                  })
+                                }
+                              >
+                                <p>
+                                  Only confirm after opening the program&rsquo;s own page and seeing
+                                  that it still takes applications. The listing stays open for
+                                  another {list.inactiveDays} days, and the confirmation is recorded
+                                  in its history under your handle.
+                                </p>
+                                <div className="field">
+                                  <label htmlFor={`confirm-open-note-${item.id}`}>
+                                    Note (optional)
+                                  </label>
+                                  <p className="hint">
+                                    What you checked. Kept in the listing&rsquo;s history.
+                                  </p>
+                                  <input
+                                    id={`confirm-open-note-${item.id}`}
+                                    value={confirmNote}
+                                    maxLength={500}
+                                    onChange={(event) => setConfirmNote(event.target.value)}
+                                    placeholder="e.g. the form still accepts submissions"
+                                  />
+                                </div>
+                              </ConfirmPanel>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
       </ResourceView>
     </>
   );
