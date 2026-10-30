@@ -391,9 +391,13 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
       // THE CONTROL IS NAMED FOR WHERE IT GOES. It used to say "Open the application page", which
       // said neither whose page nor that the click leaves this site — and this page exists to send
-      // a reader somewhere else, because the Hub takes no applications. Matched by pattern rather
+      // a reader somewhere else, because the Hub takes no applications. It names the HOST the
+      // browser will land on ("Apply on airtable.com"), not the organization, because nothing
+      // checks that a link belongs to the listing's organization. Matched as a substring rather
       // than exactly: the label carries a trailing ↗ that says the same thing to the eye.
-      const apply = page.getByRole("link", { name: /Apply on .+’s site/ });
+      const apply = page.getByRole("link", {
+        name: `Apply on ${new URL(stack.urls.programme).host}`,
+      });
       await expect(apply).toBeVisible();
 
       const afterRead = await pollUntil(

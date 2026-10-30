@@ -526,9 +526,11 @@ test.describe("M4 responsive layout", () => {
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
         // The apply action renders only once the entry's data has loaded, so it doubles as the
         // content signal `waitForLoaded` races against empty/error.
-        // The label names the operating organization when its name is short enough and falls back
-        // to "the program" when it is not, so the pattern has to admit both.
-        const apply = page.getByRole("link", { name: /Apply on .+’s site/ });
+        // The label names the host of the entry's `applicationUrl` — the fixture's, since this
+        // document does not override it — rather than the operating organization.
+        const apply = page.getByRole("link", {
+          name: `Apply on ${new URL(stack.urls.programme).host}`,
+        });
         await waitForLoaded(page, apply);
         await expect(apply).toBeVisible();
         await expectNoHorizontalOverflow(page, `/opportunities/${id}`);
