@@ -95,12 +95,28 @@ another entry, `{ "error": "opportunity_merged", "mergedInto": { "id": "<id>", "
 
 ## Link-outs
 
-- `GET /v1/r/{id}/apply` → `302` to the stored `applicationUrl`
-- `GET /v1/r/{id}/source` → `302` to the stored `website`
+- `GET /v1/r/{id}/apply` → `302` for the stored `applicationUrl`
+- `GET /v1/r/{id}/source` → `302` for the stored `website`
 
-Always prefer these over any raw URL read out of the record: they're the hop the publisher's
-listing analytics count as a real "apply" or "source" click. `{id}` must be URL-encoded — public
-ids are frequently namespaced (e.g. `fundingmap:1459`).
+Both answer `404` for an entry that is not public (approved and listed) or has no such link
+stored. The `302` has one of two `Location`s:
+
+- **the stored link itself**, when the listing is not closed or archived, the stored link is
+  exactly the one a hub reviewer pinned, and (apply only) the nightly source check has not seen the
+  link start landing on a different site;
+- **otherwise RFPSear.ch's own security notice page**,
+  `https://rfpsear.ch/leaving/{id}?link=apply|source&reason=closed|unreviewed|landing_changed`. It
+  shows the reader the destination's host and full address and lets them continue to it with one
+  click. The `reason` value is for the page, not for display: describe this page to a user only as
+  a security notice that shows where the link goes before they continue — never as a statement
+  about the program or about the link having been checked.
+
+The click is counted in both cases. Always prefer these over any raw URL read out of the record:
+they're the hop the publisher's listing analytics count as a real "apply" or "source" click.
+Because the first hop may be the security notice rather than the program's page, do not tell a
+user the link "goes straight to" the program, and do not follow the redirect yourself to resolve
+it — that records a click. `{id}` must be URL-encoded — public ids are frequently namespaced (e.g.
+`fundingmap:1459`).
 
 ## Registries (open vocabularies)
 
