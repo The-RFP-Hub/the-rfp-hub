@@ -14,10 +14,16 @@ import {
   repositories,
   withTransaction,
 } from "../../repositories/index.js";
+import type { LinkKind, LinkOutFacts } from "../../shared/link-out.js";
 import { comparableImportedOpportunity } from "../../shared/opportunity-content.js";
 import { paginate } from "../../shared/pagination.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
+
+/** One public entry's link-out: the facts `leavingReason` decides on, plus the stored public id. */
+export interface PublicLink extends LinkOutFacts {
+  publicId: string;
+}
 
 /**
  * Sortable fields. `closesAt` is gone with the re-cut — `nextDeadlineAt` (the derived, denormalized
@@ -97,10 +103,27 @@ export class OpportunityService {
     return r ? toStandard(r) : null;
   }
 
-  /** Public link-out value, still subject to protocol validation by the redirect controller. */
-  async findLink(publicId: string, kind: "apply" | "source"): Promise<string | null> {
-    const row = await this.repos.opportunities.findPublicDetailByPublicId(publicId);
-    return (kind === "apply" ? row?.applicationUrl : row?.website) ?? null;
+  /**
+   * One public entry's link-out, with what the redirect needs to decide whether to vouch for it:
+   * the stored URL, the URL a reviewer last vouched for in the same column, the status, and — for
+   * `apply` only — whether the source check saw the link start landing somewhere else.
+   *
+   * `null` when the entry is not public or stores no such link. The stored value is still subject
+   * to the redirect controller's own URL check; nothing here decides what is safe to emit.
+   */
+  async findLink(publicId: string, kind: LinkKind): Promise<PublicLink | null> {
+    const row = await this.repos.opportunities.findPublicLinkByPublicId(publicId);
+    if (!row) return null;
+    const stored = kind === "apply" ? row.applicationUrl : row.website;
+    if (stored === null) return null;
+    return {
+      publicId: row.publicId,
+      stored,
+      reviewed: kind === "apply" ? row.reviewedApplicationUrl : row.reviewedWebsite,
+      status: row.status,
+      // The flag is about where the APPLY link lands — the only URL the source check fetches.
+      landingChangedAt: kind === "apply" ? row.linkLandingChangedAt : null,
+    };
   }
 
   /**
@@ -173,12 +196,30 @@ export async function upsertOpportunityFromStandard(
   const { orgs, opp } = fromStandard(std);
   for (const org of orgs) await repos.organizations.upsertFromIngest(org);
   const sourceSystem = opts.sourceSystem ?? null;
+  const reviewStatus = opts.reviewStatus ?? "approved";
   const row: OpportunityInsert = {
     ...opp,
     sourceSystem,
-    reviewStatus: opts.reviewStatus ?? "approved",
+    reviewStatus,
     isListed: opts.isListed ?? true,
     updatedAt: new Date(),
+    /**
+     * THE CURATED CORPUS IS REVIEWED BEFORE IT IS IMPORTED — in the repository, by whoever approved
+     * the change to the corpus file — so storing it `approved` vouches for its links too, and they
+     * are pinned to exactly what is stored (`modules/shared/link-out.ts`). Without this, every
+     * seeded listing would reach the public site already sending its readers to the leaving page.
+     *
+     * Only on an APPROVED store. A pending or rejected import is not public, and its later approval
+     * pins it; leaving the keys out of the row also leaves an existing row's pins as they were on the
+     * upsert's update arm. The landing flag is NOT cleared here: it records something a fetch saw
+     * after the corpus was written, and only a reviewer looking at the live destination retires it.
+     */
+    ...(reviewStatus === "approved"
+      ? {
+          reviewedApplicationUrl: opp.applicationUrl ?? null,
+          reviewedWebsite: opp.website ?? null,
+        }
+      : {}),
   };
 
   /**

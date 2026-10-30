@@ -620,6 +620,36 @@ Conditional requests — `If-None-Match` / `If-Modified-Since`, which would save
 as the storage — are **not** sent. Neither the fetcher's result nor `verification_runs` keeps a
 response's `ETag` or `Last-Modified`, so there is nothing to send them from without a migration.
 
+**A check that sees the link land somewhere new flags it.** Each listing keeps a **landing
+baseline**: the requested URL and final URL of its last *applied* run (not stale, not transient)
+that got an answer from a server, in `opportunities.link_landing_requested_url` /
+`link_landing_final_url`. When a new applied, answered run requested the same `applicationUrl` as the
+baseline, their final URLs are compared by site, using the same last-two-labels rule as
+`offDomainRedirect`. A different site sets `opportunities.link_landing_changed_at`. It is set
+once, and a later check never moves or clears it. The `verify_source` audit patch carries
+`linkLandingChangedAt` and `landingSite: {from, to}`. From then on, `/v1/r/:id/apply` sends readers
+through the frontend's leaving page with `reason=landing_changed` until a reviewer approves or
+saves the listing, which clears the flag. Every applied, answered run then becomes the new
+baseline.
+
+The stored URL did not change, so this is the one link-out change a reviewer's pin cannot see. A
+shortener retargeted to another form is the case it is for.
+
+**The baseline is on the row, not read back from `verification_runs`.** The run log holds runs
+that are not verdicts, and it is pruned to the newest `VERIFICATION_RUNS_KEEP`. Comparing against
+"the latest run" let a discarded run stand in for the baseline and hide a move:
+- A, then a timeout, then B was compared with the timeout.
+- A, then a stale fetch of B, then B was compared with B.
+
+A transient or stale run neither compares nor moves the baseline.
+
+Migration `0017` backfills the baseline from each row's latest run that the verifier itself would
+have kept: one with an HTTP status and a final URL, answered refusals included. That means an
+applied run, recognized by its `error` not starting with `stale_result:` or `not_a_verdict:`, the
+markers the verifier always writes first. It does not filter by today's URL, because a baseline for
+another URL is simply not compared and gets replaced. A row without such a run starts comparing from
+its first answered check after deploy.
+
 ### What staleness deliberately does not touch
 
 `updated_at`. Two things read it, and both break if a maintenance pass moves it: this job's own

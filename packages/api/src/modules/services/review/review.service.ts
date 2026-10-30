@@ -29,6 +29,7 @@ import type {
   ReviewDecisionView,
 } from "../../shared/api-views.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
+import { reviewerPins } from "../../shared/link-out.js";
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
@@ -94,6 +95,10 @@ export class ReviewService {
           approvedAt: approve ? (row.approvedAt ?? now) : row.approvedAt,
           lastSeenAt: approve ? now : row.lastSeenAt,
           updatedAt: now,
+          // AN APPROVAL VOUCHES FOR THE LINKS IT WAS LOOKING AT. Pinned to what the locked row stores
+          // right now, and the landing flag cleared — see `modules/shared/link-out.ts`. A rejection
+          // pins nothing: it is not public, and nothing it stores is being vouched for.
+          ...(approve ? reviewerPins(row) : {}),
         })) ?? row;
       await repos.audit.record({
         subjectKind: "opportunity",
@@ -456,6 +461,10 @@ export class ReviewService {
           // rejection says nothing about whether the programme exists.
           lastSeenAt: decision.approve ? now : row.lastSeenAt,
           updatedAt: now,
+          // NO LINK PINS, unlike the staff route's approval. This is the publisher vouching for its
+          // own programme — the same trust event as an auto-approved write, which leaves the pins
+          // alone for the same reason: the hub's link-out vouches only for what a HUB reviewer saw.
+          // A link the reviewer already pinned stays vouched; a new one gets the leaving page.
         })) ?? row;
 
       await repos.audit.record({

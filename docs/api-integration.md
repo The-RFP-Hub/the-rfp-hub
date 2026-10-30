@@ -259,7 +259,7 @@ Link out through the redirect routes, never straight to the stored URL:
 ```sh safe-read
 # `DNT: 1` is not decoration here — see below. Without it this line records a click.
 ID=$(curl -s "$API/v1/opportunities?limit=1" | jq -r '.items[0].id')
-curl -si -H 'DNT: 1' "$API/v1/r/$ID/apply" | head -3      # 302 to the program's own page
+curl -si -H 'DNT: 1' "$API/v1/r/$ID/apply" | head -3      # 302 to the program's page, or to the hub's leaving page
 ```
 
 Click counters only move for hops the API sees. A frontend that links directly leaves `applyClicks`
@@ -271,6 +271,14 @@ publisher's numbers at zero while people are reading.
 Both routes `302` for approved **and** listed entries only, and `404` otherwise. They honor
 `DNT: 1`, and capture happens **before** the redirect — so an automated check that follows one
 records a click. Inspect the `href`, or send `DNT: 1`.
+
+The `302` goes straight to the stored link only when a hub reviewer vouched for exactly that link
+and nothing has changed since. Otherwise it goes to the hub's own leaving page,
+`/leaving/{id}?link=apply|source&reason=…`, which shows the destination and lets the reader
+continue: `closed` (a closed or archived programme), `unreviewed` (the link is not the one a
+reviewer last saw — a verified publisher's own edit or new listing included) or `landing_changed`
+(apply only: the nightly source check saw the link start landing on another site). Either way the
+click is counted, so link through the redirect regardless.
 
 ### 4.7 CORS on `/v1` is `*`, with only two request headers allowed
 

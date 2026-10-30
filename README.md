@@ -327,7 +327,7 @@ Beyond the public read surface, the API serves:
 | **Account** | `GET\|PATCH /v1/me` · `/v1/me/opportunities[/:id]` · `/v1/me/duplicates` · `GET\|POST /v1/keys` · `DELETE /v1/keys/:id` |
 | **Publishers** | `GET /v1/publishers` (public) · `PATCH /v1/organizations/:slug` |
 | **Insights** | `GET /v1/insights/opportunities/:id` · `GET /v1/insights/me/summary` |
-| **Link-outs** | `GET /v1/r/:id/apply` · `GET /v1/r/:id/source` — `302` to the opportunity's own channel |
+| **Link-outs** | `GET /v1/r/:id/apply` · `GET /v1/r/:id/source` — `302` to the opportunity's own channel when a reviewer vouched for that link, otherwise to the hub's leaving page |
 | **Review (T3)** | `/v1/review/opportunities` · `/claims` · `/duplicates` · `/organizations` · `/accounts` |
 | **Administration (T4)** | `/v1/admin/accounts/:id/role` · `/direct-create` · `/v1/admin/jobs/:job/run` |
 

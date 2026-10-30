@@ -35,6 +35,18 @@ export const NON_CONTENT: ReadonlySet<string> = new Set([
   "snapshotUrl",
   "nextDeadlineAt",
   "sourceSystem",
+  // THE LINK-OUT PINS (see `modules/shared/link-out.ts`). A reviewer's save re-pins them, and a
+  // write that only moved the pins is not an edit: counting them here would make an unchanged
+  // reviewer save of a listing whose link had drifted look like a content change — which requeues
+  // an approved entry and takes it off the public site, the opposite of what the save was for. The
+  // write path never puts them in `opp`, so a row carrying them would also differ from EVERY
+  // incoming document by their mere presence. They are the URLs' review state, not the URLs.
+  "reviewedApplicationUrl",
+  "reviewedWebsite",
+  "linkLandingChangedAt",
+  // The source check's landing baseline: written by the check, never by a document.
+  "linkLandingRequestedUrl",
+  "linkLandingFinalUrl",
 ]);
 
 /**

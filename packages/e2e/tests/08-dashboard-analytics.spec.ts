@@ -357,7 +357,9 @@ test.describe("M3-5 analytics count what a visitor does", () => {
     );
 
     // Playwright follows redirects, so the 302 has to be captured as it goes past; asserting on the
-    // final page would prove only that the fixture server answered.
+    // final page would prove only that something answered. That page is the frontend's leaving
+    // page here, not the fixture server: a verified publisher's own new listing is auto-approved
+    // but not yet vouched for by a reviewer, and the click is counted on either hop.
     const redirect = page.waitForResponse(
       (response) => response.status() === 302 && /\/v1\/r\/.*\/apply/.test(response.url()),
     );

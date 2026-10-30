@@ -69,12 +69,21 @@ export async function checkAnalytics(report, ctx, state) {
   );
 
   const click = await call(ctx, `/v1/r/${encodeURIComponent(id)}/apply`, { agent: TRAFFIC_AGENT });
+  // `clicked` is the 302 alone, because that is what decides whether a click was counted below —
+  // the API counts the leaving-page hop exactly like the direct one.
   const clicked = click.status === 302;
+  const landing = linkOutLanding(click.location, {
+    id,
+    kind: "apply",
+    destination: state.document?.applicationUrl,
+  });
   c.expect(
-    clicked,
-    "the link-out redirects to the entry's own application channel",
-    `302 → ${click.location}`,
-    `expected 302, got ${click.status ?? click.error}`,
+    clicked && landing.ok,
+    "the link-out redirects to the entry's own application channel, or to the hub's leaving page for it",
+    `302 → ${click.location} (${landing.detail})`,
+    clicked
+      ? `302 → ${click.location ?? "(no Location)"}: ${landing.detail}`
+      : `expected 302, got ${click.status ?? click.error}`,
   );
 
   // The buffer flushes on a timer, so the numbers arrive shortly after the reads do. That is what
@@ -128,6 +137,54 @@ export async function checkAnalytics(report, ctx, state) {
   );
 
   return c.finish();
+}
+
+/** The reasons the API's leaving page is sent with — its contract with the frontend. */
+export const LEAVING_REASONS = ["closed", "unreviewed", "landing_changed"];
+
+/**
+ * Whether a link-out's `Location` is one of the TWO answers the API may give.
+ *
+ * The redirect goes straight to the entry's stored link only when a hub reviewer vouched for exactly
+ * that link; otherwise it goes to the frontend's leaving page, `/leaving/{id}?link=…&reason=…`, which
+ * shows the destination and the reason. This criterion's own fixture is a verified publisher's
+ * auto-approved create — the textbook unvouched link — so on a deployment with the rule it SHOULD
+ * get the leaving page, and a check that demanded the stored URL would fail a correct deployment.
+ *
+ * What is held fixed is that it is one of those two and nothing else: the leaving page must be for
+ * THIS entry and THIS link, with a reason the frontend knows how to say. The origin is not checked
+ * — it is the deployment's `APP_BASE_URL`, which this tool is not told — and neither is the stored
+ * destination fetched; see `verifyRedirect` in checks/openapi.mjs for why a conformance run does not.
+ */
+export function linkOutLanding(location, { id, kind, destination }) {
+  if (!location) return { ok: false, detail: "no Location header" };
+  let target;
+  try {
+    target = new URL(location);
+  } catch {
+    return { ok: false, detail: `Location is not an absolute URL: ${JSON.stringify(location)}` };
+  }
+  if (destination) {
+    let stored;
+    try {
+      stored = new URL(destination).href;
+    } catch {
+      stored = destination;
+    }
+    if (target.href === stored) return { ok: true, detail: "the entry's stored applicationUrl" };
+  }
+  const reason = target.searchParams.get("reason");
+  if (
+    target.pathname === `/leaving/${encodeURIComponent(id)}` &&
+    target.searchParams.get("link") === kind &&
+    LEAVING_REASONS.includes(reason)
+  ) {
+    return { ok: true, detail: `the hub's leaving page, reason ${reason}` };
+  }
+  return {
+    ok: false,
+    detail: `neither the stored link (${destination ?? "unknown"}) nor the leaving page /leaving/${encodeURIComponent(id)}?link=${kind}&reason=${LEAVING_REASONS.join("|")}`,
+  };
 }
 
 async function totals(ctx, id) {

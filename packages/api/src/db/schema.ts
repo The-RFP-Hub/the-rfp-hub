@@ -474,6 +474,45 @@ export const opportunities = pgTable(
      */
     mergedFromPublic: boolean().notNull().default(false),
 
+    /**
+     * THE LINK-OUTS A PERSON VOUCHED FOR: the exact `application_url` and `website` a reviewer last
+     * approved or saved, copied verbatim (see `modules/shared/link-out.ts`).
+     *
+     * `/v1/r/:id/apply` and `/source` hop through this project's own domain, and a hop on our
+     * domain reads as an endorsement of wherever it lands. So the redirect sends a reader straight
+     * through only while the stored URL is still the one somebody reviewed; any other value — a
+     * verified publisher's auto-approved edit, a brand-new auto-approved listing, a row nobody has
+     * reviewed since this column existed — gets the frontend's "leaving" page instead. NULL means
+     * "never vouched", which is every row the backfill did not find approved.
+     *
+     * Server bookkeeping, never content: excluded from `comparableOpportunity`, so re-pinning on an
+     * unchanged save is not an edit and does not requeue anything.
+     */
+    reviewedApplicationUrl: text(),
+    reviewedWebsite: text(),
+    /**
+     * Set by the nightly source check when the apply link LANDED on a different site than it did on
+     * the last check of the same URL that got an answer — a retargeted shortener, a programme page
+     * that now redirects somewhere else. The stored URL has not changed, so the pin above cannot
+     * notice; this is the half of "still the destination somebody reviewed" that only a fetch can
+     * see.
+     *
+     * Set once and left alone by later checks; only a reviewer's pin clears it.
+     */
+    linkLandingChangedAt: timestamp({ withTimezone: true }),
+    /**
+     * THE LANDING BASELINE the flag above is decided against: the requested URL and the final URL
+     * of the last APPLIED source check that got an answer from a server. Kept on the row, not read
+     * back from `verification_runs`, because the run log holds runs that are not verdicts — a
+     * timeout, a result discarded because the entry changed mid-fetch — and is pruned to the newest
+     * few. Comparing against "the latest run" let either kind stand in for the baseline and hide a
+     * move (an applied check on A, a timeout, then B compared with the timeout; or A, a stale
+     * fetch of B, then B compared with B). Only an applied, answered run writes these; nothing
+     * else touches them.
+     */
+    linkLandingRequestedUrl: text(),
+    linkLandingFinalUrl: text(),
+
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

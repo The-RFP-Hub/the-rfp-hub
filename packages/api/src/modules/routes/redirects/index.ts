@@ -11,6 +11,24 @@
  * Anything else is a 404, not a redirect to an error page — an endpoint that will emit a `Location`
  * a caller supplied is a phishing primitive wearing this project's domain.
  *
+ * THE VOUCHING RULE, which is the half the open-redirect rule cannot cover: a stored destination is
+ * not caller-supplied, but nobody necessarily looked at it either, and a hop through this domain
+ * reads as our endorsement of wherever it lands. So the `302` goes STRAIGHT to the stored link only
+ * when a person reviewed exactly that link and nothing has moved since; otherwise it goes to the
+ * frontend's leaving page (`APP_BASE_URL/leaving/{id}?link=apply|source&reason=…`), which shows the
+ * destination and the reason and lets the reader carry on. The reasons, in precedence order:
+ *
+ *   - `closed` — the entry is `closed` or `archived`; dead programmes are where expired domains get
+ *     re-registered by somebody else;
+ *   - `unreviewed` — the stored URL differs from the one a reviewer last pinned, or none ever was
+ *     (a verified publisher's auto-approved edit, or a listing nobody has reviewed);
+ *   - `landing_changed` — apply only: the nightly source check saw the link land on a different
+ *     site than its previous check, though the stored text did not change.
+ *
+ * The rule itself is `modules/shared/link-out.ts`; who pins is documented on the columns
+ * (`db/schema.ts`). Its worst failure is one extra click — every case that would have been a `302`
+ * is still a `302`, the click is counted either way, and every `404` above is unchanged.
+ *
  * A DOCUMENTED REDIRECT, DELIBERATELY. The alternative — leaving these out of the OpenAPI document
  * to keep the nightly compliance run green — would mean shipping an undocumented public endpoint,
  * which is worse than a checker that does not understand redirects. The checker was taught to
@@ -34,9 +52,13 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
   const responses = {
     302: {
       description:
-        "The stored link-out. `Location` is a URL from the record itself — never one supplied by the caller.",
+        "The link-out, counted. `Location` is the record's own stored URL when a reviewer vouched for exactly that URL and nothing has changed since; otherwise it is the hub's leaving page, `{APP_BASE_URL}/leaving/{id}?link=apply|source&reason=closed|unreviewed|landing_changed`, which shows the destination and the reason. Never a URL supplied by the caller.",
       headers: {
-        Location: { type: "string", format: "uri", description: "The destination." },
+        Location: {
+          type: "string",
+          format: "uri",
+          description: "The stored destination, or the hub's leaving page for it.",
+        },
       },
     },
     404: { $ref: "ErrorResponse#" },
@@ -56,7 +78,7 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
         tags: ["opportunities"],
         summary: "Redirect to an entry's applicationUrl, counting the click",
         description:
-          "302 to the record's stored `applicationUrl`. 404 when the entry is not publicly visible, carries no `applicationUrl`, or the stored value is not an `https:` URL.",
+          "302 to the record's stored `applicationUrl` when a reviewer vouched for it; otherwise 302 to the hub's leaving page with `reason` `closed` (closed or archived entry), `unreviewed` (the stored URL is not the one last reviewed) or `landing_changed` (the source check saw the link start landing on another site). 404 when the entry is not publicly visible, carries no `applicationUrl`, or the stored value is not an `https:` URL.",
         params,
         response: responses,
       },
@@ -73,7 +95,7 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
         tags: ["opportunities"],
         summary: "Redirect to an entry's website, counting the click",
         description:
-          "302 to the record's stored `website`. The re-cut removed `source.url`, so the program's own site is what a source link-out means. 404 under the same conditions as the apply redirect.",
+          "302 to the record's stored `website` when a reviewer vouched for it, otherwise to the hub's leaving page — the apply rule without `landing_changed`, since the source check fetches only `applicationUrl`. The re-cut removed `source.url`, so the program's own site is what a source link-out means. 404 under the same conditions as the apply redirect.",
         params,
         response: responses,
       },
