@@ -46,8 +46,8 @@ export function isPublishableUrl(value: string): boolean {
 }
 
 /**
- * Where a link goes, as a reader should be shown it: the host, without a leading `www.`, or `null`
- * when there is no honest answer.
+ * Where a link goes, as a reader should be shown it: the whole host, or `null` when there is no
+ * honest answer.
  *
  * IT IS THE PARSER'S HOST, NOT A SUBSTRING OF WHAT THE PUBLISHER TYPED, and that is the security
  * property rather than a detail. `https://airtable.com@evil.example/` names `airtable.com` first
@@ -59,6 +59,13 @@ export function isPublishableUrl(value: string): boolean {
  * `host` rather than `hostname`, so a non-default port stays in view — `example.org:8443` is not
  * the same place as `example.org`.
  *
+ * NOTHING IS TRIMMED, not even a leading `www.`. Dropping it read better for the shared platforms
+ * (`www.typeform.com` → `typeform.com`), but whether `www.` is decoration or part of the
+ * registrable name depends on the public suffix list: `www.co.uk` became `co.uk`, `www.github.io`
+ * became `github.io`, `www.com.` became `com.` — each a different place from the one the link goes
+ * to, shown on the very controls that exist to say where it goes. Getting that right needs the
+ * suffix list; showing the host as the parser gives it is right without one.
+ *
  * `null` for anything without a web origin (`mailto:`, `javascript:`, a relative reference, a
  * string that does not parse): callers fall back to wording that names no host rather than
  * inventing one.
@@ -67,13 +74,7 @@ export function linkHost(value: string | null | undefined): string | null {
   if (!value || !/^https?:\/\//i.test(value.trim())) return null;
   try {
     const host = new URL(value.trim()).host;
-    if (host === "") return null;
-    // ONE leading `www.`: it is the label a reader's eye skips anyway, and dropping it is what
-    // makes the shared platforms — airtable.com, typeform.com — read as themselves. Anything else
-    // (`apply.`, `forms.`) is part of where the reader is going and stays. So does a `www.` that
-    // IS the registrable name (`www.com`): stripping it there would name a different place.
-    const stripped = host.replace(/^www\./i, "");
-    return stripped.includes(".") ? stripped : host;
+    return host === "" ? null : host;
   } catch {
     return null;
   }

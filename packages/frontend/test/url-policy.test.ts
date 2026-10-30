@@ -49,19 +49,20 @@ describe("isPublishableUrl", () => {
 });
 
 describe("linkHost", () => {
-  it("names the host and drops one leading www.", () => {
-    expect(linkHost("https://www.typeform.com/to/abc")).toBe("typeform.com");
+  it("names the whole host, lowercased, www. included", () => {
+    expect(linkHost("https://www.typeform.com/to/abc")).toBe("www.typeform.com");
     expect(linkHost("https://tally.so/r/xyz")).toBe("tally.so");
-    expect(linkHost("https://WWW.Example.ORG/Apply")).toBe("example.org");
-  });
-
-  it("keeps every other subdomain, which is part of where the reader is going", () => {
+    expect(linkHost("https://WWW.Example.ORG/Apply")).toBe("www.example.org");
     expect(linkHost("https://apply.example.org/round-4")).toBe("apply.example.org");
-    expect(linkHost("https://www.www.example.org/")).toBe("www.example.org");
   });
 
-  it("keeps a www. that is the whole registrable name rather than naming a different place", () => {
-    expect(linkHost("https://www.com/")).toBe("www.com");
+  it.each([
+    ["https://www.co.uk/", "www.co.uk"],
+    ["https://www.github.io/", "www.github.io"],
+    ["https://www.com./", "www.com."],
+    ["https://www.com/", "www.com"],
+  ])("never trims %s into a different registrable name", (url, host) => {
+    expect(linkHost(url)).toBe(host);
   });
 
   it("keeps a non-default port in view", () => {

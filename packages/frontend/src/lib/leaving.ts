@@ -19,8 +19,9 @@
  * FAILING SAFE MEANS ONE EXTRA CLICK, NEVER A BLOCKED ONE. Every value this module does not
  * recognise degrades to the most general wording rather than to an error: an unknown `link` is the
  * application link (the one the API sends almost every reader through), an unknown or missing
- * `reason` is the plain security notice. A future API that adds a fourth reason
- * before this page learns it still gets a page that shows the destination and lets the reader on.
+ * `reason` changes nothing, because no reason is ever shown as a fact. A future API that adds a fourth
+ * reason before this page learns it still gets a page that shows the destination and lets the
+ * reader on.
  */
 import type { Opportunity } from "@/lib/types";
 import { isPublishableUrl } from "@/lib/url-policy";
@@ -33,7 +34,10 @@ export type LeavingReason = (typeof LEAVING_REASONS)[number];
 
 export interface LeavingQuery {
   link: LeavingLink;
-  /** `null` when the reason is missing or one this page does not know. */
+  /**
+   * `null` when the reason is missing or one this page does not know. Informational only: the
+   * notice never states a fact on the strength of it (see `noticeCopy`).
+   */
   reason: LeavingReason | null;
 }
 
@@ -58,28 +62,23 @@ export function readLeavingQuery(params: Pick<URLSearchParams, "get">): LeavingQ
 /**
  * What the security notice says, in the site's own voice.
  *
- * Each sentence states what we know and stops there. `unreviewed` is the common case and gets the
- * plain security notice rather than an account of our review queue: "nobody has checked this"
- * reads as a warning about the program, which it is not, and teaches readers to distrust listings
- * that are fine. `closed` and `landing_changed` are facts about the link the reader can act on, so
- * they say them — "landing changed" still does not mean "hijacked", and the copy does not claim it.
- * An unknown reason gets the same plain notice as `unreviewed`.
+ * THE NOTICE STATES ONLY WHAT THE LISTING ITSELF SAYS, never what the query claims. Anyone can
+ * write `/leaving/{an-open-listing}?reason=closed`, and a page that then announced "This program
+ * is closed" would be asserting a fact on this site's behalf with nothing behind it but the
+ * address bar. So `reason` is read (it is the API's contract) and trusted for nothing: the one
+ * fact the notice states — the program is closed — comes from the listing's own `status`, read
+ * from the API with the destination. Everything else gets the plain notice, which is true for
+ * every link. "The link now lands somewhere else" is deliberately not said at all: the public
+ * listing carries no record of earlier checks, so the page has nothing to back it with.
  */
-const SECURITY_NOTICE =
+export const SECURITY_NOTICE =
   "For your security, RFPSear.ch shows you where a link goes before you leave the site.";
 
-export const REASON_COPY: Record<LeavingReason, string> = {
-  closed:
-    "This program is closed. The link may no longer work, or the site behind it may have changed hands.",
-  unreviewed: SECURITY_NOTICE,
-  landing_changed:
-    "When we last checked this link, it sent visitors to a different site than it did before.",
-};
+export const CLOSED_NOTICE =
+  "This program is closed. The link may no longer work, or the site behind it may have changed hands.";
 
-export const UNKNOWN_REASON_COPY = SECURITY_NOTICE;
-
-export function reasonCopy(reason: LeavingReason | null): string {
-  return reason === null ? UNKNOWN_REASON_COPY : REASON_COPY[reason];
+export function noticeCopy(entry: Pick<Opportunity, "status">): string {
+  return entry.status === "closed" || entry.status === "archived" ? CLOSED_NOTICE : SECURITY_NOTICE;
 }
 
 /** What the link is, in the words the page uses for it — with its article, which differs. */
