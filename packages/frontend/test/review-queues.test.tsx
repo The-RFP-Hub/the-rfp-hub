@@ -20,9 +20,12 @@ import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type {
   AccountSummary,
+  ClosingSoonItem,
+  ClosingSoonList,
   DuplicatePair,
   Me,
   MembershipInvite,
+  OpenConfirmation,
   Opportunity,
   OrganizationSummary,
 } from "@/lib/types";
@@ -225,6 +228,37 @@ const organizations = vi.fn(
   },
 );
 
+const quiet: ClosingSoonItem = {
+  id: "acme:quiet-grants",
+  title: "Quiet Grants",
+  namespace: "acme",
+  applicationUrl: "https://forms.example.org/quiet",
+  website: "https://acme.example.org/",
+  lastSeenAt: "2026-08-14T00:00:00.000Z",
+  updatedAt: "2026-07-01T00:00:00.000Z",
+  closesAt: "2026-11-12T00:00:00.000Z",
+};
+const closingRows: { current: ClosingSoonItem[] } = { current: [quiet] };
+const closingSoon = vi.fn(
+  async (): Promise<ClosingSoonList> => ({
+    items: closingRows.current,
+    windowDays: 30,
+    inactiveDays: 90,
+    asOf: "2026-10-30T00:00:00.000Z",
+    truncated: false,
+  }),
+);
+const confirmOpen = vi.fn(async (id: string): Promise<OpenConfirmation> => {
+  // The API's answer, and the list it would serve next: a confirmed row is no longer closing soon.
+  closingRows.current = closingRows.current.filter((row) => row.id !== id);
+  return {
+    id,
+    lastSeenAt: "2026-10-30T12:00:00.000Z",
+    previousLastSeenAt: "2026-08-14T00:00:00.000Z",
+    closesAt: "2027-01-28T12:00:00.000Z",
+  };
+});
+
 function client(account: Me = me): ApiClient {
   return {
     baseUrl: "https://api.example.com",
@@ -261,6 +295,8 @@ function client(account: Me = me): ApiClient {
       accounts,
       unverifyOrganization: vi.fn(),
       verifySource,
+      closingSoon,
+      confirmOpen,
     },
   } as unknown as ApiClient;
 }
@@ -275,6 +311,7 @@ const mount = (account: Me = me) =>
 beforeEach(() => {
   vi.clearAllMocks();
   inviteRows.current = [];
+  closingRows.current = [quiet];
   tab.current = null;
 });
 
@@ -285,6 +322,9 @@ describe("the section navigation", () => {
     expect(await screen.findByRole("link", { name: "Submissions · 7" })).toBeTruthy();
     await waitFor(() => expect(screen.getByRole("link", { name: "Claims · 0" })).toBeTruthy());
     expect(screen.getByRole("link", { name: "Duplicates · 0 open" })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Closing soon · 1" })).toBeTruthy(),
+    );
   });
 
   it("reads the open tab from the URL, so a link to one lands on it", async () => {
@@ -317,6 +357,71 @@ describe("the section navigation", () => {
     const organizations = await screen.findByRole("link", { name: "Organizations" });
     expect(organizations.getAttribute("href")).toBe("/review?tab=organizations");
     expect(organizations.getAttribute("data-replace")).toBe("true");
+  });
+});
+
+describe("listings closing soon", () => {
+  it("shows each listing with its links and the date the staleness job closes it", async () => {
+    tab.current = "closing";
+    mount();
+
+    const title = await screen.findByRole("link", { name: "Quiet Grants" });
+    expect(title.getAttribute("href")).toContain("/listings/acme%3Aquiet-grants");
+    expect(
+      screen.getByRole("link", { name: "Application link for Quiet Grants" }).getAttribute("href"),
+    ).toBe("https://forms.example.org/quiet");
+    expect(
+      screen.getByRole("link", { name: "Website for Quiet Grants" }).getAttribute("href"),
+    ).toBe("https://acme.example.org/");
+    expect(screen.getByText("Nov 12, 2026")).toBeTruthy();
+    expect(closingSoon).toHaveBeenCalled();
+  });
+
+  it("confirms only after a stated consequence, sends the note, and refreshes the list", async () => {
+    tab.current = "closing";
+    mount();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm still open…" }));
+    expect(confirmOpen).not.toHaveBeenCalled();
+    const panel = screen.getByRole("group", { name: "Confirm “Quiet Grants” is still open?" });
+    expect(
+      within(panel).getByText(/Only confirm after opening the program’s own page/),
+    ).toBeTruthy();
+
+    fireEvent.change(within(panel).getByLabelText("Note (optional)"), {
+      target: { value: "  form still live  " },
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "Confirm still open" }));
+
+    await waitFor(() =>
+      expect(confirmOpen).toHaveBeenCalledWith("acme:quiet-grants", "form still live"),
+    );
+    expect(
+      await screen.findByText(
+        /“Quiet Grants” is confirmed open\. It stays open until at least Jan 28, 2027\./,
+      ),
+    ).toBeTruthy();
+    // The row is re-read from the API, which no longer lists it.
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Quiet Grants" })).toBeNull());
+    expect(closingSoon.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("sends no note when the reviewer leaves it blank", async () => {
+    tab.current = "closing";
+    mount();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm still open…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm still open" }));
+
+    await waitFor(() => expect(confirmOpen).toHaveBeenCalledWith("acme:quiet-grants", null));
+  });
+
+  it("says plainly when nothing is about to close", async () => {
+    closingRows.current = [];
+    tab.current = "closing";
+    mount();
+
+    expect(await screen.findByText("Nothing closes in the next 30 days.")).toBeTruthy();
   });
 });
 

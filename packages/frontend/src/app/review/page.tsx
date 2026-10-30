@@ -35,7 +35,7 @@ import {
   actionErrorNote,
 } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { formatInstant, formatMatchReasons, formatSimilarity } from "@/lib/format";
+import { formatDate, formatInstant, formatMatchReasons, formatSimilarity } from "@/lib/format";
 import {
   CAPABILITY_DENIAL_COPY,
   ROUTE_GATE_COPY,
@@ -52,6 +52,8 @@ import { useApi } from "@/lib/session";
 import type {
   AccountSummary,
   ClaimList,
+  ClosingSoonItem,
+  ClosingSoonList,
   DuplicatePair,
   DuplicatePairList,
   DuplicateSide,
@@ -69,13 +71,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-type Tab = "submissions" | "claims" | "duplicates" | "organizations";
-const TABS: Tab[] = ["submissions", "claims", "duplicates", "organizations"];
+type Tab = "submissions" | "claims" | "duplicates" | "closing" | "organizations";
+const TABS: Tab[] = ["submissions", "claims", "duplicates", "closing", "organizations"];
 const SUBMISSION_PAGE_SIZE = 50;
 const LABELS: Record<Tab, string> = {
   submissions: "Submissions",
   claims: "Claims",
   duplicates: "Duplicates",
+  closing: "Closing soon",
   organizations: "Organizations",
 };
 
@@ -124,6 +127,7 @@ function Review({ me }: { me: Me }) {
     [api, queuePage],
   );
   const loadClaims = useCallback(() => api.review.claims({ status: "pending" }), [api]);
+  const loadClosing = useCallback(() => api.review.closingSoon(), [api]);
   const loadDuplicates = useCallback(async () => {
     const [suspected, confirmed] = await Promise.all([
       api.review.duplicates({ status: "suspected", limit: 200 }),
@@ -146,6 +150,7 @@ function Review({ me }: { me: Me }) {
 
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
+  const closing = useResource(loadClosing);
   const duplicates = useResource(loadDuplicates);
   const resolvedDuplicates = useResource(loadResolvedDuplicates, { enabled: tab === "duplicates" });
 
@@ -174,6 +179,7 @@ function Review({ me }: { me: Me }) {
             isOpenDuplicateStatus(pair.status),
           ).length
         : null,
+    closing: closing.state.status === "ready" ? closing.state.data.items.length : null,
     organizations: null,
   };
 
@@ -230,6 +236,7 @@ function Review({ me }: { me: Me }) {
           origin={returnHere}
         />
       ) : null}
+      {tab === "closing" ? <ClosingSoon closing={closing} origin={returnHere} /> : null}
       {tab === "organizations" ? <Organizations memberships={me.memberships} /> : null}
     </section>
   );
@@ -836,6 +843,194 @@ function Claims({
       </ResourceView>
     </>
   );
+}
+
+// ── closing soon ──────────────────────────────────────────────────────────────────
+
+/**
+ * Live listings the staleness job will close for going quiet, and the one thing a reviewer can do
+ * about a listing that is NOT quiet: say so.
+ *
+ * WHY THIS EXISTS. The job closes an open listing with no upcoming fixed deadline once nothing has
+ * refreshed it for ninety days, and the automated source check is the usual refresher. A page the
+ * check cannot read — a bot wall, a sign-in, a form with no title — therefore expired on schedule
+ * however alive the program was, and the only remedy was SQL in production. "Confirm still open" is
+ * that remedy as a recorded, attributed decision.
+ *
+ * THE DATES ARE THE API'S, computed by the job's own rule, so this page never holds an opinion of
+ * its own about when something closes. A date already past means the next nightly run.
+ *
+ * THE LINKS ARE THE STORED ONES, not the counted `/v1/r/…` hops: a reviewer checking a page by hand
+ * is not a reader the publisher's numbers should credit, and needs to see exactly what is stored.
+ */
+function ClosingSoon({
+  closing,
+  origin,
+}: {
+  closing: ResourceHandle<ClosingSoonList>;
+  origin: string;
+}) {
+  const api = useApi();
+  const { note, busy, run } = useAction();
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirmNote, setConfirmNote] = useState("");
+
+  return (
+    <>
+      <p className="muted footnote">
+        Open listings with no upcoming fixed deadline close automatically once nothing has refreshed
+        them for a while — a matching source check, a publisher edit or an approval. When you have
+        opened the program&rsquo;s own page and it is still taking applications, confirming keeps
+        the listing open for another full period. Nothing else about the listing changes.
+      </p>
+      <ActionNote note={note} />
+      <ResourceView resource={closing.state} what="the closing-soon list" onRetry={closing.reload}>
+        {(list) =>
+          list.items.length === 0 ? (
+            <EmptyState
+              title={`Nothing closes in the next ${list.windowDays} days.`}
+              detail="A listing appears here when it has gone quiet and has no upcoming fixed deadline to keep it open."
+            />
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <caption>
+                  {list.items.length} closing within {list.windowDays} days
+                  {list.truncated ? " · showing the soonest" : null}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Listing</th>
+                    <th scope="col">Links</th>
+                    <th scope="col">Closes</th>
+                    <th scope="col">Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((item) => (
+                    // A row and its confirmation panel are two `<tr>`s that belong to one listing.
+                    <Fragment key={item.id}>
+                      <tr>
+                        <th scope="row">
+                          <Link
+                            className="row-title"
+                            href={detailHref("/listings", item.id, origin)}
+                          >
+                            <UntrustedText value={item.title} />
+                          </Link>
+                          <div className="muted">
+                            <code>{item.id}</code>
+                            {item.namespace ? (
+                              <>
+                                {" "}
+                                · <UntrustedText value={item.namespace} />
+                              </>
+                            ) : null}
+                          </div>
+                        </th>
+                        <td>
+                          <div>
+                            <UntrustedLink
+                              href={item.applicationUrl}
+                              label="Application link"
+                              ariaLabel={`Application link for ${item.title}`}
+                            />
+                          </div>
+                          {item.website ? (
+                            <div>
+                              <UntrustedLink
+                                href={item.website}
+                                label="Website"
+                                ariaLabel={`Website for ${item.title}`}
+                              />
+                            </div>
+                          ) : null}
+                        </td>
+                        <td>
+                          {closesLabel(item, list.asOf)}
+                          <div className="muted footnote">
+                            last refreshed {formatDate(item.lastSeenAt ?? item.updatedAt)}
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setConfirmNote("");
+                              setConfirming(confirming === item.id ? null : item.id);
+                            }}
+                          >
+                            Confirm still open…
+                          </button>
+                        </td>
+                      </tr>
+                      {confirming === item.id ? (
+                        <tr>
+                          <td colSpan={4}>
+                            <ConfirmPanel
+                              title={`Confirm “${item.title}” is still open?`}
+                              confirmLabel="Confirm still open"
+                              busyLabel="Confirming…"
+                              busy={busy}
+                              onCancel={() => setConfirming(null)}
+                              onConfirm={() =>
+                                void run(async () => {
+                                  const result = await api.review.confirmOpen(
+                                    item.id,
+                                    confirmNote.trim() || null,
+                                  );
+                                  setConfirming(null);
+                                  setConfirmNote("");
+                                  closing.reload();
+                                  return result.closesAt
+                                    ? `“${item.title}” is confirmed open. It stays open until at least ${formatDate(result.closesAt)}.`
+                                    : `“${item.title}” is confirmed open.`;
+                                })
+                              }
+                            >
+                              <p>
+                                Only confirm after opening the program&rsquo;s own page and seeing
+                                that it still takes applications. The listing stays open for another{" "}
+                                {list.inactiveDays} days, and the confirmation is recorded in its
+                                history under your handle.
+                              </p>
+                              <div className="field">
+                                <label htmlFor={`confirm-open-note-${item.id}`}>
+                                  Note (optional)
+                                </label>
+                                <p className="hint">
+                                  What you checked. Kept in the listing&rsquo;s history.
+                                </p>
+                                <input
+                                  id={`confirm-open-note-${item.id}`}
+                                  value={confirmNote}
+                                  maxLength={500}
+                                  onChange={(event) => setConfirmNote(event.target.value)}
+                                  placeholder="e.g. the form still accepts submissions"
+                                />
+                              </div>
+                            </ConfirmPanel>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </ResourceView>
+    </>
+  );
+}
+
+/** The close date, or "at the next nightly run" when it has already passed. */
+function closesLabel(item: ClosingSoonItem, asOf: string): string {
+  return Date.parse(item.closesAt) <= Date.parse(asOf)
+    ? "at the next nightly run"
+    : formatDate(item.closesAt);
 }
 
 // ── duplicates ────────────────────────────────────────────────────────────────────

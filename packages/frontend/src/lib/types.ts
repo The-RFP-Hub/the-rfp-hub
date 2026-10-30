@@ -417,6 +417,40 @@ export interface ReviewDecision {
   isListed: boolean;
 }
 
+/**
+ * A live listing the staleness job will close for inactivity inside the asked-for window.
+ *
+ * `closesAt` is the API's computation from the job's own rule; the job closes the listing on its
+ * first nightly run after it, so a past `closesAt` means "the next run". The two URLs are the
+ * stored, publisher-written values — untrusted, and rendered through `UntrustedLink`.
+ */
+export interface ClosingSoonItem {
+  id: string;
+  title: string;
+  namespace: string | null;
+  applicationUrl: string | null;
+  website: string | null;
+  lastSeenAt: string | null;
+  updatedAt: string;
+  closesAt: string;
+}
+
+export interface ClosingSoonList {
+  items: ClosingSoonItem[];
+  windowDays: number;
+  inactiveDays: number;
+  asOf: string;
+  truncated: boolean;
+}
+
+export interface OpenConfirmation {
+  id: string;
+  lastSeenAt: string;
+  previousLastSeenAt: string | null;
+  /** Null when the inactivity pass does not decide this listing's closing. */
+  closesAt: string | null;
+}
+
 export interface AccountSummary {
   id: number;
   handle: string | null;

@@ -29,6 +29,7 @@ import type {
   ClaimList,
   ClaimResult,
   ClaimStatus,
+  ClosingSoonList,
   DuplicateList,
   DuplicatePair,
   DuplicatePairList,
@@ -46,6 +47,7 @@ import type {
   Notification,
   NotificationList,
   NotificationReadAll,
+  OpenConfirmation,
   Opportunity,
   OrgRole,
   OrganizationList,
@@ -402,6 +404,19 @@ export function createApiClient(options: ApiClientOptions) {
           "POST",
           `/v1/review/opportunities/${encodeURIComponent(id)}/verify`,
         ),
+      /** Live listings the staleness job will close for inactivity within `days` (default 30). */
+      closingSoon: (query?: { days?: number; limit?: number }) =>
+        request<ClosingSoonList>("GET", "/v1/review/closing-soon", { query }),
+      /**
+       * "I checked by hand, still open": refreshes the listing's staleness clock and nothing else.
+       * The note goes into the audit trail as the reason; without one the API records a default.
+       */
+      confirmOpen: (id: string, note?: string | null) =>
+        request<OpenConfirmation>(
+          "POST",
+          `/v1/review/opportunities/${encodeURIComponent(id)}/confirm-open`,
+          { body: { note: note ?? null } },
+        ),
       duplicates: (query?: { status?: DuplicateStatus; limit?: number }) =>
         request<DuplicatePairList>("GET", "/v1/review/duplicates", { query }),
       confirmDuplicate: (pairId: number) =>
@@ -561,9 +576,19 @@ export function createApiClient(options: ApiClientOptions) {
     directory: {
       list: (query?: DirectoryQuery) =>
         request<PaginatedOpportunities>("GET", "/v1/opportunities", { query }),
-      /** The full Standard object, and the read the API counts as a detail view. */
-      find: (id: string) =>
-        request<Opportunity>("GET", `/v1/opportunities/${encodeURIComponent(id)}`),
+      /**
+       * The full Standard object, and the read the API counts as a detail view.
+       *
+       * `{ count: false }` is for a read that is NOT somebody reading the listing — the leaving page,
+       * whose reader was already counted by the link-out redirect that sent them there. It adds
+       * `?count=false`, which the API serves identically and does not record. A query parameter
+       * rather than a header: the API's CORS policy allows `Content-Type` and `Authorization` only,
+       * and anything else would cost a preflight.
+       */
+      find: (id: string, options?: { count?: boolean }) =>
+        request<Opportunity>("GET", `/v1/opportunities/${encodeURIComponent(id)}`, {
+          query: options?.count === false ? { count: false } : undefined,
+        }),
     },
 
     publishers: {
