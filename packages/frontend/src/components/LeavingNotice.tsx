@@ -14,13 +14,14 @@
  * THE DESTINATION COMES FROM THE LISTING, NEVER FROM THE ADDRESS BAR. The query names which of the
  * listing's two links and why — `lib/leaving.ts` reads those two parameters and nothing else — and
  * the URL behind "Continue" is the stored `applicationUrl` or `website`, read by id through the
- * public route. A forged query can choose between two links the listing already publishes and
- * between three cautionary sentences of ours; it cannot put an address of its own on this page.
+ * public route. A forged query can choose between two links the listing already publishes; it
+ * cannot put an address of its own on this page.
  *
- * THE REASON IS NOT RE-CHECKED AGAINST THE LISTING, deliberately. "Closed" is the API's verdict, and
- * the API may reach it from a deadline that has passed while `status` still says open; second-
- * guessing it here would swap a true sentence for a vaguer one. And every reason this page knows is
- * a caution — a forged one can only make the page more careful than it needed to be.
+ * THE NOTICE STATES ONLY WHAT THE LISTING SAYS. The query's `reason` is parsed and never shown as a
+ * fact: anyone can write `?reason=closed` on an open listing, and the page must not announce a
+ * closure on this site's behalf on the strength of the address bar. "This program is closed" comes
+ * from the listing's own `status` (`noticeCopy` in `lib/leaving.ts`); every other case gets the
+ * plain security notice, which is true of every link.
  *
  * WHAT THE READER SEES IS WHAT THE PARSER SAYS. The host shown large, and named in the button, is
  * `new URL(stored).host` (see `linkHost`), so `https://airtable.com@evil.example/` reads

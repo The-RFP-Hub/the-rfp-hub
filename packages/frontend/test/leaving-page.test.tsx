@@ -95,7 +95,7 @@ describe("the leaving page, offering the stored link", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "You’re leaving RFPSear.ch" }),
     ).toBeTruthy();
-    // The host without its `www.`, as the large line under "Where it goes".
+    // The whole host, `www.` included, as the large line under "Where it goes".
     const host = await screen.findByText("www.typeform.com", { selector: ".leaving-host *" });
     expect(host).toBeTruthy();
     // The whole URL, verbatim, and as text rather than as a second link.
