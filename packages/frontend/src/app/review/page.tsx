@@ -851,9 +851,9 @@ function Claims({
  * Live listings the staleness job will close for going quiet, and the one thing a reviewer can do
  * about a listing that is NOT quiet: say so.
  *
- * WHY THIS EXISTS. The job closes an open listing with no upcoming fixed deadline once nothing has
- * refreshed it for ninety days, and the automated source check is the usual refresher. A page the
- * check cannot read — a bot wall, a sign-in, a form with no title — therefore expired on schedule
+ * WHY THIS EXISTS. The job closes an open listing once nothing has refreshed it for ninety days and
+ * no fixed deadline is still ahead of it — a deadline postpones the close, it does not prevent it —
+ * and the automated source check is the usual refresher. A page the check cannot read — a bot wall, a sign-in, a form with no title — therefore expired on schedule
  * however alive the program was, and the only remedy was SQL in production. "Confirm still open" is
  * that remedy as a recorded, attributed decision.
  *
@@ -878,10 +878,10 @@ function ClosingSoon({
   return (
     <>
       <p className="muted footnote">
-        Open listings with no upcoming fixed deadline close automatically once nothing has refreshed
-        them for a while — a matching source check, a publisher edit or an approval. When you have
-        opened the program&rsquo;s own page and it is still taking applications, confirming keeps
-        the listing open for another full period. Nothing else about the listing changes.
+        Open listings close automatically once nothing has refreshed them for a while — a matching
+        source check, a publisher edit or an approval — and no fixed deadline is still ahead. When
+        you have opened the program&rsquo;s own page and it is still taking applications, confirming
+        keeps the listing open for another full period. Nothing else about the listing changes.
       </p>
       <ActionNote note={note} />
       <ResourceView resource={closing.state} what="the closing-soon list" onRetry={closing.reload}>
@@ -889,7 +889,7 @@ function ClosingSoon({
           list.items.length === 0 ? (
             <EmptyState
               title={`Nothing closes in the next ${list.windowDays} days.`}
-              detail="A listing appears here when it has gone quiet and has no upcoming fixed deadline to keep it open."
+              detail="A listing appears here when it has gone quiet and no fixed deadline will keep it open past the next few weeks."
             />
           ) : (
             <div className="table-scroll">

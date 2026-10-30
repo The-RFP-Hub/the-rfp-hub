@@ -1027,7 +1027,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, by the job's own rule; the job closes it on its first run after that instant.",
+      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or the last fixed deadline of a rolling programme when that is later — the job's own rule projected forward; the job closes it on its first run after that instant.",
     required: [
       "id",
       "title",
@@ -1075,7 +1075,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: ["string", "null"],
         format: "date-time",
         description:
-          "When the inactivity pass would now close it; null when that pass does not decide it (a future fixed deadline, or a past-due entry the job closes on its deadlines).",
+          "When the inactivity pass would now close it — after the last fixed deadline, for a rolling programme that has one; null when that pass never will (an entry with fixed deadlines and no rolling intake closes as past due instead).",
       },
     },
   },

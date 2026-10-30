@@ -206,7 +206,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         tags: ["review"],
         summary: "Confirm by hand that a live listing is still open",
         description:
-          "Sets `last_seen_at` to now and audits it (`update`, with `lastSeenAt` before/after and a `reason`: the reviewer's `note`, or a default). This is the staleness job's inactivity clock, so the listing gets a fresh `STALENESS_INACTIVE_DAYS`. Nothing else changes: not `updatedAt`, not the content, not the reviewed link pins. 409 `not_approved`, `not_listed`, `not_open` or `opportunity_merged` for anything that is not an approved, listed, open, unmerged entry. A past-due entry is still closed on its deadlines: `closesAt` is null for it.",
+          "Sets `last_seen_at` to now and audits it (`update`, with `lastSeenAt` before/after and a `reason`: the reviewer's `note`, or a default). This is the staleness job's inactivity clock, so the listing gets a fresh `STALENESS_INACTIVE_DAYS`. Nothing else changes: not `updatedAt`, not the content, not the reviewed link pins. 409 `not_approved`, `not_listed`, `not_open` or `opportunity_merged` for anything that is not an approved, listed, open, unmerged entry, and `past_due` for one whose fixed deadlines have all passed with no rolling intake: the job closes that on its deadlines, which a confirmation cannot change. `closesAt` is when the inactivity pass would now close it (after the last fixed deadline, for a rolling programme that has one), or null when that pass never will (fixed deadlines only).",
         security: [{ bearerAuth: [] }],
         params: idParams,
         body: {
@@ -235,7 +235,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         tags: ["review"],
         summary: "Live listings the staleness job will close for inactivity soon",
         description:
-          "Approved, listed, open, unmerged entries that the staleness job's inactivity rule would close within `days` (default 30), soonest first, each with its `closesAt`. Computed by the job's own rule, so an entry with a future fixed deadline (never closed for inactivity) and a past-due one (closed on its deadlines whatever its clock says) are not listed.",
+          "Approved, listed, open, unmerged entries that the staleness job's inactivity rule would close within `days` (default 30), soonest first, each with its `closesAt`. The job's own rule projected across the window: a fixed deadline only postpones an inactivity close, so a rolling programme whose last fixed deadline passes inside the window is listed at `max(clock + STALENESS_INACTIVE_DAYS, that deadline)`. Not listed: one whose last fixed deadline lies beyond the window, a fixed-only entry (it closes as past due, not inactive) and a past-due one (closed on its deadlines whatever its clock says).",
         security: [{ bearerAuth: [] }],
         querystring: {
           type: "object",

@@ -32,6 +32,7 @@ import type {
   OrganizationSummaryView,
   ReviewDecisionView,
 } from "../../shared/api-views.js";
+import { isPastDue } from "../../shared/deadlines.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { reviewerPins } from "../../shared/link-out.js";
 import { inactivityClosesAt } from "../../shared/staleness.js";
@@ -51,8 +52,11 @@ const ORG_ROLES: OrgRole[] = ["owner", "admin", "publisher"];
 /** The audit `reason` of a "confirm still open" that carried no note of its own. */
 export const CONFIRM_OPEN_DEFAULT_REASON = "reviewer confirmed the listing is still open";
 
-/** Rows read per page while building the "closing soon" list. */
-const CLOSING_SOON_PAGE = 200;
+/**
+ * The most candidate rows one "closing soon" read examines. Far above a realistic backlog — the job
+ * closes anything already due every night — and the bound that keeps the read one query.
+ */
+const CLOSING_SOON_SCAN = 2000;
 
 /** The directory fields an authorised editor may change. Deliberately not the verified flag. */
 export interface OrganizationMetadata {
@@ -145,7 +149,10 @@ export class ReviewService {
    * vouches that the programme still runs, not for where its links go — that is what approval is.
    *
    * Only for a LIVE, OPEN listing, because those are the only ones the staleness job can close for
-   * inactivity that anybody can see. Each refusal is its own 409 code so a client can say why.
+   * inactivity that anybody can see — and NOT for a past-due one: the job closes that on its
+   * deadlines whatever the clock says, so a confirmation would be recorded and change nothing. The
+   * remedy there is the listing's deadlines, not this. Each refusal is its own 409 code so a client
+   * can say why.
    */
   async confirmOpen(
     reviewerId: number,
@@ -174,6 +181,12 @@ export class ReviewService {
         );
       }
       const now = new Date();
+      if (isPastDue(row.deadlines, now)) {
+        throw conflict(
+          "past_due",
+          `opportunity ${JSON.stringify(row.publicId)} has no deadline left and no rolling intake; the staleness job closes it on its deadlines, which confirming cannot change. Update its deadlines instead.`,
+        );
+      }
       await repos.opportunities.touchLastSeen(row.id, now);
       const reason = note?.trim() || CONFIRM_OPEN_DEFAULT_REASON;
       await repos.audit.record({
@@ -205,12 +218,17 @@ export class ReviewService {
    * Live, open listings the staleness job would close for inactivity within `windowDays`, soonest
    * first.
    *
-   * THE JOB'S RULE, NOT A COPY OF IT. The SQL is the job's own candidate scope plus the clock bound
-   * (`listClosingSoonCandidates`), and every row it returns is then put through
-   * `inactivityClosesAt` — the same comparison `stalenessClosureReason` makes, solved for time — so
-   * a past-due entry, one with a future fixed deadline and one whose stored `next_deadline_at` is
-   * stale all drop out exactly as the job would treat them. The list cannot promise a date the job
-   * will not keep.
+   * THE JOB'S RULE PROJECTED ACROSS THE WINDOW, NOT A COPY OF IT. Every candidate is put through
+   * `inactivityClosesAt` — `stalenessClosureReason` solved for time — so a rolling listing whose
+   * fixed date passes inside the window is listed at `max(clock + days, that date)`, while a
+   * past-due entry, a fixed-only one (it closes as `past_due`, which a confirmation cannot prevent)
+   * and one whose last fixed date lies beyond the window drop out exactly as the job would treat
+   * them. The list cannot promise a date the job will not keep.
+   *
+   * SORTED HERE, BY THE PROJECTED DATE. The SQL can only order by the clock, and once a deadline can
+   * postpone the close the two orders differ. The candidate read is therefore one bounded query of
+   * at most `CLOSING_SOON_SCAN` rows; if it fills, the answer says `truncated` rather than claiming
+   * to be the soonest of everything.
    */
   async closingSoon(
     windowDays: number,
@@ -219,39 +237,31 @@ export class ReviewService {
   ): Promise<ClosingSoonListView> {
     const inactiveDays = this.config.stalenessInactiveDays;
     const horizon = now.getTime() + windowDays * 86_400_000;
-    // closesAt = clock + inactiveDays <= now + window  ⇔  clock <= now + window - inactiveDays.
+    // Every projected close is >= clock + inactiveDays, so closesAt <= horizon needs
+    // clock <= horizon - inactiveDays.
     const clockAtOrBefore = new Date(horizon - inactiveDays * 86_400_000);
-    const items: ClosingSoonItemView[] = [];
-    let truncated = false;
-    let offset = 0;
-    walk: for (;;) {
-      const page = await this.repos.opportunities.listClosingSoonCandidates(
-        now,
-        clockAtOrBefore,
-        offset,
-        CLOSING_SOON_PAGE,
-      );
-      offset += page.length;
-      for (const row of page) {
-        const closesAt = inactivityClosesAt(row, now, inactiveDays);
-        if (closesAt === null || closesAt.getTime() > horizon) continue;
-        if (items.length === limit) {
-          truncated = true;
-          break walk;
-        }
-        items.push({
-          id: row.publicId,
-          title: row.title,
-          namespace: row.sourcePublisher,
-          applicationUrl: row.applicationUrl,
-          website: row.website,
-          lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
-          updatedAt: row.updatedAt.toISOString(),
-          closesAt: closesAt.toISOString(),
-        });
-      }
-      if (page.length < CLOSING_SOON_PAGE) break;
+    const candidates = await this.repos.opportunities.listClosingSoonCandidates(
+      new Date(horizon),
+      clockAtOrBefore,
+      CLOSING_SOON_SCAN,
+    );
+    const due: { row: OpportunityRow; closesAt: Date }[] = [];
+    for (const row of candidates) {
+      const closesAt = inactivityClosesAt(row, now, inactiveDays);
+      if (closesAt !== null && closesAt.getTime() <= horizon) due.push({ row, closesAt });
     }
+    due.sort((a, b) => a.closesAt.getTime() - b.closesAt.getTime() || a.row.id - b.row.id);
+    const items: ClosingSoonItemView[] = due.slice(0, limit).map(({ row, closesAt }) => ({
+      id: row.publicId,
+      title: row.title,
+      namespace: row.sourcePublisher,
+      applicationUrl: row.applicationUrl,
+      website: row.website,
+      lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+      updatedAt: row.updatedAt.toISOString(),
+      closesAt: closesAt.toISOString(),
+    }));
+    const truncated = due.length > limit || candidates.length === CLOSING_SOON_SCAN;
     return { items, windowDays, inactiveDays, asOf: now.toISOString(), truncated };
   }
 

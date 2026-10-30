@@ -661,18 +661,24 @@ the programme's title): before it, such a listing closed for inactivity on sched
 the programme was, and the only remedy was setting `last_seen_at` in SQL against production.
 
 * `GET /v1/review/closing-soon?days=30&limit=100` lists approved, listed, open, unmerged entries
-  this job would close for inactivity within `days` (default 30, at most 365), soonest first, each
-  with its `closesAt` = `coalesce(last_seen_at, updated_at) + STALENESS_INACTIVE_DAYS`. It is the
-  job's own rule (`modules/shared/staleness.ts`, which `closureReason` calls), applied to the job's
-  own candidate scope, so an entry with a future fixed deadline and a past-due one never appear —
-  the first is never closed for inactivity, the second is closed on its deadlines whatever its clock
-  says. The job closes an entry on its first run after `closesAt`; a past `closesAt` means tonight.
+  this job would close for inactivity within `days` (default 30, at most 365), soonest first. It
+  is the job's own rule (`modules/shared/staleness.ts`; `closureReason` calls it) **projected
+  across the window**. A future fixed deadline only *postpones* an inactivity close: once a rolling
+  programme's last fixed date passes, `next_deadline_at` is NULL again and the same clock applies.
+  So `closesAt` = `max(coalesce(last_seen_at, updated_at) + STALENESS_INACTIVE_DAYS, last fixed
+  deadline)` for a rolling programme, and the first term alone for one with no fixed deadline. Not
+  listed: a programme whose last fixed deadline is beyond the window; one with fixed deadlines and
+  no rolling intake (when the last passes it closes as `past_due`, not `inactive`); and one already
+  past due. The job closes an entry on its first run after `closesAt`; a past `closesAt` means
+  tonight.
 * `POST /v1/review/opportunities/{id}/confirm-open` with an optional `{"note": "…"}` (≤ 500
   characters) sets `last_seen_at = now()` under a row lock and audits it as `update`, with the
   reviewer as actor: `{"lastSeenAt": {"before": …, "after": …}, "reason": "<note, or a default>"}`.
   **It changes nothing else** — not `updated_at` (that would re-queue a source check and claim an
   edit nobody made), not the content, not the reviewer link pins. `409` `not_approved`,
-  `not_listed`, `not_open` or `opportunity_merged` for anything that is not a live, open entry.
+  `not_listed`, `not_open` or `opportunity_merged` for anything that is not a live, open entry, and
+  `past_due` for an entry whose fixed deadlines have all passed with no rolling intake: the job
+  closes that on its deadlines, so a confirmation would change nothing. Fix its deadlines instead.
 
 Both are on the reviewer page, under **Closing soon**. A confirmation buys one more
 `STALENESS_INACTIVE_DAYS`, not a permanent exemption: if the programme is still running when the

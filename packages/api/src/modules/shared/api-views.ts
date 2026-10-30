@@ -434,9 +434,10 @@ export interface ReviewDecisionView {
 /**
  * One live listing the staleness job would close for inactivity within the requested window.
  *
- * `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, computed by the job's
- * own rule (`modules/shared/staleness.ts`); the job closes the entry on its first nightly run after
- * that instant, so a `closesAt` already in the past means the next run.
+ * `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or a rolling
+ * programme's last fixed deadline when that is later — the job's own rule projected forward
+ * (`modules/shared/staleness.ts`); the job closes the entry on its first nightly run after that
+ * instant, so a `closesAt` already in the past means the next run.
  */
 export interface ClosingSoonItemView {
   id: string;

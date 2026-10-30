@@ -453,24 +453,26 @@ export class OpportunityRepository {
   }
 
   /**
-   * Live entries whose inactivity clock is at or before `clockAtOrBefore`, the stalest first — the
+   * Live entries the staleness job could close for inactivity by `horizon` — a SUPERSET, and the
    * read behind the reviewer's "closing soon" list.
    *
-   * THE JOB'S OWN CANDIDATE SCOPE, narrowed to what the public can see. `stalenessCandidateScope`
-   * is the predicate the staleness walk uses, so nothing the job would never examine can appear
-   * here; `approved AND is_listed` is added because an entry nobody can read is not one a reviewer
-   * is being asked to keep open. The clock bound is only a pruning predicate: the caller applies
-   * `inactivityClosesAt` (`modules/shared/staleness.ts`), the job's rule, to every row it keeps,
-   * which is what drops a past-due row or one whose stored `next_deadline_at` is stale.
+   * THE JOB'S CANDIDATE SCOPE, PROJECTED TO THE HORIZON. The job examines `next_deadline_at IS NULL
+   * OR next_deadline_at <= now`; an entry whose next fixed deadline falls before the horizon becomes
+   * one of those on the way there (a rolling programme whose fixed date passes is closed as
+   * `inactive` from then on), so the bound here is `<= horizon` rather than `<= now`. An entry whose
+   * next fixed deadline is after the horizon cannot close for inactivity before it. `approved AND
+   * is_listed` is added because an entry nobody can read is not one a reviewer is asked to keep open.
+   * The clock bound holds for every projected close (`closesAt >= clock + days`).
    *
-   * OFFSET-paged rather than keyset-paged on the clock: `updated_at` carries microseconds a JS
-   * `Date` cannot hold, so a cursor rebuilt from a returned row would compare below that row and
-   * serve it again. The list is bounded and read at human pace; OFFSET is the honest tool.
+   * Only a pruning predicate: the caller applies `inactivityClosesAt` (`modules/shared/staleness.ts`)
+   * to every row, which is what drops a past-due row, a fixed-only one and one whose last fixed date
+   * lies beyond the horizon, and it is what the caller sorts by — the clock order here is only for a
+   * deterministic cap. ONE BOUNDED READ, `limit` rows at most: no OFFSET walk over rows the caller
+   * then discards.
    */
   async listClosingSoonCandidates(
-    now: Date,
+    horizon: Date,
     clockAtOrBefore: Date,
-    offset: number,
     limit: number,
   ): Promise<OpportunityRow[]> {
     const clock = sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`;
@@ -479,14 +481,15 @@ export class OpportunityRepository {
       .from(opportunities)
       .where(
         and(
-          this.stalenessCandidateScope(now),
+          eq(opportunities.status, "open"),
+          isNull(opportunities.mergedIntoId),
+          or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, horizon)),
           eq(opportunities.reviewStatus, "approved"),
           eq(opportunities.isListed, true),
           sql`${clock} <= ${clockAtOrBefore}`,
         ),
       )
       .orderBy(asc(clock), asc(opportunities.id))
-      .offset(offset)
       .limit(limit);
   }
 
@@ -814,15 +817,11 @@ export class OpportunityRepository {
   }
 
   private stalenessCandidateFilter(now: Date, afterId: number): SQL | undefined {
-    return and(this.stalenessCandidateScope(now), gt(opportunities.id, afterId));
-  }
-
-  /** What the staleness job may close at all. Shared with `listClosingSoonCandidates`. */
-  private stalenessCandidateScope(now: Date): SQL | undefined {
     return and(
       eq(opportunities.status, "open"),
       isNull(opportunities.mergedIntoId),
       or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, now)),
+      gt(opportunities.id, afterId),
     );
   }
 }

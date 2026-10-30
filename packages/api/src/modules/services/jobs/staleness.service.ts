@@ -16,8 +16,11 @@
  * has re-asserted for ninety days is exactly the stale listing this job exists to close — and any
  * publisher write, granted claim or successful verification resets `last_seen_at`, so an entry that
  * is still real is trivially kept open by the people who own it. The `next_deadline_at IS NULL`
- * clause is load-bearing for the opposite reason: an entry with a known future deadline is never
- * closed for inactivity, however quiet its publisher has been.
+ * clause is load-bearing for the opposite reason: an entry is never closed for inactivity WHILE it
+ * holds a known future deadline, however quiet its publisher has been. That postpones the close, it
+ * does not cancel it: once a rolling programme's last fixed date passes, the column is NULL again
+ * and the same clock applies (`inactivityClosesAt` in `modules/shared/staleness.ts` projects this
+ * for the reviewer's "closing soon" list).
  *
  * THE CANDIDATE PREDICATE, AND WHY THE RUN RETIRES IT.
  *

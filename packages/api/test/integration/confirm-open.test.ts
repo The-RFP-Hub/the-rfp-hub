@@ -245,7 +245,7 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       expect(await auditRows(before.id)).toHaveLength(0);
     });
 
-    it("refuses an entry that is closed, unapproved, unlisted or merged — and touches none", async () => {
+    it("refuses an entry that is closed, unapproved, unlisted, merged or past due — and touches none", async () => {
       const closed = await seed(`${NS}:closed`, { quietDays: 80, status: "closed" });
       const pending = await seed(`${NS}:pending`, {
         quietDays: 80,
@@ -255,6 +255,12 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       const unlisted = await seed(`${NS}:unlisted`, { quietDays: 80, isListed: false });
       const survivor = await seed(`${NS}:survivor`, { quietDays: 1 });
       const merged = await seed(`${NS}:merged`, { quietDays: 80 });
+      // Every fixed deadline passed, no rolling intake: the job closes it on its deadlines tonight
+      // whatever its clock says, so a confirmation would be recorded and change nothing.
+      const pastDue = await seed(`${NS}:past-due`, {
+        quietDays: 80,
+        deadlines: [fixed(new Date(Date.now() - 2 * DAY))],
+      });
       await db
         .update(opportunities)
         .set({ mergedIntoId: survivor.id })
@@ -265,6 +271,7 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         [pending, "not_approved"],
         [unlisted, "not_listed"],
         [merged, "opportunity_merged"],
+        [pastDue, "past_due"],
       ];
       for (const [row, code] of cases) {
         const res = await confirm(row.publicId, reviewerToken, {});
@@ -291,7 +298,9 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
     let sooner: OpportunityRow;
     let overdue: OpportunityRow;
     let later: OpportunityRow;
-    let withDeadline: OpportunityRow;
+    let deadlineInWindow: OpportunityRow;
+    let deadlineBeyond: OpportunityRow;
+    let fixedOnly: OpportunityRow;
     let pastDue: OpportunityRow;
     let hidden: OpportunityRow;
 
@@ -300,9 +309,22 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       sooner = await seed(`${NS}:cs-sooner`, { quietDays: 85 }); // closes in 5 days
       overdue = await seed(`${NS}:cs-overdue`, { quietDays: 95 }); // the next run closes it
       later = await seed(`${NS}:cs-later`, { quietDays: 30 }); // closes in 60 days
-      withDeadline = await seed(`${NS}:cs-deadline`, {
-        quietDays: 85,
+      // Quiet for 100 days, but a fixed deadline 10 days ahead keeps it open until then; after it,
+      // the clock has long run out, so the job closes it as inactive on day 10.
+      deadlineInWindow = await seed(`${NS}:cs-deadline-in-window`, {
+        quietDays: 100,
         deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() + 10 * DAY))],
+      });
+      // The same, with the deadline 45 days ahead: outside a 30-day window.
+      deadlineBeyond = await seed(`${NS}:cs-deadline-beyond`, {
+        quietDays: 100,
+        deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() + 45 * DAY))],
+      });
+      // Fixed deadlines and no rolling intake: when the last one passes it closes as past due,
+      // never as inactive, and a confirmation could not keep it open.
+      fixedOnly = await seed(`${NS}:cs-fixed-only`, {
+        quietDays: 100,
+        deadlines: [fixed(new Date(Date.now() + 10 * DAY))],
       });
       pastDue = await seed(`${NS}:cs-past-due`, {
         quietDays: 85,
@@ -327,6 +349,7 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       expect(ids.filter((id) => id.startsWith(`${NS}:cs-`))).toEqual([
         overdue.publicId,
         sooner.publicId,
+        deadlineInWindow.publicId,
         soon.publicId,
       ]);
       const item = ours(body).find((i) => i.id === soon.publicId);
@@ -336,16 +359,23 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       expect(item?.applicationUrl).toBe(soon.applicationUrl);
     });
 
-    it("excludes a future fixed deadline, a past-due entry, an unlisted one and one outside the window", async () => {
+    it("lists a quiet rolling programme at its last fixed deadline when that falls in the window", async () => {
+      const item = ours(await closingSoon()).find((i) => i.id === deadlineInWindow.publicId);
+      const deadline = (deadlineInWindow.deadlines ?? []).find((d) => d.deadlineType === "fixed");
+      expect(item?.closesAt).toBe(new Date(String(deadline?.date)).toISOString());
+    });
+
+    it("excludes a deadline or a clock beyond the window, fixed-only, past-due and unlisted entries", async () => {
       const ids = ours(await closingSoon()).map((i) => i.id);
-      for (const row of [withDeadline, pastDue, hidden, later]) {
+      for (const row of [deadlineBeyond, later, fixedOnly, pastDue, hidden]) {
         expect(ids, row.publicId).not.toContain(row.publicId);
       }
-      // A wider window reaches the later one, and still never the three the job will not close
-      // for inactivity.
+      // A wider window reaches the two that were only out of range, and still never the three the
+      // job will not close for inactivity.
       const wide = ours(await closingSoon("?days=90")).map((i) => i.id);
       expect(wide).toContain(later.publicId);
-      for (const row of [withDeadline, pastDue, hidden]) {
+      expect(wide).toContain(deadlineBeyond.publicId);
+      for (const row of [fixedOnly, pastDue, hidden]) {
         expect(wide, row.publicId).not.toContain(row.publicId);
       }
     });
@@ -357,11 +387,13 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         expect(jobDecides(row, new Date(at - 1000)), `${item.id} just before`).toBeNull();
         expect(jobDecides(row, new Date(at + 1000)), `${item.id} just after`).toBe("inactive");
       }
-      // And the excluded ones are excluded for the job's reasons: not closed for inactivity even at
-      // the far edge of the window.
-      const edge = new Date(Date.now() + 9 * DAY);
-      expect(jobDecides(withDeadline, edge)).toBeNull();
-      expect(jobDecides(pastDue, edge)).toBe("past_due");
+      // And the excluded ones are excluded for the job's reasons: never closed as inactive anywhere
+      // across a 90-day window — the fixed-only one closes as past due once its deadline passes.
+      for (let day = 0; day <= 90; day += 1) {
+        const at = new Date(Date.now() + day * DAY);
+        expect(jobDecides(fixedOnly, at), `fixed-only, day ${day}`).not.toBe("inactive");
+        expect(jobDecides(pastDue, at), `past-due, day ${day}`).toBe("past_due");
+      }
     });
 
     it("drops a listing once a reviewer confirms it, and honours the limit", async () => {
