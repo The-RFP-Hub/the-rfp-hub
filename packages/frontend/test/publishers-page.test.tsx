@@ -144,6 +144,13 @@ describe("the public publishers page", () => {
     expect(await screen.findByText("This publisher has not written a description.")).toBeTruthy();
   });
 
+  it("dates a publisher's verification to the day", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    expect(await screen.findByText("Verified Aug 14, 2026")).toBeTruthy();
+  });
+
   it("links each card to the directory filtered by that organization", async () => {
     const { client: c } = client();
     mount(c);
