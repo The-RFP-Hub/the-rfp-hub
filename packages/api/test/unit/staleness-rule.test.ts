@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { nextDeadlineAt } from "../../src/modules/shared/deadlines.js";
 import {
   type StalenessFacts,
+  closingDriver,
   inactiveBeforeOf,
   inactivityClockOf,
   inactivityClosesAt,
@@ -158,5 +159,45 @@ describe("the staleness rule", () => {
     const facts = row({ deadlines: [fixed(at(-1))], lastSeenAt: NOW });
     expect(inactivityClosesAt(facts, NOW, DAYS)).toBeNull();
     expect(decide(facts, NOW)).toBe("past_due");
+  });
+
+  describe("what decides the close — whether a confirmation can move it", () => {
+    it.each([
+      ["rolling, no fixed date", row({}), "inactivity"],
+      ["no deadlines at all", row({ deadlines: [] }), "inactivity"],
+      [
+        "rolling, last deadline sooner than a fresh clock would run",
+        row({ deadlines: [{ deadlineType: "rolling" }, fixed(at(10))], lastSeenAt: at(-100) }),
+        "inactivity",
+      ],
+      [
+        "rolling, last deadline later than a fresh clock would run",
+        row({ deadlines: [{ deadlineType: "rolling" }, fixed(at(120))], lastSeenAt: at(-100) }),
+        "final_deadline",
+      ],
+      [
+        "fixed-only and quiet: inactive exactly at its final deadline",
+        row({ deadlines: [fixed(at(10))], lastSeenAt: at(-300) }),
+        "final_deadline",
+      ],
+      [
+        "fixed-only and recently seen: past due after its final deadline",
+        row({ deadlines: [fixed(at(10))], lastSeenAt: at(-1) }),
+        "final_deadline",
+      ],
+      [
+        "fixed-only, deadline beyond a fresh clock",
+        row({ deadlines: [fixed(at(200))], lastSeenAt: at(-50) }),
+        "final_deadline",
+      ],
+    ])("%s", (_label, facts, expected) => {
+      expect(closingDriver(facts, NOW, DAYS)).toBe(expected);
+      // The definition, restated against the projection: `inactivity` exactly when a fresh clock
+      // moves the earliest close later.
+      const before = inactivityClosesAt(facts, NOW, DAYS);
+      const after = inactivityClosesAt({ ...facts, lastSeenAt: NOW }, NOW, DAYS);
+      const moves = after !== null && (before === null || after.getTime() > before.getTime());
+      expect(moves).toBe(expected === "inactivity");
+    });
   });
 });

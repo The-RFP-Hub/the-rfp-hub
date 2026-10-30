@@ -885,7 +885,9 @@ function ClosingSoon({
         Open listings close automatically once nothing has refreshed them for a while — a matching
         source check, a publisher edit or an approval — and no fixed deadline is still ahead. When
         you have opened the program&rsquo;s own page and it is still taking applications, confirming
-        keeps the listing open for another full period. Nothing else about the listing changes.
+        keeps the listing open for another full period. Nothing else about the listing changes. Some
+        listings close at their final deadline instead, and confirming cannot extend that: for
+        those, correct the deadlines if the program has moved them.
       </p>
       <ActionNote note={note} />
       <ResourceView resource={closing.state} what="the closing-soon list" onRetry={closing.reload}>
@@ -975,19 +977,39 @@ function ClosingSoon({
                             </div>
                           </td>
                           <td>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                setConfirmNote("");
-                                setConfirming(confirming === item.id ? null : item.id);
-                              }}
-                            >
-                              Confirm still open…
-                            </button>
+                            {/*
+                             * NO CONFIRM WHERE A CONFIRMATION CHANGES NOTHING. A listing whose close
+                             * is set by its final deadline closes then whatever its clock says; the
+                             * API refuses the confirmation, and offering it here would promise an
+                             * extension that does not happen. The deadlines are what to fix.
+                             */}
+                            {item.closesBy === "final_deadline" ? (
+                              <>
+                                <p className="muted footnote">
+                                  Closes at its final deadline; confirming can&rsquo;t extend it.
+                                </p>
+                                <Link
+                                  href={`/listings/${encodeURIComponent(item.id)}/edit`}
+                                  aria-label={`Edit the deadlines of ${item.title}`}
+                                >
+                                  Edit the deadlines
+                                </Link>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => {
+                                  setConfirmNote("");
+                                  setConfirming(confirming === item.id ? null : item.id);
+                                }}
+                              >
+                                Confirm still open…
+                              </button>
+                            )}
                           </td>
                         </tr>
-                        {confirming === item.id ? (
+                        {confirming === item.id && item.closesBy === "inactivity" ? (
                           <tr>
                             <td colSpan={4}>
                               <ConfirmPanel

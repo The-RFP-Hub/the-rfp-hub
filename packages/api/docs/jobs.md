@@ -671,12 +671,18 @@ the programme was, and the only remedy was setting `last_seen_at` in SQL against
   An entry with fixed deadlines and no rolling intake is `inactive` at exactly one instant, its final
   deadline (there `isPastDue` and `nextDeadlineAt` both say no), and `past_due` from just after it;
   when it has been quiet throughout it is listed at that deadline, and it closes then whatever a
-  confirmation says. Not listed: a programme whose last fixed deadline is beyond the window, and one
+  confirmation says. Each item carries `closesBy`: `inactivity` when confirming now would move the
+  close later, `final_deadline` when it would not (a fixed-only entry, or a rolling one whose last
+  fixed deadline outlasts a fresh clock). The reviewer page offers "Confirm still open" only for the
+  first, and a link to edit the deadlines for the second. Not listed: a programme whose last fixed deadline is beyond the window, and one
   already past due. The job closes an entry on its first run at or after `closesAt`; a past
   `closesAt` means tonight. The list is the true soonest: the scan reads in clock order and stops
-  only once no unread row can close earlier (every `closesAt` is at least `clock + days`). A safety
-  cap on rows examined remains, and if it ever stops the scan the answer says `complete: false` and
-  the reviewer page says the list is incomplete.
+  only once no unread row can close earlier (every `closesAt` is at least `clock + days`). Every page
+  is read inside one read-only REPEATABLE READ transaction, so a listing refreshed mid-scan is not
+  read twice (ids are de-duplicated as well). No expression index backs the clock order; each page
+  sorts the filtered candidates, which is fine at this corpus's size. A safety cap on rows examined
+  remains, and if it ever stops the scan the answer says `complete: false` and the reviewer page says
+  the list is incomplete.
 * `POST /v1/review/opportunities/{id}/confirm-open` with an optional `{"note": "…"}` (≤ 500
   characters) sets `last_seen_at = now()` under a row lock and audits it as `update`, with the
   reviewer as actor: `{"lastSeenAt": {"before": …, "after": …}, "reason": "<note, or a default>"}`.
@@ -684,7 +690,9 @@ the programme was, and the only remedy was setting `last_seen_at` in SQL against
   edit nobody made), not the content, not the reviewer link pins. `409` `not_approved`,
   `not_listed`, `not_open` or `opportunity_merged` for anything that is not a live, open entry, and
   `past_due` for an entry whose fixed deadlines have all passed with no rolling intake: the job
-  closes that on its deadlines, so a confirmation would change nothing. Fix its deadlines instead.
+  closes that on its deadlines, so a confirmation would change nothing. Likewise
+  `closes_on_deadline` for an entry whose close is set by its final fixed deadline (`closesBy:
+  "final_deadline"` above). Fix its deadlines instead.
 
 Both are on the reviewer page, under **Closing soon**. A confirmation buys one more
 `STALENESS_INACTIVE_DAYS`, not a permanent exemption: if the programme is still running when the

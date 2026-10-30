@@ -116,6 +116,14 @@ export function repositories(exec: DbLike): Repositories {
 export function withTransaction<T>(
   db: DB,
   run: (repos: Repositories) => Promise<T> | T,
+  /**
+   * Isolation and access mode, when the default (read committed, read write) is not enough — e.g.
+   * a multi-query read that must see ONE snapshot (`repeatable read`, `read only`).
+   */
+  config?: {
+    isolationLevel?: "read committed" | "repeatable read" | "serializable";
+    accessMode?: "read only" | "read write";
+  },
 ): Promise<T> {
-  return db.transaction((tx) => Promise.resolve(run(repositories(tx))));
+  return db.transaction((tx) => Promise.resolve(run(repositories(tx))), config);
 }

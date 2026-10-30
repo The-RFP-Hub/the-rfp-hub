@@ -449,6 +449,12 @@ export interface ClosingSoonItemView {
   lastSeenAt: string | null;
   updatedAt: string;
   closesAt: string;
+  /**
+   * `inactivity`: a reviewer's "confirm still open" moves the close later. `final_deadline`: it
+   * cannot — the close is set by the listing's final fixed deadline, and `confirm-open` refuses it
+   * (`409 closes_on_deadline`). See `closingDriver` in `modules/shared/staleness.ts`.
+   */
+  closesBy: "inactivity" | "final_deadline";
 }
 
 export interface ClosingSoonListView {
@@ -472,7 +478,10 @@ export interface OpenConfirmationView {
   id: string;
   lastSeenAt: string;
   previousLastSeenAt: string | null;
-  /** When the inactivity pass would now close it, or null when that pass does not decide it. */
+  /**
+   * When the inactivity pass would now close it — later than before, since a confirmation that
+   * could not move the close is refused (`past_due`, `closes_on_deadline`). Null only in principle.
+   */
   closesAt: string | null;
 }
 

@@ -166,4 +166,42 @@ describe("the closing-soon walk", () => {
       expect(result.complete).toBe(true);
     }
   });
+
+  it("never lists a listing twice when its clock moves between two pages", async () => {
+    // Codex's reproduction: one-row pages, and A refreshed (clock moved later, still inside the
+    // window) after it was read. A reader with no single snapshot serves A again past the cursor.
+    const a = make({ lastSeenAt: at(-89) });
+    const b = make({ lastSeenAt: at(-88) });
+    const rows = [a, b];
+    const clock = (r: Row) => (r.lastSeenAt ?? r.updatedAt).getTime();
+    let reads = 0;
+    const moving: CandidatePageReader<Row> = async (after, size) => {
+      reads += 1;
+      if (reads === 2) a.lastSeenAt = at(-60); // committed by somebody else between pages
+      const sorted = [...rows].sort((x, y) => clock(x) - clock(y) || x.id - y.id);
+      const start =
+        after === null
+          ? 0
+          : sorted.findIndex(
+              (r) =>
+                clock(r) > Date.parse(after.clockKey) ||
+                (clock(r) === Date.parse(after.clockKey) && r.id > after.id),
+            );
+      return (start === -1 ? [] : sorted.slice(start, start + size)).map((row) => ({
+        row,
+        clockKey: new Date(clock(row)).toISOString(),
+      }));
+    };
+    const result = await earliestInactivityClosings<Row>({
+      readPage: moving,
+      now: NOW,
+      horizon: NOW.getTime() + 365 * DAY,
+      inactiveDays: DAYS,
+      limit: 100,
+      pageSize: 1,
+      scanCap: 1000,
+    });
+    expect(result.due.map((d) => d.row.id)).toEqual([a.id, b.id]);
+    expect(result.complete).toBe(true);
+  });
 });

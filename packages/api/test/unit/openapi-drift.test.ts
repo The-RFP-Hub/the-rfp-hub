@@ -654,6 +654,7 @@ describe("M3 closed components vs their view types", () => {
     lastSeenAt: null,
     updatedAt: "2026-08-14T00:00:00.000Z",
     closesAt: "2026-11-12T00:00:00.000Z",
+    closesBy: "inactivity",
   };
 
   const samples: Record<string, object> = {

@@ -1037,6 +1037,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "lastSeenAt",
       "updatedAt",
       "closesAt",
+      "closesBy",
     ],
     properties: {
       id: { type: "string" },
@@ -1047,6 +1048,12 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       lastSeenAt: { type: ["string", "null"], format: "date-time" },
       updatedAt: { type: "string", format: "date-time" },
       closesAt: { type: "string", format: "date-time" },
+      closesBy: {
+        type: "string",
+        enum: ["inactivity", "final_deadline"],
+        description:
+          "`inactivity`: confirming the listing still open moves its close later. `final_deadline`: it cannot — the close is set by its final fixed deadline (fixed deadlines and no rolling intake, or a rolling programme whose last deadline outlasts a fresh clock), and `confirm-open` answers 409 `closes_on_deadline`.",
+      },
     },
   },
   {
@@ -1083,7 +1090,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: ["string", "null"],
         format: "date-time",
         description:
-          "When the inactivity pass would now close it — after the last fixed deadline, for a rolling programme that has one; null when that pass never will (an entry with fixed deadlines and no rolling intake whose clock has not run out by its final deadline closes as past due just after it).",
+          "When the inactivity pass would now close it, always later than before the confirmation: a confirmation that could not move the close is refused (`past_due`, `closes_on_deadline`) rather than recorded. Nullable in the schema only for compatibility.",
       },
     },
   },

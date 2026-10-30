@@ -132,7 +132,13 @@ const jobDecides = (row: OpportunityRow, at: Date) =>
   );
 
 interface ClosingSoonBody {
-  items: { id: string; closesAt: string; lastSeenAt: string | null; applicationUrl: string }[];
+  items: {
+    id: string;
+    closesAt: string;
+    closesBy: "inactivity" | "final_deadline";
+    lastSeenAt: string | null;
+    applicationUrl: string;
+  }[];
   windowDays: number;
   inactiveDays: number;
   truncated: boolean;
@@ -249,7 +255,7 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       expect(await auditRows(before.id)).toHaveLength(0);
     });
 
-    it("refuses an entry that is closed, unapproved, unlisted, merged or past due — and touches none", async () => {
+    it("refuses an entry that is closed, unapproved, unlisted, merged, past due or deadline-bound — and touches none", async () => {
       const closed = await seed(`${NS}:closed`, { quietDays: 80, status: "closed" });
       const pending = await seed(`${NS}:pending`, {
         quietDays: 80,
@@ -265,6 +271,17 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         quietDays: 80,
         deadlines: [fixed(new Date(Date.now() - 2 * DAY))],
       });
+      // Fixed deadlines, no rolling intake: it closes at its final deadline whatever a confirmation
+      // says, so the API refuses rather than record an extension that will not happen.
+      const fixedOnly = await seed(`${NS}:fixed-only`, {
+        quietDays: 80,
+        deadlines: [fixed(new Date(Date.now() + 20 * DAY))],
+      });
+      // Rolling, but its last fixed deadline outlasts a fresh clock: a confirmation moves nothing.
+      const rollingFar = await seed(`${NS}:rolling-far`, {
+        quietDays: 80,
+        deadlines: [{ deadlineType: "rolling" }, fixed(new Date(Date.now() + 120 * DAY))],
+      });
       await db
         .update(opportunities)
         .set({ mergedIntoId: survivor.id })
@@ -276,6 +293,8 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         [unlisted, "not_listed"],
         [merged, "opportunity_merged"],
         [pastDue, "past_due"],
+        [fixedOnly, "closes_on_deadline"],
+        [rollingFar, "closes_on_deadline"],
       ];
       for (const [row, code] of cases) {
         const res = await confirm(row.publicId, reviewerToken, {});
@@ -385,6 +404,7 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
         new Date((soon.lastSeenAt as Date).getTime() + INACTIVE_DAYS * DAY).toISOString(),
       );
       expect(item?.applicationUrl).toBe(soon.applicationUrl);
+      expect(item?.closesBy).toBe("inactivity");
     });
 
     it("lists a quiet listing at its last fixed deadline when that decides, passed or not", async () => {
@@ -443,6 +463,62 @@ run("M5OPEN a reviewer confirms a listing is still open", () => {
       // Both rows sharing a microsecond clock are served, once each.
       const tieIds = a.items.map((i) => i.id).filter((id) => id.startsWith(`${NS}:cs-tie-`));
       expect(tieIds).toEqual([tieA.publicId, tieB.publicId]);
+    });
+
+    it("marks a listing that closes at its final deadline, and refuses to confirm it", async () => {
+      const items = ours(await closingSoon());
+      const byId = (row: OpportunityRow) => items.find((i) => i.id === row.publicId)?.closesBy;
+      expect(byId(fixedOnly)).toBe("final_deadline");
+      // A rolling programme whose deadline is sooner than a fresh clock: a confirmation does move it.
+      expect(byId(deadlineInWindow)).toBe("inactivity");
+      expect(byId(deadlinePassed)).toBe("inactivity");
+
+      const refused = await confirm(fixedOnly.publicId, reviewerToken, {});
+      expect(refused.statusCode, refused.body).toBe(409);
+      expect(refused.json().error).toBe("closes_on_deadline");
+      expect((await rowOf(fixedOnly.publicId)).lastSeenAt).toEqual(fixedOnly.lastSeenAt);
+      expect(await auditRows(fixedOnly.id)).toHaveLength(0);
+    });
+
+    it("reads every page from one snapshot: a refresh committed mid-walk is not read twice", async () => {
+      // Seeded here so the other tests' exact orderings are untouched. Closes in 2 days; refreshed
+      // to closing in 89 — still inside a 365-day window, and past the cursor once moved.
+      const moved = await seed(`${NS}:cs-moved`, { quietDays: 88 });
+      const expected = new Date((moved.lastSeenAt as Date).getTime() + INACTIVE_DAYS * DAY);
+      let refreshed = false;
+      // How many times the walk was SERVED this row. One snapshot: once. A fresh snapshot per page
+      // (READ COMMITTED) would serve it again past the cursor — the de-duplication would then be the
+      // only thing hiding it, which is not what this test is about.
+      let served = 0;
+      const service = new ReviewService(db, {
+        closingSoonScan: {
+          pageSize: 1,
+          scanCap: 1_000_000,
+          afterPage: async (rows) => {
+            served += rows.filter((row) => row.id === moved.id).length;
+            if (refreshed || !rows.some((row) => row.id === moved.id)) return;
+            refreshed = true;
+            // Through the shared pool: another connection, committed before the next page is read.
+            await db
+              .update(opportunities)
+              .set({ lastSeenAt: new Date(Date.now() - DAY) })
+              .where(eq(opportunities.id, moved.id));
+          },
+        },
+      });
+      const result = await service.closingSoon(365, 200);
+      expect(refreshed).toBe(true);
+      expect(served).toBe(1);
+      const hits = result.items.filter((i) => i.id === moved.publicId);
+      expect(hits).toHaveLength(1);
+      // The snapshot's answer, not the moved one.
+      expect(hits[0]?.closesAt).toBe(expected.toISOString());
+      expect(new Set(result.items.map((i) => i.id)).size).toBe(result.items.length);
+      expect(result.complete).toBe(true);
+      // The refresh did commit; a new read sees it.
+      const after = await new ReviewService(db).closingSoon(365, 200);
+      const again = after.items.find((i) => i.id === moved.publicId);
+      expect(Date.parse(String(again?.closesAt))).toBeGreaterThan(expected.getTime());
     });
 
     it("reports an incomplete answer when the safety cap stops the walk", async () => {

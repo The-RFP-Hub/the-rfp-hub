@@ -94,3 +94,27 @@ export function inactivityClosesAt(
   }
   return new Date(Math.max(quietUntil, latest?.getTime() ?? quietUntil));
 }
+
+/**
+ * What decides when this listing closes — and so whether a reviewer's "confirm still open" can do
+ * anything about it.
+ *
+ *   - `inactivity`: refreshing the clock NOW moves the earliest close later. A confirmation buys
+ *     real time.
+ *   - `final_deadline`: it does not. Either the listing has fixed deadlines and no rolling intake
+ *     (it closes at its final deadline whatever its clock says — `inactive` at that instant when it
+ *     is quiet, `past_due` just after it either way), or it is a rolling programme whose last fixed
+ *     deadline is later than a fresh clock would run (`max(clock + days, L)` stays `L`).
+ *
+ * Decided by the same projection, evaluated twice — as stored and with the clock refreshed to `now`
+ * — so it cannot disagree with `inactivityClosesAt`, or with the job behind it.
+ */
+export type ClosingDriver = "inactivity" | "final_deadline";
+
+export function closingDriver(row: StalenessFacts, now: Date, inactiveDays: number): ClosingDriver {
+  const asStored = inactivityClosesAt(row, now, inactiveDays);
+  const refreshed = inactivityClosesAt({ ...row, lastSeenAt: now }, now, inactiveDays);
+  const extends_ =
+    refreshed !== null && (asStored === null || refreshed.getTime() > asStored.getTime());
+  return extends_ ? "inactivity" : "final_deadline";
+}

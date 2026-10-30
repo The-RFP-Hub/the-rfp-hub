@@ -237,6 +237,7 @@ const quiet: ClosingSoonItem = {
   lastSeenAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-07-01T00:00:00.000Z",
   closesAt: "2026-11-12T00:00:00.000Z",
+  closesBy: "inactivity",
 };
 const closingRows: { current: ClosingSoonItem[] } = { current: [quiet] };
 const closingFlags = { current: { truncated: false, complete: true } };
@@ -445,6 +446,35 @@ describe("listings closing soon", () => {
     expect(await screen.findByText("This list is incomplete.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Quiet Grants" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Closing soon · 1+", current: "page" })).toBeTruthy();
+  });
+
+  it("offers no confirmation for a listing that closes at its final deadline, and links to edit it", async () => {
+    closingRows.current = [
+      quiet,
+      {
+        ...quiet,
+        id: "acme:fixed-round",
+        title: "Fixed Round",
+        closesAt: "2026-11-20T00:00:00.000Z",
+        closesBy: "final_deadline",
+      },
+    ];
+    tab.current = "closing";
+    mount();
+
+    const row = (await screen.findByRole("link", { name: "Fixed Round" })).closest("tr");
+    expect(row).toBeTruthy();
+    const cells = within(row as HTMLElement);
+    expect(
+      cells.getByText("Closes at its final deadline; confirming can’t extend it."),
+    ).toBeTruthy();
+    expect(cells.queryByRole("button", { name: "Confirm still open…" })).toBeNull();
+    expect(
+      cells.getByRole("link", { name: "Edit the deadlines of Fixed Round" }).getAttribute("href"),
+    ).toBe("/listings/acme%3Afixed-round/edit");
+    // The ordinary row keeps its confirm action.
+    expect(screen.getAllByRole("button", { name: "Confirm still open…" })).toHaveLength(1);
+    expect(screen.getByText(/Some listings close at their final deadline instead/)).toBeTruthy();
   });
 
   it("says the rows are the soonest when more close than were returned", async () => {

@@ -32,10 +32,10 @@ import type {
   OrganizationSummaryView,
   ReviewDecisionView,
 } from "../../shared/api-views.js";
-import { isPastDue } from "../../shared/deadlines.js";
+import { isPastDue, latestFixedDeadlineAt } from "../../shared/deadlines.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { reviewerPins } from "../../shared/link-out.js";
-import { inactivityClosesAt } from "../../shared/staleness.js";
+import { closingDriver, inactivityClosesAt } from "../../shared/staleness.js";
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
@@ -61,6 +61,11 @@ export const CONFIRM_OPEN_DEFAULT_REASON = "reviewer confirmed the listing is st
 export interface ClosingSoonScan {
   pageSize: number;
   scanCap: number;
+  /**
+   * TEST SEAM: awaited after each page is read, inside the walk's snapshot. Lets a test commit a
+   * concurrent refresh between two pages and prove the walk does not see it.
+   */
+  afterPage?: (rows: OpportunityRow[]) => Promise<void>;
 }
 const CLOSING_SOON_SCAN: ClosingSoonScan = { pageSize: 500, scanCap: 50_000 };
 
@@ -163,8 +168,9 @@ export class ReviewService {
    * Only for a LIVE, OPEN listing, because those are the only ones the staleness job can close for
    * inactivity that anybody can see — and NOT for a past-due one: the job closes that on its
    * deadlines whatever the clock says, so a confirmation would be recorded and change nothing. The
-   * remedy there is the listing's deadlines, not this. Each refusal is its own 409 code so a client
-   * can say why.
+   * remedy there is the listing's deadlines, not this. Likewise `closes_on_deadline` for a listing
+   * whose close is set by its final fixed deadline (`closingDriver`): confirming it would move
+   * nothing. Each refusal is its own 409 code so a client can say why.
    */
   async confirmOpen(
     reviewerId: number,
@@ -197,6 +203,19 @@ export class ReviewService {
         throw conflict(
           "past_due",
           `opportunity ${JSON.stringify(row.publicId)} has no deadline left and no rolling intake; the staleness job closes it on its deadlines, which confirming cannot change. Update its deadlines instead.`,
+        );
+      }
+      // The same refusal, for the same reason, one step earlier: a listing whose close is set by its
+      // final deadline (fixed deadlines and no rolling intake, or a rolling one whose last deadline
+      // outlasts a fresh clock) is not kept open one moment longer by a confirmation. Recording one
+      // would tell the reviewer, and the audit trail, that it was.
+      if (closingDriver(row, now, this.config.stalenessInactiveDays) === "final_deadline") {
+        const latest = latestFixedDeadlineAt(row.deadlines);
+        throw conflict(
+          "closes_on_deadline",
+          `opportunity ${JSON.stringify(row.publicId)} closes at its final fixed deadline${
+            latest ? ` (${latest.toISOString()})` : ""
+          }; confirming it now cannot keep it open any longer. Update its deadlines instead.`,
         );
       }
       await repos.opportunities.touchLastSeen(row.id, now);
@@ -251,21 +270,34 @@ export class ReviewService {
     // Every projected close is >= clock + inactiveDays, so closesAt <= horizon needs
     // clock <= horizon - inactiveDays.
     const clockAtOrBefore = new Date(horizon - inactiveDays * 86_400_000);
-    const { due, truncated, complete } = await earliestInactivityClosings<OpportunityRow>({
-      readPage: (after, size) =>
-        this.repos.opportunities.listClosingSoonCandidates(
-          new Date(horizon),
-          clockAtOrBefore,
-          after,
-          size,
-        ),
-      now,
-      horizon,
-      inactiveDays,
-      limit,
-      pageSize: this.closingSoonScan.pageSize,
-      scanCap: this.closingSoonScan.scanCap,
-    });
+    const scan = this.closingSoonScan;
+    // ONE SNAPSHOT FOR EVERY PAGE. Under READ COMMITTED each page would see the commits made since
+    // the last one, and a listing confirmed (or matched by a source check) mid-walk would move past
+    // the cursor and be read again — twice in the answer, with two dates. REPEATABLE READ pins the
+    // snapshot at the first page; READ ONLY because nothing here writes.
+    const { due, truncated, complete } = await withTransaction(
+      this.db,
+      (repos) =>
+        earliestInactivityClosings<OpportunityRow>({
+          readPage: async (after, size) => {
+            const page = await repos.opportunities.listClosingSoonCandidates(
+              new Date(horizon),
+              clockAtOrBefore,
+              after,
+              size,
+            );
+            await scan.afterPage?.(page.map((candidate) => candidate.row));
+            return page;
+          },
+          now,
+          horizon,
+          inactiveDays,
+          limit,
+          pageSize: scan.pageSize,
+          scanCap: scan.scanCap,
+        }),
+      { isolationLevel: "repeatable read", accessMode: "read only" },
+    );
     const items: ClosingSoonItemView[] = due.map(({ row, closesAt }) => ({
       id: row.publicId,
       title: row.title,
@@ -275,6 +307,7 @@ export class ReviewService {
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
       updatedAt: row.updatedAt.toISOString(),
       closesAt: closesAt.toISOString(),
+      closesBy: closingDriver(row, now, inactiveDays),
     }));
     return { items, windowDays, inactiveDays, asOf: now.toISOString(), truncated, complete };
   }

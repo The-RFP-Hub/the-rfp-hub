@@ -17,7 +17,14 @@
  *
  * KEYSET, NOT OFFSET. The reader resumes after `(clockKey, id)`, where `clockKey` is the clock as
  * the database prints it: `updated_at` carries microseconds a JS `Date` cannot hold, so a cursor
- * rebuilt from a `Date` would compare below the row it came from.
+ * rebuilt from a `Date` would compare below the row it came from. (No expression index backs the
+ * `coalesce(last_seen_at, updated_at)` order; each page is a sort over the filtered candidates,
+ * which is fine at this corpus's size.)
+ *
+ * ONE SNAPSHOT. Every page must come from the same snapshot — the caller runs the walk in a
+ * read-only REPEATABLE READ transaction. Under READ COMMITTED each page is a new snapshot, and a
+ * listing refreshed mid-walk would move past the cursor and be read again. Ids are also de-duplicated
+ * here, defensively.
  *
  * `scanCap` is a SAFETY bound on rows examined, far above any realistic backlog. If it is reached
  * before the stop condition, the answer is reported `complete: false` and the caller must say so;
@@ -70,6 +77,7 @@ export async function earliestInactivityClosings<
   // The best `limit + 1` seen so far, kept sorted.
   const kept: { row: T; closesAt: Date }[] = [];
   const keep = limit + 1;
+  const seen = new Set<number>();
   let scanned = 0;
   let after: ClockCursor | null = null;
 
@@ -78,6 +86,11 @@ export async function earliestInactivityClosings<
     if (size <= 0) return finish(false);
     const page = await readPage(after, size);
     for (const { row } of page) {
+      // A listing is examined once. The caller reads every page from one snapshot, so this should
+      // never trigger — but a clock moved between two reads (a confirmation, a matched check) would
+      // otherwise put the same listing in the answer twice, with two different dates.
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
       const floor = floorOf(row);
       if (floor > horizon) return finish(true);
       const last = kept[keep - 1];

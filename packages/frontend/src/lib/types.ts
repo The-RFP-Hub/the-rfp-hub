@@ -433,6 +433,11 @@ export interface ClosingSoonItem {
   lastSeenAt: string | null;
   updatedAt: string;
   closesAt: string;
+  /**
+   * `final_deadline`: the listing closes at its final fixed deadline and confirming it cannot
+   * extend that (the API refuses with `closes_on_deadline`). The page offers an edit instead.
+   */
+  closesBy: "inactivity" | "final_deadline";
 }
 
 export interface ClosingSoonList {
@@ -440,7 +445,10 @@ export interface ClosingSoonList {
   windowDays: number;
   inactiveDays: number;
   asOf: string;
-  /** More close inside the window than were returned; the ones returned are the soonest. */
+  /**
+   * More close inside the window than were returned. When `complete` is true the ones returned are
+   * the soonest; when it is false they are only the soonest the API found before it stopped.
+   */
   truncated: boolean;
   /** False when the API stopped looking before it could prove the list is the soonest. */
   complete: boolean;
