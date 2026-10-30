@@ -884,7 +884,8 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     await screen.findByText(HOSTILE_TITLE);
-    expect(find).toHaveBeenCalledWith("acme:round-4");
+    // The counted read, exactly: no `{ count: false }` — that opt-out is the leaving page's alone.
+    expect(find.mock.calls).toEqual([["acme:round-4"]]);
     await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFPSear.ch`));
   });
 

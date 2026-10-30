@@ -72,7 +72,9 @@ function BackToListing({ id }: { id: string }) {
 export function LeavingNotice({ id }: { id: string }) {
   const api = useApi();
   const { link } = readLeavingQuery(useSearchParams());
-  const load = useCallback(() => api.directory.find(id), [api, id]);
+  // NOT A DETAIL VIEW. The redirect that sent this reader here already counted their apply or
+  // source click; counting this read as well would credit the listing twice for one action.
+  const load = useCallback(() => api.directory.find(id, { count: false }), [api, id]);
   const { state, reload } = useResource(load);
 
   if (state.status === "idle" || state.status === "loading") {
