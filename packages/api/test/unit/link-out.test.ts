@@ -99,48 +99,50 @@ describe("reviewerPins", () => {
 });
 
 describe("landingMove", () => {
-  const run = (finalUrl: string | null, httpStatus: number | null = 200) => ({
-    requestedUrl: "https://go.example.org/apply",
+  const landed = (
+    finalUrl: string | null,
+    requestedUrl: string | null = "https://go.example.org/apply",
+  ) => ({
+    requestedUrl,
     finalUrl,
-    httpStatus,
   });
 
   it("reports a landing on another site, for the same requested URL", () => {
     expect(
-      landingMove(run("https://forms.first.example/x"), run("https://forms.second.example/x")),
+      landingMove(
+        landed("https://forms.first.example/x"),
+        landed("https://forms.second.example/x"),
+      ),
     ).toEqual({ from: "first.example", to: "second.example" });
   });
 
   it("is quiet for the same site, including across subdomains and paths", () => {
     expect(
-      landingMove(run("https://forms.first.example/x"), run("https://www.first.example/y")),
+      landingMove(landed("https://forms.first.example/x"), landed("https://www.first.example/y")),
     ).toBeUndefined();
   });
 
-  it("is quiet without a previous run, or when the requested URL itself changed", () => {
-    expect(landingMove(undefined, run("https://forms.second.example/x"))).toBeUndefined();
+  it("is quiet without a baseline yet, or when the requested URL itself changed", () => {
+    expect(
+      landingMove(landed(null, null), landed("https://forms.second.example/x")),
+    ).toBeUndefined();
     expect(
       landingMove(
-        { ...run("https://forms.first.example/x"), requestedUrl: "https://go.example.org/old" },
-        run("https://forms.second.example/x"),
+        landed("https://forms.first.example/x", "https://go.example.org/old"),
+        landed("https://forms.second.example/x"),
       ),
     ).toBeUndefined();
   });
 
-  // A transient failure carries no status, and its URL is wherever the request gave up — the
-  // vanity host, typically. Treating that as a landing would flag the next good check.
-  it("ignores a run that got no answer from a server, on either side", () => {
-    const timedOut = run("https://go.example.org/apply", null);
-    expect(landingMove(timedOut, run("https://forms.first.example/x"))).toBeUndefined();
-    expect(landingMove(run("https://forms.first.example/x"), timedOut)).toBeUndefined();
-    // A `dns_failure` records the bare hostname, which is not a URL at all.
-    expect(landingMove(run("go.example.org", null), run("https://x.example/"))).toBeUndefined();
-    expect(landingMove(run(null), run("https://forms.first.example/x"))).toBeUndefined();
+  it("is quiet when either side has no final URL it can read a site from", () => {
+    expect(landingMove(landed(null), landed("https://forms.first.example/x"))).toBeUndefined();
+    expect(landingMove(landed("https://forms.first.example/x"), landed(null))).toBeUndefined();
+    expect(landingMove(landed("go.example.org"), landed("https://x.example/"))).toBeUndefined();
   });
 
-  it("counts a server's answer that was not the page — a redirect the fetcher stopped following", () => {
+  it("compares wherever the answered check ended, a redirect target included", () => {
     expect(
-      landingMove(run("https://forms.first.example/x"), run("https://loop.other.example/", 302)),
+      landingMove(landed("https://forms.first.example/x"), landed("https://loop.other.example/")),
     ).toEqual({ from: "first.example", to: "other.example" });
   });
 });

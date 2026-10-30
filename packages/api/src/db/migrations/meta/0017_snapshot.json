@@ -1,5 +1,5 @@
 {
-  "id": "e58bb0d6-8c7d-4ec9-ace7-1daa9aabbf7f",
+  "id": "f07c6401-2d5c-48ca-8f05-10239d42f576",
   "prevId": "42937b70-2cad-4e31-8586-e99f5bdd4450",
   "version": "7",
   "dialect": "postgresql",
@@ -995,6 +995,18 @@
         "link_landing_changed_at": {
           "name": "link_landing_changed_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_landing_requested_url": {
+          "name": "link_landing_requested_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_landing_final_url": {
+          "name": "link_landing_final_url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

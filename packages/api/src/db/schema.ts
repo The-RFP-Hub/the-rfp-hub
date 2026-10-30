@@ -492,13 +492,26 @@ export const opportunities = pgTable(
     reviewedWebsite: text(),
     /**
      * Set by the nightly source check when the apply link LANDED on a different site than it did on
-     * the previous check of the same URL — a retargeted shortener, a programme page that now
-     * redirects somewhere else. The stored URL has not changed, so the pin above cannot notice;
-     * this is the half of "still the destination somebody reviewed" that only a fetch can see.
+     * the last check of the same URL that got an answer — a retargeted shortener, a programme page
+     * that now redirects somewhere else. The stored URL has not changed, so the pin above cannot
+     * notice; this is the half of "still the destination somebody reviewed" that only a fetch can
+     * see.
      *
      * Set once and left alone by later checks; only a reviewer's pin clears it.
      */
     linkLandingChangedAt: timestamp({ withTimezone: true }),
+    /**
+     * THE LANDING BASELINE the flag above is decided against: the requested URL and the final URL
+     * of the last APPLIED source check that got an answer from a server. Kept on the row, not read
+     * back from `verification_runs`, because the run log holds runs that are not verdicts — a
+     * timeout, a result discarded because the entry changed mid-fetch — and is pruned to the newest
+     * few. Comparing against "the latest run" let either kind stand in for the baseline and hide a
+     * move (an applied check on A, a timeout, then B compared with the timeout; or A, a stale
+     * fetch of B, then B compared with B). Only an applied, answered run writes these; nothing
+     * else touches them.
+     */
+    linkLandingRequestedUrl: text(),
+    linkLandingFinalUrl: text(),
 
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

@@ -10,13 +10,18 @@
  * page instead of the destination is the intended cost; a 404 or an uncounted click is a bug.
  */
 import { readFileSync } from "node:fs";
-import { and, count, desc, eq, gte } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { type AppConfig, config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
-import { auditLog, opportunities, opportunityEvents } from "../../src/db/schema.js";
+import {
+  auditLog,
+  opportunities,
+  opportunityEvents,
+  verificationRuns,
+} from "../../src/db/schema.js";
 import { analyticsEvents } from "../../src/modules/services/insights/event-buffer.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import {
@@ -416,6 +421,104 @@ run("M5LINK link-outs vouch only for reviewed destinations", () => {
     expect(saved.reviewStatus).toBe("approved");
     expect(await flag(), "a reviewer's save clears the landing flag").toBeNull();
     await expectLinkOut(id, "apply", vanity);
+  });
+
+  describe("compares with the last ANSWERED, APPLIED check, never with whatever the run log holds", () => {
+    const vanity = "https://go.m5link-short.example/baseline";
+    const siteA = "https://forms.site-a.example/m5link";
+    const siteB = "https://forms.site-b.example/m5link";
+    const page = { body: sourcePage({ title: "Link-out baseline fixture" }) };
+    const landsOn = (destination: string) =>
+      fixtureTransport({
+        [vanity]: { status: 302, headers: { location: destination } },
+        [destination]: page,
+      });
+    /** The entry is saved while its source is being fetched, so the run is recorded but stale. */
+    const savedMidFetch =
+      (publicId: string, inner: SourceTransport): SourceTransport =>
+      async (url, options) => {
+        // What an unchanged `PUT` by its verified publisher does to the row the check compares.
+        await db
+          .update(opportunities)
+          .set({ updatedAt: new Date() })
+          .where(eq(opportunities.publicId, publicId));
+        return inner(url, options);
+      };
+
+    async function landingAt(id: string) {
+      await seedImport(id, { applicationUrl: vanity, website: SITE_URL });
+      const { id: rowId } = await rowOf(id);
+      await verifier(landsOn(siteA)).verify(rowId);
+      expect((await rowOf(id)).linkLandingFinalUrl).toBe(siteA);
+      return rowId;
+    }
+
+    it("A, a timeout, then B: flagged", async () => {
+      const id = `${NS}:baseline-timeout`;
+      const rowId = await landingAt(id);
+      await verifier(timingOut).verify(rowId);
+      await verifier(landsOn(siteB)).verify(rowId);
+      expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+      await expectLinkOut(id, "apply", leaving(id, "apply", "landing_changed"));
+    });
+
+    it("A, a stale fetch of B, then B: flagged, and the stale run moved nothing", async () => {
+      const id = `${NS}:baseline-stale`;
+      const rowId = await landingAt(id);
+      await verifier(savedMidFetch(id, landsOn(siteB))).verify(rowId);
+      const afterStale = await rowOf(id);
+      expect(afterStale.linkLandingChangedAt, "a stale run is not a verdict").toBeNull();
+      expect(afterStale.linkLandingFinalUrl, "…and does not become the baseline").toBe(siteA);
+      await verifier(landsOn(siteB)).verify(rowId);
+      expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+      await expectLinkOut(id, "apply", leaving(id, "apply", "landing_changed"));
+    });
+
+    it("A, then enough timeouts to prune A from the run log, then B: still flagged", async () => {
+      const id = `${NS}:baseline-pruned`;
+      const rowId = await landingAt(id);
+      for (let i = 0; i < config.verification.runsKeep; i++) {
+        await verifier(timingOut).verify(rowId);
+      }
+      const answeredLeft = await db
+        .select({ id: verificationRuns.id })
+        .from(verificationRuns)
+        .where(and(eq(verificationRuns.opportunityId, rowId), isNull(verificationRuns.error)));
+      expect(answeredLeft, "the answered check on A has been pruned").toHaveLength(0);
+      await verifier(landsOn(siteB)).verify(rowId);
+      expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+    });
+
+    it("0017's baseline backfill picks the last answered, applied check of the current URL", async () => {
+      const id = `${NS}:baseline-backfill`;
+      const rowId = await landingAt(id);
+      // Two runs after A that must NOT become the baseline: a stale fetch of B, and a timeout.
+      await verifier(savedMidFetch(id, landsOn(siteB))).verify(rowId);
+      await verifier(timingOut).verify(rowId);
+      // The state of every row before 0017 runs: no baseline at all.
+      await db
+        .update(opportunities)
+        .set({ linkLandingRequestedUrl: null, linkLandingFinalUrl: null })
+        .where(eq(opportunities.id, rowId));
+
+      const migration = readFileSync(
+        new URL("../../src/db/migrations/0017_link_out_reviewed_destinations.sql", import.meta.url),
+        "utf8",
+      );
+      const backfill = migration
+        .split("--> statement-breakpoint")
+        .find((chunk) => chunk.includes('"link_landing_requested_url" = r."requested_url"'))
+        ?.trim();
+      expect(backfill).toMatch(/^-- BACKFILL THE LANDING BASELINE[\s\S]*;$/);
+      // Narrowed to this row, for the same reason as the pin backfill above.
+      await pool.query(`${backfill?.replace(/;$/, "")} AND o."id" = $1`, [rowId]);
+
+      const row = await rowOf(id);
+      expect(row.linkLandingRequestedUrl).toBe(vanity);
+      expect(row.linkLandingFinalUrl).toBe(siteA);
+      await verifier(landsOn(siteB)).verify(rowId);
+      expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+    });
   });
 
   it("builds the leaving page from APP_BASE_URL and percent-encodes the id's colon", async () => {

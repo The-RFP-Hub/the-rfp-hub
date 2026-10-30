@@ -280,11 +280,7 @@ export class VerificationService {
       // of bytes nobody stores any more — the snapshot of record has to be on the row that claims
       // it. Nothing is re-fetched to do this; it is the row already in front of us.
       const applied = !stale && !transient;
-      // Read for an APPLIED run that got no page, too: the landing comparison below needs the
-      // previous run whenever this one is a verdict, and a redirect the fetcher stopped following or
-      // a content type it would not read still says where the link went.
-      const previous =
-        fetched !== undefined || applied ? await repos.verificationRuns.latest(row.id) : undefined;
+      const previous = fetched ? await repos.verificationRuns.latest(row.id) : undefined;
       const unchanged =
         fetched !== undefined &&
         fetched.truncated === false &&
@@ -336,8 +332,35 @@ export class VerificationService {
       await repos.verificationRuns.pruneToLatest([row.id], this.config.verification.runsKeep);
 
       const matched = assessed?.matched ?? false;
+      // WHERE THE APPLY LINK LANDS, compared with the LANDING BASELINE kept on the row — the last
+      // applied check that got an answer — never with the run log. The log holds runs that are not
+      // verdicts (a timeout, a result discarded because the entry changed mid-fetch) and is pruned
+      // to the newest few, so "the latest run" could be either and hide a move. Read off the LOCKED
+      // row, so two overlapping checks cannot compare with the same stale baseline. A verdict only:
+      // a stale run was about content that has since been replaced, and a transient one never
+      // reached anybody — neither compares, and neither moves the baseline. Set once, never cleared
+      // here; see `landingMove` and `flagLandingChanged`.
+      const answered =
+        applied && run.httpStatus !== null && run.finalUrl !== null
+          ? { requestedUrl: url, finalUrl: run.finalUrl }
+          : undefined;
+      const landing = answered
+        ? landingMove(
+            {
+              requestedUrl: current?.linkLandingRequestedUrl ?? null,
+              finalUrl: current?.linkLandingFinalUrl ?? null,
+            },
+            answered,
+          )
+        : undefined;
       if (applied) {
         await repos.opportunities.applyVerification(row.id, {
+          ...(answered
+            ? {
+                linkLandingRequestedUrl: answered.requestedUrl,
+                linkLandingFinalUrl: answered.finalUrl,
+              }
+            : {}),
           verifiedAgainstSource: matched,
           verifiedAt: now,
           // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed
@@ -351,11 +374,6 @@ export class VerificationService {
         });
       }
 
-      // WHERE THE APPLY LINK LANDS, compared with where it landed last time — the one change to a
-      // link-out that a reviewer's pin cannot see, because the stored URL did not move. A verdict
-      // only: a stale run was about content that has since been replaced, and a transient one never
-      // reached anybody. Set once, never cleared here; see `landingMove` and `flagLandingChanged`.
-      const landing = applied ? landingMove(previous, run) : undefined;
       const landingFlagged =
         landing !== undefined && (await repos.opportunities.flagLandingChanged(row.id, now));
 
@@ -605,38 +623,43 @@ function isTransientFailure(failure: SourceFetchError | undefined): boolean {
   return failure !== undefined && TRANSIENT_FETCH_FAILURES.has(failure.category);
 }
 
-/** The three facts about a run that say where its link landed. */
-type Landing = Pick<VerificationRunRow, "requestedUrl" | "finalUrl" | "httpStatus">;
+/** Where one answered check of a link landed: the URL it requested and the URL it ended on. */
+interface Landing {
+  requestedUrl: string | null;
+  finalUrl: string | null;
+}
 
 /**
- * Whether the apply link now lands on a different SITE than it did on the previous check — the
- * signal behind the `landing_changed` link-out reason (`modules/shared/link-out.ts`).
+ * Whether the apply link now lands on a different SITE than its LANDING BASELINE — the last
+ * applied check that got an answer, kept on the row (`link_landing_requested_url` /
+ * `link_landing_final_url`). The signal behind the `landing_changed` link-out reason
+ * (`modules/shared/link-out.ts`).
  *
- * THREE CONDITIONS BEYOND "THE SITES DIFFER", each closing a false alarm. A false alarm here is not
+ * BOTH SIDES ARE ANSWERED, APPLIED CHECKS, and the caller is what guarantees it: the baseline is
+ * written only by such a check, and only such a check is compared. A transient failure never saw a
+ * landing (a timeout of a vanity link would otherwise record the vanity host and flag the next good
+ * check), and a stale result was about content that has since been replaced; neither compares and
+ * neither moves the baseline. That is also why the baseline lives on the row rather than being read
+ * back from `verification_runs`: the run log holds exactly those non-verdicts, and is pruned.
+ *
+ * TWO CONDITIONS BEYOND "THE SITES DIFFER", each closing a false alarm. A false alarm here is not
  * free: it sends every reader of that listing through the leaving page until a reviewer saves it.
  *
  *   1. **The same requested URL.** An edited link is supposed to land somewhere new, and it is the
- *      pin's job to notice that, not this one's.
- *   2. **Both runs got an answer from a server** — an HTTP status, whether the page itself, a
- *      redirect the fetcher stopped following, or a refused content type. A run without one never
- *      saw a landing: the transient failures (`timeout`, `transport_failure`, `dns_failure`) never
- *      carry a status, and a `dns_failure` does not even record a URL. Without this, one timed-out
- *      check of a vanity link that redirects to its form host would record the vanity host as the
- *      "landing", and the next good check would flag a move that never happened. The current run's
- *      own transience is excluded by the caller (only an applied run is compared), the previous
- *      run's is excluded here.
- *   3. **"Site" is `siteOf`**, the last two labels — the same notion `offDomainRedirect` reports,
+ *      pin's job to notice that, not this one's. No baseline yet (NULL) is "nothing to compare".
+ *   2. **"Site" is `siteOf`**, the last two labels — the same notion `offDomainRedirect` reports,
  *      so `grants.example.org` → `www.example.org` is not a move, and the two signals can never
  *      disagree about what leaving a site means.
  */
 export function landingMove(
-  previous: Landing | undefined,
+  baseline: Landing,
   current: Landing,
 ): { from: string; to: string } | undefined {
-  if (!previous || previous.requestedUrl !== current.requestedUrl) return undefined;
-  if (previous.httpStatus === null || current.httpStatus === null) return undefined;
-  if (previous.finalUrl === null || current.finalUrl === null) return undefined;
-  const from = siteOf(previous.finalUrl);
+  if (baseline.requestedUrl === null || baseline.requestedUrl !== current.requestedUrl) {
+    return undefined;
+  }
+  if (baseline.finalUrl === null || current.finalUrl === null) return undefined;
+  const from = siteOf(baseline.finalUrl);
   const to = siteOf(current.finalUrl);
   if (!from || !to || from === to) return undefined;
   return { from, to };

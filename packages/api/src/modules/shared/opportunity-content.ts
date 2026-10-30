@@ -44,6 +44,9 @@ export const NON_CONTENT: ReadonlySet<string> = new Set([
   "reviewedApplicationUrl",
   "reviewedWebsite",
   "linkLandingChangedAt",
+  // The source check's landing baseline: written by the check, never by a document.
+  "linkLandingRequestedUrl",
+  "linkLandingFinalUrl",
 ]);
 
 /**

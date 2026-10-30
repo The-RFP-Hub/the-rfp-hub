@@ -392,6 +392,9 @@ export class OpportunityRepository {
       verifiedAgainstSource: boolean;
       verifiedAt: Date;
       lastSeenAt: Date | null;
+      /** Only when this run got an answer: the new landing baseline (see `landingMove`). */
+      linkLandingRequestedUrl?: string;
+      linkLandingFinalUrl?: string;
     },
   ): Promise<void> {
     await this.exec.update(opportunities).set(values).where(eq(opportunities.id, id));

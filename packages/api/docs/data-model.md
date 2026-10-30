@@ -271,6 +271,8 @@ CREATE TABLE opportunities (
   reviewed_application_url TEXT,                        -- the application_url a reviewer last vouched for
   reviewed_website         TEXT,                        -- the website a reviewer last vouched for
   link_landing_changed_at  TIMESTAMPTZ,                 -- the source check saw the apply link land on another site; a reviewer's pin clears it
+  link_landing_requested_url TEXT,                      -- landing baseline: the URL of the last applied source check that got an answer
+  link_landing_final_url   TEXT,                        -- …and where it ended up; the next check compares sites with this
 
   -- full-text search (weighted)
   search_tsv         tsvector GENERATED ALWAYS AS (
