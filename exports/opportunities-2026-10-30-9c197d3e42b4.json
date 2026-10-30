@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-29T10:09:28.509Z",
+  "generatedAt": "2026-10-30T10:11:52.308Z",
   "count": 170,
   "opportunities": [
     {
@@ -55,7 +55,6 @@
       ],
       "source": {
         "publisher": "arbitrum-foundation",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:54.399Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
@@ -208,7 +207,7 @@
       ],
       "postedAt": "2026-08-13T00:00:00.000Z",
       "createdAt": "2026-10-01T12:40:54.397Z",
-      "updatedAt": "2026-10-01T12:40:54.399Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -245,7 +244,6 @@
       ],
       "source": {
         "publisher": "blueshift-foundation",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:55.859Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": null
@@ -273,7 +271,7 @@
       "additionalReferences": "FilPGF homepage (objectives overview, $9.96M committed / 49 projects): https://www.filpgf.io/ | Kernel program page (objective, timeline, tiers, inventory): https://www.filpgf.io/kernel/",
       "website": "https://www.filpgf.io/kernel/",
       "createdAt": "2026-10-01T12:40:55.857Z",
-      "updatedAt": "2026-10-01T12:40:55.859Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -306,7 +304,6 @@
       ],
       "source": {
         "publisher": "colosseum",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:55.181Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
@@ -457,7 +454,7 @@
       ],
       "postedAt": "2026-09-14T00:00:00.000Z",
       "createdAt": "2026-10-01T12:40:55.179Z",
-      "updatedAt": "2026-10-01T12:40:55.181Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -5149,8 +5146,6 @@
         }
       ],
       "source": {
-        "publisher": "curated",
-        "submittedAt": "2026-10-01T13:49:07.242Z",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
         "verifiedAt": "2026-10-01T13:49:07.373Z"
@@ -5188,7 +5183,7 @@
       ],
       "postedAt": "2023-02-26T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-10-01T13:49:07.242Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -5288,7 +5283,7 @@
       "fundingType": "grant",
       "title": "MetaMask Grants Program",
       "description": "MetaMask Grants DAO is an employee-led, Consensys-funded DAO whose mission is to fund the development of high-value projects in the MetaMask ecosystem, supporting developers across the community to build on top of MetaMask while empowering Consensys employees to embrace web3 mechanisms.\n\n**Structure — three parts:**\n1. **Employee-Led DAO** — the body of the DAO, made up of full-time Consensys employees, with a stated intent to decentralize over time and add external contributors.\n2. **Leadership Committee (mini-DAO)** — 7 individuals responsible for finding high-potential projects, creating governance proposals, updating external content, gathering feedback and queuing multisig transactions. If a member leaves Consensys, the remaining members may fill the seat by majority vote. Members are Dan Finlay, Aaron Davis (Kumavis), Taylor Monahan, Christian Montoya, Ryan Jones, Ian Wallis and Jordan Spence.\n3. **Secure MultiSig** — a 2-of-3 Gnosis Safe controlled by Consensys that manages the token contract and treasury and signs disbursements.\n\n**Two grant types:**\n- **Leadership Committee Grants** — voted on exclusively by the Leadership Committee. Any Committee member may propose; proposals with at least **5 'yes' votes** at closing pass. Votes are open for **five days**.\n- **Full DAO Grants** — voted on by the full DAO. Any Committee member may propose; proposals with more 'yes' than 'no' votes at closing pass. Votes are open for **ten days**.\n\nVoting occurs on Activate, Consensys' proprietary platform built on top of Snapshot (the DAO's Snapshot space is `heart.mmgdao.eth`). Governance uses a non-transferable, fungible mainnet token that is mintable and burnable by the multisig and is \"explicitly designed to never be exchanged for value\"; all Consensys employees receive the same number of tokens, minted on joining and burned on departure.\n\n**Intake:** external developers apply via a rolling application form. The DAO's Request for Proposals page states: \"We are not currently running any RFP rounds, but our rolling grant applications remain open.\" There is no guaranteed review timeline — \"We can't guarantee when we will review your request or that it will get approved, but know that our team will review the application pipeline as often as we can.\"\n\n**No published range, and no envelope.** Nothing on the DAO's own site carries a dollar figure — not the FAQ's description of the two grant types, not the RFP page, not the grantee list. The closest it comes is a DAO objective stating that \"More than 50% of the DAO's initial budget is allocated through tokenized proposal voting within the first three months of operation\": the phrase \"initial budget\", without the number. Its Snapshot space holds sixteen proposals in total, of which three state an amount, and each states it as that grant's own size ($36,000, $35,000, $35,000) rather than as a range the program publishes. Consensys' launch announcement put the DAO's first-year funding at $2.4M, but that is the funder's press release rather than the program's own published budget, so this record carries no `fundingInfo` rather than promote it into one. The treasury cannot be read instead: it is described only as a 2-of-3 Gnosis Safe controlled by Consensys, with no address published anywhere on the site.\n\n**On the open status:** the DAO's own RFP page still states that rolling grant applications remain open, which is what this record follows. Its Snapshot space has had no proposal since 22 December 2023, so the intake is open and the governance around it is quiet.\n\nThe DAO was launched on 27 October 2022, announced by Consensys as issuing grants to developers worldwide; metamaskgrants.org was first captured the same day.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "MetaMask Grants DAO",
@@ -5355,7 +5350,7 @@
       "fundingType": "bounty",
       "title": "MetaMask Validator Staking Bug Bounty",
       "description": "Rolling bug bounty for the smart contracts behind MetaMask Portfolio's 32-ETH Validator Staking — the Kiln On-Chain v1 staking contracts — hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 18 March 2024 — its catalogue entry reports a last update on 15 May 2026 — with rewards denominated in ETH: 20-200 ETH for a critical finding (the platform's sidebar renders that as roughly $70,000-$700,000 at current prices), 5-20 ETH for high, 1-5 ETH for medium and 0.25-1 ETH for low. The critical rule is published: 10% of the funds directly affected, calculated at report-submission time, capped at the table maximum with the table minimum as a guaranteed floor; high rewards are capped at 100% of the funds affected within their range.\n\nThe scope is deliberately narrow: the mainnet staking contract at 0xdc71affc862fceb6ad32be58e098423a7727bebd (no proxy) and the pinned kilnfi/staking-contracts repository at commit f33eb8d. The portfolio.metamask.io web application is explicitly out of scope, as are known issues from the program's three published audits. The listing reports 262 submissions from 131 hackers and **$0 in total rewards paid** — a live program that has yet to validate a paying finding.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "MetaMask (Consensys)",
@@ -8049,7 +8044,7 @@
       "fundingType": "grant",
       "title": "SSV Grants Program",
       "description": "The ssv.network Grants Program, **led by the SSV Foundation**, funds teams building services for the SSV Network ecosystem, with the intent of promoting and accelerating development and innovation by building on top of ssv.network. The program is presented publicly under the headline \"$5M Grants Program\" and is community-led.\n\n**Grant categories:**\n- **Open Grants** — supporting unique use cases for SSV across the ecosystem.\n- **Strategic Partnerships** — partnerships to develop critical components like performance data, monitoring tools and integrations.\n- **Performance and Metadata Providers** — reliable performance and metadata services for the SSV ecosystem.\n- **Alerting & Monitoring Solutions** — tools for real-time network monitoring and alerting.\n- **Alternative Client Implementations** — different client software to improve network resilience and diversification.\n- **Staking Integrations** — partnering with major staking protocols to enhance ecosystem interoperability.\n- **Developer Tools** — tools that assist developers building on the SSV network.\n- **Bug Bounties** — run separately as a $1M program powered by Immunefi.\n- **Micro Grants** — smaller grants for impactful contributions, often awarded retroactively, honouring those who significantly contributed to the community and the project in unforeseen ways. Anyone in the community can be awarded one or suggest a candidate.\n\n**Process:** applications are reviewed on a rolling basis by the **Grants Committee**, which votes on approval and communicates the decision to the applicant. Accepted grant applications are published on the ssv.network forum. Milestone completion is then tracked closely together with the Grants Committee. All grantees must sign agreements with the SSV Foundation and complete **KYC/KYB**.\n\nGrant sizes are negotiated per application rather than published as a range; the program's own showcase cites SSVScan (by DragonStake and Polkastats) as having received a **$300k** grant. Program contact: matthias@ssv.network.\n\nThe SSV Foundation published no announcement date, so `postedAt` is an archival bound: the program's own public application page was publicly visible by 25 August 2022, its first capture. The SSV DAO forum proposal that created the program (\"Eco-system Grant Program\") was posted 12 April 2022.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "SSV Foundation",
@@ -10971,7 +10966,7 @@
       ],
       "postedAt": "2026-01-07T21:30:19.000Z",
       "createdAt": "2026-02-03T17:46:02.000Z",
-      "updatedAt": "2026-10-01T13:49:06.152Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -16891,7 +16886,7 @@
       ],
       "postedAt": "2025-06-11T22:30:03.000Z",
       "createdAt": "2025-08-19T16:16:40.000Z",
-      "updatedAt": "2026-10-01T13:49:03.837Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -16992,7 +16987,7 @@
       ],
       "postedAt": "2025-06-11T22:30:03.000Z",
       "createdAt": "2025-08-19T16:15:52.000Z",
-      "updatedAt": "2026-10-01T13:49:04.999Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17721,7 +17716,6 @@
       ],
       "source": {
         "publisher": "prezenti",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:56.519Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
@@ -17764,7 +17758,7 @@
       ],
       "postedAt": "2026-08-19T19:02:00.000Z",
       "createdAt": "2026-10-01T12:40:56.517Z",
-      "updatedAt": "2026-10-01T12:40:56.519Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17819,7 +17813,6 @@
       ],
       "source": {
         "publisher": "prezenti",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:57.242Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
@@ -17857,7 +17850,7 @@
       ],
       "postedAt": "2026-08-12T19:13:00.000Z",
       "createdAt": "2026-10-01T12:40:57.240Z",
-      "updatedAt": "2026-10-01T12:40:57.242Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17887,7 +17880,6 @@
       ],
       "source": {
         "publisher": "rocket-pool-gmc",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:57.885Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
@@ -17932,7 +17924,7 @@
       ],
       "postedAt": "2026-09-08T00:11:46.000Z",
       "createdAt": "2026-10-01T12:40:57.883Z",
-      "updatedAt": "2026-10-01T12:40:57.885Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17962,7 +17954,6 @@
       ],
       "source": {
         "publisher": "rocket-pool-gmc",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:58.596Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
@@ -18007,7 +17998,7 @@
       ],
       "postedAt": "2026-09-08T00:23:55.000Z",
       "createdAt": "2026-10-01T12:40:58.595Z",
-      "updatedAt": "2026-10-01T12:40:58.596Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -18040,7 +18031,6 @@
       ],
       "source": {
         "publisher": "thedao-security-fund",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:59.250Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
@@ -18081,7 +18071,7 @@
       ],
       "postedAt": "2026-09-15T00:00:00.000Z",
       "createdAt": "2026-10-01T12:40:59.248Z",
-      "updatedAt": "2026-10-01T12:40:59.250Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -18118,7 +18108,6 @@
       ],
       "source": {
         "publisher": "uniswap-foundation",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-06T19:12:41.095Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
@@ -18171,7 +18160,7 @@
         }
       ],
       "createdAt": "2026-10-06T19:12:41.093Z",
-      "updatedAt": "2026-10-06T19:12:41.095Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     },
     {
       "specVersion": "1.0.1",
@@ -18213,7 +18202,6 @@
       ],
       "source": {
         "publisher": "whitechain",
-        "submittedBy": "brunodmsi",
         "submittedAt": "2026-10-01T12:40:59.895Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
@@ -18259,7 +18247,7 @@
         }
       ],
       "createdAt": "2026-10-01T12:40:59.894Z",
-      "updatedAt": "2026-10-01T12:40:59.895Z"
+      "updatedAt": "2026-10-30T04:33:14.127Z"
     }
   ]
 }
