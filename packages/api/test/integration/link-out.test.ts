@@ -519,6 +519,86 @@ run("M5LINK link-outs vouch only for reviewed destinations", () => {
       await verifier(landsOn(siteB)).verify(rowId);
       expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
     });
+
+    it("0017's baseline backfill keeps answered refusals, skips stale and transient runs, and ignores whitespace around the URL", async () => {
+      const id = `${NS}:baseline-shapes`;
+      const shapes = "https://go.m5link-short.example/shapes";
+      await seedImport(id, { applicationUrl: shapes, website: SITE_URL });
+      const { id: rowId } = await rowOf(id);
+      // Stored with surrounding whitespace JavaScript's trim() removes and PostgreSQL's btrim()
+      // would not; the verifier requests the trimmed URL.
+      await db
+        .update(opportunities)
+        .set({
+          applicationUrl: `\t${shapes}\n`,
+          // Pinned as stored, the way an approval of this row would have pinned it.
+          reviewedApplicationUrl: `\t${shapes}\n`,
+          linkLandingRequestedUrl: null,
+          linkLandingFinalUrl: null,
+        })
+        .where(eq(opportunities.id, rowId));
+      const at = (minutes: number) => new Date(Date.UTC(2026, 9, 1, 0, minutes));
+      await db.insert(verificationRuns).values([
+        // Applied and answered, but a refusal: a content type the verifier would not read. It still
+        // landed on site A, and the verifier itself keeps such a run as the baseline.
+        {
+          opportunityId: rowId,
+          runAt: at(1),
+          requestedUrl: shapes,
+          finalUrl: siteA,
+          httpStatus: 200,
+          existsAtSource: false,
+          matched: false,
+          error: "content_type_not_allowed: application/pdf is not a page",
+        },
+        // Stale: answered, but discarded. Must not become the baseline.
+        {
+          opportunityId: rowId,
+          runAt: at(2),
+          requestedUrl: shapes,
+          finalUrl: siteB,
+          httpStatus: 200,
+          existsAtSource: true,
+          matched: true,
+          error:
+            "stale_result: the entry changed while its source was being fetched, so this verdict was recorded but not applied",
+        },
+        // Transient: never answered.
+        {
+          opportunityId: rowId,
+          runAt: at(3),
+          requestedUrl: shapes,
+          finalUrl: shapes,
+          httpStatus: null,
+          existsAtSource: false,
+          matched: false,
+          error:
+            "not_a_verdict: the source could not be reached, so the previous verdict stands and the entry stays owed a check — timeout: request timed out",
+        },
+      ]);
+
+      const migration = readFileSync(
+        new URL("../../src/db/migrations/0017_link_out_reviewed_destinations.sql", import.meta.url),
+        "utf8",
+      );
+      const backfill = migration
+        .split("--> statement-breakpoint")
+        .find((chunk) => chunk.includes('"link_landing_requested_url" = r."requested_url"'))
+        ?.trim();
+      await pool.query(`${backfill?.replace(/;$/, "")} AND o."id" = $1`, [rowId]);
+
+      const row = await rowOf(id);
+      expect(row.linkLandingRequestedUrl, "the answered refusal is the baseline").toBe(shapes);
+      expect(row.linkLandingFinalUrl).toBe(siteA);
+
+      const toB = fixtureTransport({
+        [shapes]: { status: 302, headers: { location: siteB } },
+        [siteB]: page,
+      });
+      await verifier(toB).verify(rowId);
+      expect((await rowOf(id)).linkLandingChangedAt).not.toBeNull();
+      await expectLinkOut(id, "apply", leaving(id, "apply", "landing_changed"));
+    });
   });
 
   it("builds the leaving page from APP_BASE_URL and percent-encodes the id's colon", async () => {

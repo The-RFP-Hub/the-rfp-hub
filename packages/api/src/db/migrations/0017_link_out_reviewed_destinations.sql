@@ -3,25 +3,33 @@ ALTER TABLE "opportunities" ADD COLUMN "reviewed_website" text;--> statement-bre
 ALTER TABLE "opportunities" ADD COLUMN "link_landing_changed_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "opportunities" ADD COLUMN "link_landing_requested_url" text;--> statement-breakpoint
 ALTER TABLE "opportunities" ADD COLUMN "link_landing_final_url" text;--> statement-breakpoint
--- BACKFILL THE LANDING BASELINE (hand-written): for each row, the last source check of its CURRENT
--- apply URL that was applied AND got an answer from a server. A run's `error` is NULL exactly when
--- the fetch returned a response and its verdict was applied — a stale result, a transient failure
--- and a refused fetch each record why in `error` — so that is the filter. This is the baseline the
--- next check compares with (`verification.service.ts`); comparing against the run log instead
--- would let a discarded or pruned run stand in for it. A row with no such run keeps NULL, and its
--- first answered check after deploy becomes the baseline without being compared with anything.
--- `btrim` because the check requests the trimmed URL.
+-- BACKFILL THE LANDING BASELINE (hand-written): for each row, its latest source check that the
+-- verifier would itself have kept as the baseline — an APPLIED run that got an ANSWER from a server
+-- (`verification.service.ts`: `applied && http_status IS NOT NULL && final_url IS NOT NULL`). That
+-- includes answered refusals (a content type it would not read, a redirect it stopped following),
+-- which carry an `error` but did land somewhere; so the filter is not `error IS NULL`. It excludes
+-- the runs that were not verdicts, by the markers the verifier has written into `error` since they
+-- existed (`stale_result:` since 2026-08-24, `not_a_verdict:` since 2026-08-26, unchanged since); a
+-- transient run never has an HTTP status in any case. Comparing against the run log at runtime
+-- instead would let exactly those runs stand in for the baseline, which is what this column fixes.
+-- No URL filter: the verifier compares only when the baseline's requested URL equals the URL it is
+-- about to request (the trimmed `application_url`), so a baseline for an older URL is simply not
+-- compared and gets replaced — and matching here would need JavaScript's `trim()` in SQL.
+-- A row with no such run keeps NULL, and its first answered check becomes the baseline.
 UPDATE "opportunities" AS o
 SET "link_landing_requested_url" = r."requested_url",
     "link_landing_final_url" = r."final_url"
 FROM (
   SELECT DISTINCT ON ("opportunity_id") "opportunity_id", "requested_url", "final_url"
   FROM "verification_runs"
-  WHERE "error" IS NULL AND "http_status" IS NOT NULL AND "final_url" IS NOT NULL
+  WHERE "http_status" IS NOT NULL
+    AND "final_url" IS NOT NULL
+    AND "requested_url" IS NOT NULL
+    AND position('stale_result:' in coalesce("error", '')) = 0
+    AND position('not_a_verdict:' in coalesce("error", '')) = 0
   ORDER BY "opportunity_id", "run_at" DESC, "id" DESC
 ) AS r
-WHERE r."opportunity_id" = o."id"
-  AND r."requested_url" = btrim(o."application_url");
+WHERE r."opportunity_id" = o."id";
 --> statement-breakpoint
 -- BACKFILL (hand-written below the generated DDL): every approved row's CURRENT links count as the
 -- reviewed ones.
