@@ -15,6 +15,7 @@
  * audited on the ORGANISATION, which is the subject whose state changed — the members' accounts did
  * not.
  */
+import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow, OrganizationRow } from "../../../db/schema.js";
 import {
@@ -24,12 +25,17 @@ import {
   withTransaction,
 } from "../../repositories/index.js";
 import type {
+  ClosingSoonItemView,
+  ClosingSoonListView,
   MembershipResultView,
+  OpenConfirmationView,
   OrganizationSummaryView,
   ReviewDecisionView,
 } from "../../shared/api-views.js";
+import { isPastDue, latestFixedDeadlineAt } from "../../shared/deadlines.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { reviewerPins } from "../../shared/link-out.js";
+import { closingDriver, inactivityClosesAt } from "../../shared/staleness.js";
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
@@ -38,10 +44,30 @@ import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
 } from "../notifications/notification-dispatch.queue.js";
+import { earliestInactivityClosings } from "./closing-soon.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
 
 const ORG_ROLES: OrgRole[] = ["owner", "admin", "publisher"];
+
+/** The audit `reason` of a "confirm still open" that carried no note of its own. */
+export const CONFIRM_OPEN_DEFAULT_REASON = "reviewer confirmed the listing is still open";
+
+/**
+ * How the "closing soon" walk reads. `scanCap` is a safety bound on rows examined, far above any
+ * realistic backlog (the job closes whatever is already due every night); reaching it is reported
+ * as `complete: false`, never hidden. Injectable so a test can reach it with a handful of rows.
+ */
+export interface ClosingSoonScan {
+  pageSize: number;
+  scanCap: number;
+  /**
+   * TEST SEAM: awaited after each page is read, inside the walk's snapshot. Lets a test commit a
+   * concurrent refresh between two pages and prove the walk does not see it.
+   */
+  afterPage?: (rows: OpportunityRow[]) => Promise<void>;
+}
+const CLOSING_SOON_SCAN: ClosingSoonScan = { pageSize: 500, scanCap: 50_000 };
 
 /** The directory fields an authorised editor may change. Deliberately not the verified flag. */
 export interface OrganizationMetadata {
@@ -57,12 +83,21 @@ export class ReviewService {
   private readonly repos: Repositories;
   private readonly notificationQueue: NotificationDispatchEnqueuer;
 
+  private readonly config: AppConfig;
+  private readonly closingSoonScan: ClosingSoonScan;
+
   constructor(
     private readonly db: DB = defaultDb,
-    options: { notificationQueue?: NotificationDispatchEnqueuer } = {},
+    options: {
+      notificationQueue?: NotificationDispatchEnqueuer;
+      config?: AppConfig;
+      closingSoonScan?: ClosingSoonScan;
+    } = {},
   ) {
     this.repos = repositories(db);
     this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
+    this.config = options.config ?? defaultConfig;
+    this.closingSoonScan = options.closingSoonScan ?? CLOSING_SOON_SCAN;
   }
 
   // ── opportunities ──────────────────────────────────────────────────────────────
@@ -114,6 +149,167 @@ export class ReviewService {
       });
       return { id: next.publicId, reviewStatus: next.reviewStatus, isListed: next.isListed };
     });
+  }
+
+  /**
+   * "I checked by hand, it is still open": refresh the staleness clock of ONE live listing.
+   *
+   * The only other things that move `last_seen_at` are a matched source check, a publisher write,
+   * a granted claim and an approval — so a listing whose page the automated check cannot read (a
+   * bot wall, a login, a page that does not carry the programme's title) had no way to stay open
+   * except SQL in production. This is that statement, made by a reviewer and audited like every
+   * other one.
+   *
+   * IT CHANGES `last_seen_at` AND NOTHING ELSE (`touchLastSeen`). Not `updated_at`: the verifier's
+   * predicate is `verified_at < updated_at`, so a bump would queue an outbound fetch, and the public
+   * `updatedAt` would claim a content change nobody made. Not the reviewer pins either: a hand check
+   * vouches that the programme still runs, not for where its links go — that is what approval is.
+   *
+   * Only for a LIVE, OPEN listing, because those are the only ones the staleness job can close for
+   * inactivity that anybody can see — and NOT for a past-due one: the job closes that on its
+   * deadlines whatever the clock says, so a confirmation would be recorded and change nothing. The
+   * remedy there is the listing's deadlines, not this. Likewise `closes_on_deadline` for a listing
+   * whose close is set by its final fixed deadline (`closingDriver`): confirming it would move
+   * nothing. Each refusal is its own 409 code so a client can say why.
+   */
+  async confirmOpen(
+    reviewerId: number,
+    publicId: string,
+    note?: string | null,
+  ): Promise<OpenConfirmationView> {
+    return withTransaction(this.db, async (repos) => {
+      const row = await lockOpportunity(repos, publicId);
+      assertNotMerged(row);
+      if (row.reviewStatus !== "approved") {
+        throw conflict(
+          "not_approved",
+          `opportunity ${JSON.stringify(row.publicId)} is ${row.reviewStatus}; only an approved listing can be confirmed open.`,
+        );
+      }
+      if (!row.isListed) {
+        throw conflict(
+          "not_listed",
+          `opportunity ${JSON.stringify(row.publicId)} is unlisted; only a listed entry can be confirmed open.`,
+        );
+      }
+      if (row.status !== "open") {
+        throw conflict(
+          "not_open",
+          `opportunity ${JSON.stringify(row.publicId)} is ${row.status}; only an open listing can be confirmed open.`,
+        );
+      }
+      const now = new Date();
+      if (isPastDue(row.deadlines, now)) {
+        throw conflict(
+          "past_due",
+          `opportunity ${JSON.stringify(row.publicId)} has no deadline left and no rolling intake; the staleness job closes it on its deadlines, which confirming cannot change. Update its deadlines instead.`,
+        );
+      }
+      // The same refusal, for the same reason, one step earlier: a listing whose close is set by its
+      // final deadline (fixed deadlines and no rolling intake, or a rolling one whose last deadline
+      // outlasts a fresh clock) is not kept open one moment longer by a confirmation. Recording one
+      // would tell the reviewer, and the audit trail, that it was.
+      if (closingDriver(row, now, this.config.stalenessInactiveDays) === "final_deadline") {
+        const latest = latestFixedDeadlineAt(row.deadlines);
+        throw conflict(
+          "closes_on_deadline",
+          `opportunity ${JSON.stringify(row.publicId)} closes at its final fixed deadline${
+            latest ? ` (${latest.toISOString()})` : ""
+          }; confirming it now cannot keep it open any longer. Update its deadlines instead.`,
+        );
+      }
+      await repos.opportunities.touchLastSeen(row.id, now);
+      const reason = note?.trim() || CONFIRM_OPEN_DEFAULT_REASON;
+      await repos.audit.record({
+        subjectKind: "opportunity",
+        subjectId: row.id,
+        actorKind: "user",
+        actorAccountId: reviewerId,
+        action: "update",
+        patch: {
+          lastSeenAt: { before: row.lastSeenAt?.toISOString() ?? null, after: now.toISOString() },
+          reason,
+        },
+      });
+      const closesAt = inactivityClosesAt(
+        { ...row, lastSeenAt: now },
+        now,
+        this.config.stalenessInactiveDays,
+      );
+      return {
+        id: row.publicId,
+        lastSeenAt: now.toISOString(),
+        previousLastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+        closesAt: closesAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  /**
+   * Live, open listings the staleness job would close for inactivity within `windowDays`, soonest
+   * first.
+   *
+   * THE JOB'S RULE PROJECTED ACROSS THE WINDOW, NOT A COPY OF IT. Every candidate is put through
+   * `inactivityClosesAt` — `stalenessClosureReason` solved for time — so a rolling listing whose
+   * fixed date passes inside the window is listed at `max(clock + days, that date)`, while a
+   * past-due entry and one whose last fixed date lies beyond the window drop out exactly as the job
+   * would treat them. The list cannot promise a date the job will not keep.
+   *
+   * THE TRUE EARLIEST, NOT THE EARLIEST OF A SAMPLE. The database can only order by the clock, so the
+   * walk (`earliestInactivityClosings`) reads in clock order, keyset-paged, and stops as soon as no
+   * unread row can close earlier than what it already holds. `complete: false` is reported only if
+   * the safety cap on rows examined stops it first.
+   */
+  async closingSoon(
+    windowDays: number,
+    limit: number,
+    now: Date = new Date(),
+  ): Promise<ClosingSoonListView> {
+    const inactiveDays = this.config.stalenessInactiveDays;
+    const horizon = now.getTime() + windowDays * 86_400_000;
+    // Every projected close is >= clock + inactiveDays, so closesAt <= horizon needs
+    // clock <= horizon - inactiveDays.
+    const clockAtOrBefore = new Date(horizon - inactiveDays * 86_400_000);
+    const scan = this.closingSoonScan;
+    // ONE SNAPSHOT FOR EVERY PAGE. Under READ COMMITTED each page would see the commits made since
+    // the last one, and a listing confirmed (or matched by a source check) mid-walk would move past
+    // the cursor and be read again — twice in the answer, with two dates. REPEATABLE READ pins the
+    // snapshot at the first page; READ ONLY because nothing here writes.
+    const { due, truncated, complete } = await withTransaction(
+      this.db,
+      (repos) =>
+        earliestInactivityClosings<OpportunityRow>({
+          readPage: async (after, size) => {
+            const page = await repos.opportunities.listClosingSoonCandidates(
+              new Date(horizon),
+              clockAtOrBefore,
+              after,
+              size,
+            );
+            await scan.afterPage?.(page.map((candidate) => candidate.row));
+            return page;
+          },
+          now,
+          horizon,
+          inactiveDays,
+          limit,
+          pageSize: scan.pageSize,
+          scanCap: scan.scanCap,
+        }),
+      { isolationLevel: "repeatable read", accessMode: "read only" },
+    );
+    const items: ClosingSoonItemView[] = due.map(({ row, closesAt }) => ({
+      id: row.publicId,
+      title: row.title,
+      namespace: row.sourcePublisher,
+      applicationUrl: row.applicationUrl,
+      website: row.website,
+      lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+      updatedAt: row.updatedAt.toISOString(),
+      closesAt: closesAt.toISOString(),
+      closesBy: closingDriver(row, now, inactiveDays),
+    }));
+    return { items, windowDays, inactiveDays, asOf: now.toISOString(), truncated, complete };
   }
 
   /** Unlist or relist. Separate from approval: a listing decision is not a conformance decision. */

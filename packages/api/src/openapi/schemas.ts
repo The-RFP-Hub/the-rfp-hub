@@ -1023,6 +1023,78 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "ClosingSoonItem",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A live listing the staleness job would close for inactivity within the requested window. `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or the last fixed deadline when that is later — the job's own rule projected forward; the job closes it on its first run at or after that instant.",
+    required: [
+      "id",
+      "title",
+      "namespace",
+      "applicationUrl",
+      "website",
+      "lastSeenAt",
+      "updatedAt",
+      "closesAt",
+      "closesBy",
+    ],
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      namespace: { type: ["string", "null"] },
+      applicationUrl: { type: ["string", "null"] },
+      website: { type: ["string", "null"] },
+      lastSeenAt: { type: ["string", "null"], format: "date-time" },
+      updatedAt: { type: "string", format: "date-time" },
+      closesAt: { type: "string", format: "date-time" },
+      closesBy: {
+        type: "string",
+        enum: ["inactivity", "final_deadline"],
+        description:
+          "`inactivity`: confirming the listing still open moves its close later. `final_deadline`: it cannot — the close is set by its final fixed deadline (fixed deadlines and no rolling intake, or a rolling programme whose last deadline outlasts a fresh clock), and `confirm-open` answers 409 `closes_on_deadline`.",
+      },
+    },
+  },
+  {
+    $id: "ClosingSoonList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "windowDays", "inactiveDays", "asOf", "truncated", "complete"],
+    properties: {
+      items: { type: "array", items: { $ref: "ClosingSoonItem" } },
+      windowDays: { type: "integer" },
+      inactiveDays: { type: "integer" },
+      asOf: { type: "string", format: "date-time" },
+      truncated: {
+        type: "boolean",
+        description: "More entries close inside the window than `limit` allowed to return.",
+      },
+      complete: {
+        type: "boolean",
+        description:
+          "False when the safety cap on rows examined stopped the search before it could prove these are the earliest closes: the list may then be missing entries.",
+      },
+    },
+  },
+  {
+    $id: "OpenConfirmation",
+    type: "object",
+    additionalProperties: false,
+    required: ["id", "lastSeenAt", "previousLastSeenAt", "closesAt"],
+    properties: {
+      id: { type: "string" },
+      lastSeenAt: { type: "string", format: "date-time" },
+      previousLastSeenAt: { type: ["string", "null"], format: "date-time" },
+      closesAt: {
+        type: ["string", "null"],
+        format: "date-time",
+        description:
+          "When the inactivity pass would now close it, always later than before the confirmation: a confirmation that could not move the close is refused (`past_due`, `closes_on_deadline`) rather than recorded. Nullable in the schema only for compatibility.",
+      },
+    },
+  },
+  {
     $id: "AccountSummary",
     type: "object",
     additionalProperties: false,

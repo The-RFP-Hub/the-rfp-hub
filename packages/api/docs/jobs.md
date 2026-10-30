@@ -524,9 +524,11 @@ why), so the moment `verified_at` is stamped, `verified_at < updated_at` is fals
 A seeded entry nobody ever edits was checked once, in the week it was imported, and never again.
 
 That is not merely a stale flag. `staleness` closes an entry with no future fixed deadline once
-`coalesce(last_seen_at, updated_at)` is `STALENESS_INACTIVE_DAYS` old, and the only thing that
-refreshes `last_seen_at` is a **matched** check. One check, then silence, then the whole rolling and
-no-deadline half of the corpus auto-closing ninety days after it was seeded.
+`coalesce(last_seen_at, updated_at)` is `STALENESS_INACTIVE_DAYS` old, and for a seeded entry
+nobody edits, the only automated thing that refreshes `last_seen_at` is a **matched** check (a
+reviewer can also confirm one by hand — see "Keeping a listing open by hand" below). One check,
+then silence, then the whole rolling and no-deadline half of the corpus auto-closing ninety days
+after it was seeded.
 
 So the predicate gains a third clause — `verified_at < now() - VERIFY_RECHECK_DAYS` — and with it
 three consequences worth stating:
@@ -649,6 +651,52 @@ applied run, recognized by its `error` not starting with `stale_result:` or `not
 markers the verifier always writes first. It does not filter by today's URL, because a baseline for
 another URL is simply not compared and gets replaced. A row without such a run starts comparing from
 its first answered check after deploy.
+
+### Keeping a listing open by hand: a reviewer's "confirm still open"
+
+`last_seen_at` is refreshed by a matched source check, a publisher write, a granted claim, a review
+approval — and by a **reviewer confirming by hand that the listing is still open**. That last one
+exists for pages the automated check cannot read (a bot wall, a sign-in, a form that does not carry
+the programme's title): before it, such a listing closed for inactivity on schedule however alive
+the programme was, and the only remedy was setting `last_seen_at` in SQL against production.
+
+* `GET /v1/review/closing-soon?days=30&limit=100` lists approved, listed, open, unmerged entries
+  this job would close for inactivity within `days` (default 30, at most 365), soonest first. It
+  is the job's own rule (`modules/shared/staleness.ts`; `closureReason` calls it) **projected
+  across the window**. A future fixed deadline only *postpones* an inactivity close: once a rolling
+  programme's last fixed date passes, `next_deadline_at` is NULL again and the same clock applies.
+  So `closesAt` = `max(coalesce(last_seen_at, updated_at) + STALENESS_INACTIVE_DAYS, last fixed
+  deadline)` for a rolling programme — **including a last deadline that has already passed**, since
+  the rule was not `inactive` before it — and the first term alone for one with no fixed deadline.
+  An entry with fixed deadlines and no rolling intake is `inactive` at exactly one instant, its final
+  deadline (there `isPastDue` and `nextDeadlineAt` both say no), and `past_due` from just after it;
+  when it has been quiet throughout it is listed at that deadline, and it closes then whatever a
+  confirmation says. Each item carries `closesBy`: `inactivity` when confirming now would move the
+  close later, `final_deadline` when it would not (a fixed-only entry, or a rolling one whose last
+  fixed deadline outlasts a fresh clock). The reviewer page offers "Confirm still open" only for the
+  first, and a link to edit the deadlines for the second. Not listed: a programme whose last fixed deadline is beyond the window, and one
+  already past due. The job closes an entry on its first run at or after `closesAt`; a past
+  `closesAt` means tonight. The list is the true soonest: the scan reads in clock order and stops
+  only once no unread row can close earlier (every `closesAt` is at least `clock + days`). Every page
+  is read inside one read-only REPEATABLE READ transaction, so a listing refreshed mid-scan is not
+  read twice (ids are de-duplicated as well). No expression index backs the clock order; each page
+  sorts the filtered candidates, which is fine at this corpus's size. A safety cap on rows examined
+  remains, and if it ever stops the scan the answer says `complete: false` and the reviewer page says
+  the list is incomplete.
+* `POST /v1/review/opportunities/{id}/confirm-open` with an optional `{"note": "…"}` (≤ 500
+  characters) sets `last_seen_at = now()` under a row lock and audits it as `update`, with the
+  reviewer as actor: `{"lastSeenAt": {"before": …, "after": …}, "reason": "<note, or a default>"}`.
+  **It changes nothing else** — not `updated_at` (that would re-queue a source check and claim an
+  edit nobody made), not the content, not the reviewer link pins. `409` `not_approved`,
+  `not_listed`, `not_open` or `opportunity_merged` for anything that is not a live, open entry, and
+  `past_due` for an entry whose fixed deadlines have all passed with no rolling intake: the job
+  closes that on its deadlines, so a confirmation would change nothing. Likewise
+  `closes_on_deadline` for an entry whose close is set by its final fixed deadline (`closesBy:
+  "final_deadline"` above). Fix its deadlines instead.
+
+Both are on the reviewer page, under **Closing soon**. A confirmation buys one more
+`STALENESS_INACTIVE_DAYS`, not a permanent exemption: if the programme is still running when the
+listing comes round again, it is confirmed again.
 
 ### What staleness deliberately does not touch
 
@@ -986,6 +1034,10 @@ mutation. The patch names the job and its reason:
 has passed" and "nobody has re-asserted this listing in ninety days" — which are different things to
 tell a publisher. The public trail shows the changed field names and the actor `job`; the entry's
 submitter, its publisher and T3+ see the full patch.
+
+A reviewer's "confirm still open" is not a job write: it is an `update` row with `actor_kind='user'`
+and the reviewer's account, carrying `lastSeenAt` before/after and a `reason` (§3, "Keeping a
+listing open by hand").
 
 Notification delivery is operational telemetry, not an authority-bearing change, so it does not
 append an audit action. The notification row itself carries `email_dispatched_at` or

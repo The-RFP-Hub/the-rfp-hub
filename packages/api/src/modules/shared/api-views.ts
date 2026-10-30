@@ -431,6 +431,60 @@ export interface ReviewDecisionView {
   isListed: boolean;
 }
 
+/**
+ * One live listing the staleness job would close for inactivity within the requested window.
+ *
+ * `closesAt` is `coalesce(lastSeenAt, updatedAt) + STALENESS_INACTIVE_DAYS`, or the last fixed
+ * deadline when that is later — the job's own rule projected forward
+ * (`modules/shared/staleness.ts`); the job closes the entry on its first nightly run at or after
+ * that instant, so a `closesAt` already in the past means the next run.
+ */
+export interface ClosingSoonItemView {
+  id: string;
+  title: string;
+  /** The source namespace (`source_publisher`), or null for a community submission. */
+  namespace: string | null;
+  applicationUrl: string | null;
+  website: string | null;
+  lastSeenAt: string | null;
+  updatedAt: string;
+  closesAt: string;
+  /**
+   * `inactivity`: a reviewer's "confirm still open" moves the close later. `final_deadline`: it
+   * cannot — the close is set by the listing's final fixed deadline, and `confirm-open` refuses it
+   * (`409 closes_on_deadline`). See `closingDriver` in `modules/shared/staleness.ts`.
+   */
+  closesBy: "inactivity" | "final_deadline";
+}
+
+export interface ClosingSoonListView {
+  items: ClosingSoonItemView[];
+  /** The window asked for, in days from `asOf`. */
+  windowDays: number;
+  /** `STALENESS_INACTIVE_DAYS` on this deployment. */
+  inactiveDays: number;
+  asOf: string;
+  /** More entries fall inside the window than `limit` allowed to be returned. */
+  truncated: boolean;
+  /**
+   * False when the safety cap on rows examined stopped the search before it could prove these are
+   * the earliest: the list may then miss listings, and a client must say so.
+   */
+  complete: boolean;
+}
+
+/** The result of a reviewer confirming by hand that a listing is still open. */
+export interface OpenConfirmationView {
+  id: string;
+  lastSeenAt: string;
+  previousLastSeenAt: string | null;
+  /**
+   * When the inactivity pass would now close it — later than before, since a confirmation that
+   * could not move the close is refused (`past_due`, `closes_on_deadline`). Null only in principle.
+   */
+  closesAt: string | null;
+}
+
 export interface AccountSummaryView {
   id: number;
   handle: string | null;

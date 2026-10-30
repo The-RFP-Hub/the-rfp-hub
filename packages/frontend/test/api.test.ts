@@ -360,6 +360,46 @@ describe("the public directory", () => {
 
     expect(calls[0]?.url).toBe("https://api.example.com/v1/opportunities/acme%3Around-1");
   });
+
+  it("asks for an uncounted read with a query parameter, never a header that needs a preflight", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ id: "acme:round-1" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.directory.find("acme:round-1", { count: false });
+    await api.directory.find("acme:round-1", { count: true });
+
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/opportunities/acme%3Around-1?count=false",
+    );
+    expect(Object.keys(calls[0]?.init.headers as Record<string, string>).sort()).toEqual([
+      "accept",
+    ]);
+    // Counting is the default, and asking for it explicitly sends nothing at all.
+    expect(calls[1]?.url).toBe("https://api.example.com/v1/opportunities/acme%3Around-1");
+  });
+});
+
+describe("the reviewer's closing-soon list", () => {
+  it("reads the list and confirms a listing, with the note as the body", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({}));
+    const api = createApiClient({
+      baseUrl: "https://api.example.com",
+      getToken: async () => "session-token",
+      fetchImpl,
+    });
+
+    await api.review.closingSoon({ days: 14 });
+    await api.review.confirmOpen("acme:round-1", "the form is still live");
+    await api.review.confirmOpen("acme:round-1");
+
+    expect(calls[0]?.url).toBe("https://api.example.com/v1/review/closing-soon?days=14");
+    expect(calls[1]?.url).toBe(
+      "https://api.example.com/v1/review/opportunities/acme%3Around-1/confirm-open",
+    );
+    expect(calls[1]?.init.method).toBe("POST");
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({ note: "the form is still live" });
+    expect(JSON.parse(String(calls[2]?.init.body))).toEqual({ note: null });
+  });
 });
 
 describe("linkOutUrl", () => {

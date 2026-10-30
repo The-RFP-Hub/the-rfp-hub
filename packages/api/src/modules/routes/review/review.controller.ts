@@ -74,6 +74,18 @@ export const reviewController = {
     return reviews.decide(principal.accountId, id, false, reason);
   }),
 
+  confirmOpen: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    const { note } = bodyOf<{ note?: string | null }>(request);
+    return reviews.confirmOpen(principal.accountId, id, note);
+  }),
+
+  closingSoon: handled(async (request: FastifyRequest) => {
+    const { days, limit } = queryOf<{ days?: number; limit?: number }>(request);
+    return reviews.closingSoon(days ?? 30, limit ?? 100);
+  }),
+
   setListed: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);

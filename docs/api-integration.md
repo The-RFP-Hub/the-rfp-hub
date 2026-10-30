@@ -268,6 +268,12 @@ is the traffic it had itself generated. The same argument applies to the detail 
 is counted by `GET /v1/opportunities/{id}`, so a browse surface built on some other read leaves a
 publisher's numbers at zero while people are reading.
 
+The opposite case exists too: a read that is not somebody reading the listing. The hub's leaving
+page reads the entry only to show where a link goes, after the redirect already counted the click,
+so it asks for `GET /v1/opportunities/{id}?count=false` — the same record, no detail view recorded.
+Use it for the same kind of read in your own client. It can only lower a count, like `DNT: 1`, and
+it is a query parameter rather than a header so it needs no CORS preflight (§4.7).
+
 Both routes `302` for approved **and** listed entries only, and `404` otherwise. They honor
 `DNT: 1`, and capture happens **before** the redirect — so an automated check that follows one
 records a click. Inspect the `href`, or send `DNT: 1`.

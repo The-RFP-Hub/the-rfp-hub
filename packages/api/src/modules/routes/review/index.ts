@@ -198,6 +198,60 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   );
 
   router.post(
+    "/opportunities/:id/confirm-open",
+    {
+      onRequest: metered(),
+      schema: {
+        operationId: "confirmOpportunityOpen",
+        tags: ["review"],
+        summary: "Confirm by hand that a live listing is still open",
+        description:
+          "Sets `last_seen_at` to now and audits it (`update`, with `lastSeenAt` before/after and a `reason`: the reviewer's `note`, or a default). This is the staleness job's inactivity clock, so the listing gets a fresh `STALENESS_INACTIVE_DAYS`. Nothing else changes: not `updatedAt`, not the content, not the reviewed link pins. 409 `not_approved`, `not_listed`, `not_open` or `opportunity_merged` for anything that is not an approved, listed, open, unmerged entry, `past_due` for one whose fixed deadlines have all passed with no rolling intake: the job closes that on its deadlines, which a confirmation cannot change; and `closes_on_deadline` for one whose close is set by its final fixed deadline (fixed deadlines and no rolling intake, or a rolling programme whose last deadline outlasts a fresh clock), which a confirmation cannot move either. `closesAt` is when the inactivity pass would now close it (after the last fixed deadline, for a rolling programme that has one), always later than before the confirmation (anything a confirmation cannot extend is refused above).",
+        security: [{ bearerAuth: [] }],
+        params: idParams,
+        body: {
+          // Nullable so a bare POST with no body at all is the plain "confirmed, no note" call.
+          type: ["object", "null"],
+          additionalProperties: false,
+          properties: { note: { type: ["string", "null"], maxLength: 500 } },
+        },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "OpenConfirmation#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
+      },
+    },
+    reviewController.confirmOpen,
+  );
+
+  router.get(
+    "/closing-soon",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "listClosingSoon",
+        tags: ["review"],
+        summary: "Live listings the staleness job will close for inactivity soon",
+        description:
+          "Approved, listed, open, unmerged entries that the staleness job's inactivity rule would close within `days` (default 30), soonest first, each with its `closesAt`. The job's own rule projected across the window: a fixed deadline only postpones an inactivity close, so a rolling programme whose last fixed deadline passes inside the window is listed at `max(clock + STALENESS_INACTIVE_DAYS, that deadline)`. A last fixed deadline that has already passed still counts. An entry with fixed deadlines and no rolling intake is inactive only at the exact instant of its final deadline (past due just after), and is listed at that instant when its clock has run out by then. Not listed: one whose last fixed deadline lies beyond the window, and a past-due one (closed on its deadlines whatever its clock says). Each item's `closesBy` says whether a confirmation can move its close (`inactivity`) or not (`final_deadline`). The items are the true soonest, read from one snapshot; `complete: false` means a safety cap on rows examined stopped the search first and the list may be missing entries.",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            days: { type: "integer", minimum: 1, maximum: 365, default: 30 },
+            limit: { type: "integer", minimum: 1, maximum: 200, default: 100 },
+          },
+        },
+        response: { 200: { $ref: "ClosingSoonList#" }, ...errors },
+      },
+    },
+    reviewController.closingSoon,
+  );
+
+  router.post(
     "/opportunities/:id/verify",
     {
       // The one review action that reaches the network, so the limit is also what stops this

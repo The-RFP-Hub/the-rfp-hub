@@ -173,8 +173,15 @@ happened:
 3 total, page 1 of 1. Read just now.
 ```
 
-For a single record fetched with `get.mjs`, also surface the `links.source` URL (the program's own
-site) alongside `links.apply`.
+For a single record fetched with `get.mjs`, also surface the `links.source` URL (it leads to the
+program's own site) alongside `links.apply`.
+
+Both links are redirects on the API, and a click may land first on RFPSear.ch's security notice
+page (`https://rfpsear.ch/leaving/{id}?link=…`), which shows the destination's address and lets
+the reader continue with one click — for example when a program has closed. If you mention it, call
+it a security notice that shows where the link goes; do not say the link "goes straight to" the
+program, and do not describe it as an unchecked or unreviewed link. Details:
+[references/api-reference.md](references/api-reference.md#link-outs).
 
 ## 9. Limits
 

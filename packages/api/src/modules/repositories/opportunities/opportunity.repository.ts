@@ -452,6 +452,66 @@ export class OpportunityRepository {
     return rows[0]?.value ?? 0;
   }
 
+  /**
+   * Live entries the staleness job could close for inactivity by `horizon` — a SUPERSET, and the
+   * read behind the reviewer's "closing soon" list.
+   *
+   * THE JOB'S CANDIDATE SCOPE, PROJECTED TO THE HORIZON. The job examines `next_deadline_at IS NULL
+   * OR next_deadline_at <= now`; an entry whose next fixed deadline falls before the horizon becomes
+   * one of those on the way there (a rolling programme whose fixed date passes is closed as
+   * `inactive` from then on), so the bound here is `<= horizon` rather than `<= now`. An entry whose
+   * next fixed deadline is after the horizon cannot close for inactivity before it. `approved AND
+   * is_listed` is added because an entry nobody can read is not one a reviewer is asked to keep open.
+   * The clock bound holds for every projected close (`closesAt >= clock + days`).
+   *
+   * Only a pruning predicate: the caller applies `inactivityClosesAt` (`modules/shared/staleness.ts`)
+   * to every row, which is what drops a past-due row and one whose last fixed date lies beyond the
+   * horizon. ASCENDING CLOCK ORDER IS THE CONTRACT: the caller's early stop
+   * (`services/review/closing-soon.ts`) relies on it.
+   *
+   * KEYSET-PAGED on `(clock, id)`. `clockKey` is the clock as Postgres prints it, and the cursor is
+   * compared as `clockKey::timestamptz` — exact to the microsecond, which a JS `Date` rebuilt from
+   * the row would not be (it would compare below the row and serve it again).
+   */
+  async listClosingSoonCandidates(
+    horizon: Date,
+    clockAtOrBefore: Date,
+    after: { clockKey: string; id: number } | null,
+    limit: number,
+  ): Promise<{ row: OpportunityRow; clockKey: string }[]> {
+    const clock = sql`coalesce(${opportunities.lastSeenAt}, ${opportunities.updatedAt})`;
+    return this.exec
+      .select({ row: opportunities, clockKey: sql<string>`(${clock})::text` })
+      .from(opportunities)
+      .where(
+        and(
+          eq(opportunities.status, "open"),
+          isNull(opportunities.mergedIntoId),
+          or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, horizon)),
+          eq(opportunities.reviewStatus, "approved"),
+          eq(opportunities.isListed, true),
+          sql`${clock} <= ${clockAtOrBefore}`,
+          after === null
+            ? undefined
+            : sql`(${clock}, ${opportunities.id}) > (${after.clockKey}::timestamptz, ${after.id})`,
+        ),
+      )
+      .orderBy(asc(clock), asc(opportunities.id))
+      .limit(limit);
+  }
+
+  /**
+   * A reviewer's "confirm still open": `last_seen_at` and NOTHING ELSE.
+   *
+   * Its own statement rather than `update(id, {lastSeenAt})` so the property is visible where it is
+   * kept: `updated_at` is absent (it would re-queue the row for a source check, see
+   * `pendingVerificationFilter`), and so are the reviewer pins — a hand check vouches that the
+   * programme is still running, not for whatever its links point at.
+   */
+  async touchLastSeen(id: number, at: Date): Promise<void> {
+    await this.exec.update(opportunities).set({ lastSeenAt: at }).where(eq(opportunities.id, id));
+  }
+
   async updateNextDeadline(id: number, nextDeadlineAt: Date | null): Promise<void> {
     await this.exec.update(opportunities).set({ nextDeadlineAt }).where(eq(opportunities.id, id));
   }

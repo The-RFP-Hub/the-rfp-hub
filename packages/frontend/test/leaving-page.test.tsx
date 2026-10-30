@@ -86,7 +86,15 @@ describe("the leaving page, offering the stored link", () => {
 
     await continueLink();
     expect(find).toHaveBeenCalledTimes(1);
-    expect(find).toHaveBeenCalledWith("acme:round-4");
+    expect(find).toHaveBeenCalledWith("acme:round-4", { count: false });
+  });
+
+  it("reads WITHOUT counting a detail view: the redirect already counted this reader's click", async () => {
+    const { api, find } = client();
+    open("link=source&reason=unreviewed", api);
+
+    await continueLink();
+    expect(find.mock.calls).toEqual([["acme:round-4", { count: false }]]);
   });
 
   it("says where the link goes: the host prominently, the full URL as text, the listing linked", async () => {
@@ -364,7 +372,7 @@ describe("refusing to offer Continue", () => {
     open("link=apply", api);
 
     await expectUnavailable();
-    expect(find).toHaveBeenCalledWith("acme%3Around-4%E0%A4%A");
+    expect(find).toHaveBeenCalledWith("acme%3Around-4%E0%A4%A", { count: false });
   });
 });
 

@@ -328,7 +328,7 @@ Beyond the public read surface, the API serves:
 | **Publishers** | `GET /v1/publishers` (public) · `PATCH /v1/organizations/:slug` |
 | **Insights** | `GET /v1/insights/opportunities/:id` · `GET /v1/insights/me/summary` |
 | **Link-outs** | `GET /v1/r/:id/apply` · `GET /v1/r/:id/source` — `302` to the opportunity's own channel when a reviewer vouched for that link, otherwise to the hub's leaving page |
-| **Review (T3)** | `/v1/review/opportunities` · `/claims` · `/duplicates` · `/organizations` · `/accounts` |
+| **Review (T3)** | `/v1/review/opportunities` · `/claims` · `/duplicates` · `/closing-soon` · `/organizations` · `/accounts` |
 | **Administration (T4)** | `/v1/admin/accounts/:id/role` · `/direct-create` · `/v1/admin/jobs/:job/run` |
 
 Every mutation — by a person, a key, or a job — writes a row to an append-only trail enforced by a

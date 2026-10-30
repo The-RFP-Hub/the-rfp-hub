@@ -29,9 +29,21 @@ const getAll = async (req: FastifyRequest, res: FastifyReply) => {
   return res.send(page);
 };
 
-/** GET /v1/opportunities/:id — full Standard object, or 404. */
+/**
+ * GET /v1/opportunities/:id — full Standard object, or 404.
+ *
+ * `?count=false` IS A CLIENT-CHOSEN OPT-OUT, AND THAT IS SAFE BECAUSE IT CAN ONLY SUBTRACT. The
+ * frontend's leaving page reads the listing to show where a link goes, and the reader on it has
+ * already been counted once, as the apply or source click whose redirect sent them there; counting
+ * that read as a detail view too would credit one action twice. Nothing a caller sends can ADD an
+ * event — the worst a forged `count=false` does is make a real read go uncounted, which `DNT: 1`
+ * already lets any reader do (`plugins/analytics-context.ts`). A query parameter rather than a
+ * header because the API's CORS policy allows only `Content-Type` and `Authorization`: a custom
+ * header would cost every leaving-page read a preflight, and a parameter costs nothing.
+ */
 const find = async (req: FastifyRequest, res: FastifyReply) => {
   const { id } = req.params as { id: string };
+  const { count } = (req.query ?? {}) as { count?: boolean };
   const service = new OpportunityService();
   const opportunity = await service.find(id);
   if (!opportunity) {
@@ -42,7 +54,7 @@ const find = async (req: FastifyRequest, res: FastifyReply) => {
     return res.code(404).send({ error: "not_found", message: `opportunity '${id}' not found` });
   }
   // Only a served record is counted: a 404 is not a read of anything.
-  captureViews(req, "detail_view", [opportunity.id]);
+  if (count !== false) captureViews(req, "detail_view", [opportunity.id]);
   return res.send(opportunity);
 };
 

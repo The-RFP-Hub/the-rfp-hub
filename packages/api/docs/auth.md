@@ -309,6 +309,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `GET /v1/review/opportunities`, `POST …/:id/approve\|reject`, `PATCH …/:id` | T3, **session** | |
 | `GET /v1/review/opportunities/:id` | T3, **session** | one entry in full, whatever its review status. The owner route `GET /v1/me/opportunities/:id` is scoped to entries the caller owns, and everything a reviewer is sent to is by definition somebody else's |
 | `POST /v1/review/opportunities/:id/verify` | T3, **session** | triggering a source check is a reviewer capability |
+| `GET /v1/review/closing-soon`, `POST /v1/review/opportunities/:id/confirm-open` | T3, **session** | live listings the staleness job will close for inactivity, and a hand check that refreshes `last_seen_at` only — audited, never `updated_at` ([`jobs.md`](./jobs.md#keeping-a-listing-open-by-hand-a-reviewers-confirm-still-open)) |
 | `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval also verifies the organization |
 | `GET /v1/review/duplicates`, `POST …/:id/confirm\|dismiss\|merge` | T3, **session** | |
 | `POST /v1/review/organizations/:slug/verify\|unverify`, `PATCH …/:slug`, `POST\|DELETE …/:slug/members` | T3, **session** | |
@@ -705,6 +706,12 @@ curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/m
 
 # Check the entry against its own applicationUrl before deciding.
 curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/my-org:42/verify
+
+# What the staleness job will close for inactivity in the next 30 days, and keeping one open after
+# checking its page by hand (the note is optional and becomes the audit reason):
+curl -H "Authorization: Bearer $REVIEWER" "$API/v1/review/closing-soon?days=30"
+curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
+  -d '{"note":"form still accepting applications"}' $API/v1/review/opportunities/my-org:42/confirm-open
 
 # Claims. Approval also verifies the organization atomically:
 curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
