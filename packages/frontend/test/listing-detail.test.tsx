@@ -164,6 +164,30 @@ it("does not offer editing to an account with management read access only", asyn
   expect(screen.queryByRole("link", { name: "Edit" })).toBeNull();
 });
 
+it("names each counted link-out by the host it reaches, keeping the API hop as the href", async () => {
+  const api = client({ ...managed, mergedInto: null });
+  api.me.opportunity = async () => ({
+    ...entry,
+    applicationUrl: "https://www.tally.so/r/abc",
+    website: "https://acme.example.org",
+  });
+  mount(<ListingPage />, api);
+
+  const apply = await screen.findByRole("link", { name: "Open the application page on tally.so" });
+  expect(apply.getAttribute("href")).toBe("https://api.example.com/v1/r/acme%3Aold/apply");
+  const site = screen.getByRole("link", { name: "Open the program site on acme.example.org" });
+  expect(site.getAttribute("href")).toBe("https://api.example.com/v1/r/acme%3Aold/source");
+});
+
+it("keeps the bare label for a stored value with no web host", async () => {
+  const api = client({ ...managed, mergedInto: null });
+  api.me.opportunity = async () => ({ ...entry, applicationUrl: "mailto:grants@acme.example" });
+  mount(<ListingPage />, api);
+
+  const apply = await screen.findByRole("link", { name: "Open the application page" });
+  expect(apply.getAttribute("href")).toBe("https://api.example.com/v1/r/acme%3Aold/apply");
+});
+
 it("lets an organization manager confirm taking over the submission and reloads its details", async () => {
   const other = {
     ...managed,

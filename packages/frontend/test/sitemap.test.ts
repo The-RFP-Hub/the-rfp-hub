@@ -242,4 +242,14 @@ describe("the public sitemap", () => {
       );
     }
   });
+
+  it("carries no link-out step, not even for the listings it does publish", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://rfpsear.ch");
+    await mockHost("rfpsear.ch");
+    stubDirectory([{ id: "curated:0x-bug-bounty" }, { id: "fundingmap:1496" }]);
+
+    const entries = await sitemap();
+    expect(entries.length).toBe(STATIC_URLS.length + 2);
+    for (const entry of entries) expect(entry.url).not.toContain("/leaving");
+  });
 });

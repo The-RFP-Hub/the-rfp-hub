@@ -46,6 +46,23 @@ describe("what agents are told", () => {
     expect(prompt).toContain("RFPHUB_API_BASE set to https://api.rfphub.example");
   });
 
+  it("says the apply link may show the destination on RFPSear.ch first, not only redirect", () => {
+    // The API sends an unreviewed link or a closed program's link to `/leaving/{id}` instead of
+    // straight out. An agent told "it redirects to the program's page" would describe that page to
+    // its user as a malfunction; both texts say what can actually happen.
+    const text = llmsTxt(origins);
+    expect(text).toContain(
+      `[Apply link](${origins.apiBaseUrl}/v1/r/{id}/apply): redirects to the program's own application page, or to an RFPSear.ch security notice that shows the destination first.`,
+    );
+    expect(text).toContain("Link to it rather than copying `applicationUrl`.");
+
+    const prompt = agentPrompt(origins);
+    expect(prompt).toContain(`${origins.apiBaseUrl}/v1/r/{id}/apply to open myself`);
+    expect(prompt).toContain(
+      "to an RFPSear.ch security notice that shows me the destination first",
+    );
+  });
+
   it("names only the list-valued filters as comma-separated", () => {
     expect(llmsTxt(origins)).toContain(
       "`fundingType`, `status`, `ecosystem` and `category` take comma-separated values",

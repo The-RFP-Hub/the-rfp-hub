@@ -3492,6 +3492,12 @@ body:has(.landing) .shell-submit {
   margin: 0;
 }
 
+/* The destination host beside a secondary link-out: present, readable, and quieter than the label. */
+.action-host {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
 .share-card-preview {
   display: block;
   inline-size: 100%;
@@ -3508,6 +3514,73 @@ body:has(.landing) .shell-submit {
   .opportunity-aside {
     position: static;
   }
+}
+
+/* -------------------------------------------------------------- leaving page --- */
+
+/*
+ * THE HOST IS THE HEADLINE. The one fact this page exists to put in front of a reader is where the
+ * link goes, so the host gets the display face at metric size and a two-pixel ink frame — the same
+ * "this is an instruction, not a container" border `.card-strong` uses — and the full URL sits
+ * under it in mono, small, wrapping anywhere: present for whoever wants the path, never competing
+ * with the host for the eye.
+ *
+ * The reason is a warning-toned callout because it is a caution, not a failure: the reader can go
+ * on, and the page must not read like an error that stopped them.
+ */
+.leaving {
+  max-width: 44rem;
+}
+
+.leaving-destination {
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.leaving-destination dt {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.leaving-destination dd {
+  margin: 0 0 var(--space-3);
+}
+
+.leaving-destination dd:last-child {
+  margin-bottom: 0;
+}
+
+.leaving-host {
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: var(--text-metric);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.leaving-url {
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.leaving-reason {
+  padding: var(--space-3) var(--space-4);
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.leaving-reason p:last-child {
+  margin-bottom: 0;
+}
+
+.leaving-actions {
+  margin: var(--space-6) 0 var(--space-3);
 }
 
 /* --------------------------------------------------- how it works, folded --- */

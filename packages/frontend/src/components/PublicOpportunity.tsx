@@ -39,6 +39,7 @@ import { fundingTypeLabel, ingestionMethodLabel, joinOrganizationNames } from "@
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
+import { linkHost } from "@/lib/url-policy";
 import { ArrowTopRightOnSquareIcon, GlobeAltIcon, LinkIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -340,13 +341,23 @@ export function OpportunityView({
  * THE ONE THING A READER CAME HERE TO DO, above the fold and shaped like it matters.
  *
  * The action this page exists for is leaving it — the Hub takes no applications and never will, so
- * the honest primary action is the program's own intake, named as such. "Apply on the
- * program's own site" says where the click goes before it is clicked; "Open the application
- * page" said neither whose page nor that it leaves.
+ * the honest primary action is the program's own intake, named by WHERE IT GOES: "Apply on
+ * airtable.com". The label used to say "Apply on Acme's site", which was a claim this page could
+ * not back — most application links are shared platforms (Airtable, Typeform, Tally, a Google
+ * Form), and nothing here checks that a link belongs to the organization named on the listing. The
+ * host is what the reader's browser will actually show them next, so it is what the button says.
  *
  * THE HOP GOES THROUGH THE API, and that is not decoration: `GET /v1/r/{id}/apply` is where the
  * apply click is counted. A page that linked straight to the stored `applicationUrl` would leave a
- * publisher's numbers at zero while people were applying through it.
+ * publisher's numbers at zero while people were applying through it. That is also why hovering the
+ * button shows the API's own address, and why the label has to carry the destination instead. The
+ * API may answer that hop with RFPSear.ch's `/leaving/{id}` page rather than the destination — a
+ * link nobody reviewed, a closed program — which costs the reader one click and never blocks them.
+ *
+ * THE HOST IS READ FROM THE STORED URL BY THE URL PARSER (`linkHost`), not cut out of the string,
+ * so the label names the host the browser will connect to. A value with no web host — something
+ * the API would refuse to redirect to anyway — falls back to the wording this button used before
+ * it named hosts, rather than to a host invented from a string that does not parse.
  *
  * NO APPLICATION LINK IS A REAL STATE AND IT IS NOT A DEAD END. Roughly one listing in eight
  * carries no `applicationUrl` — an ongoing bounty program, a record imported from a feed that
@@ -357,8 +368,10 @@ export function OpportunityView({
  */
 function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
   const operator = entry.operatingOrganizations[0];
+  const siteHost = linkHost(entry.website);
 
   if (entry.applicationUrl) {
+    const applyHost = linkHost(entry.applicationUrl);
     return (
       <div className="card action-card">
         <a
@@ -368,12 +381,20 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           rel="noopener noreferrer"
         >
           <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
-            {operator && operator.name.length <= 24
-              ? `Apply on ${operator.name}’s site`
-              : "Apply on the program’s site"}
+            {applyHost ? (
+              <>
+                Apply on <UntrustedText value={applyHost} />
+              </>
+            ) : operator && operator.name.length <= 24 ? (
+              `Apply on ${operator.name}’s site`
+            ) : (
+              "Apply on the program’s site"
+            )}
           </IconLabel>
         </a>
-        <p className="muted footnote">Applying takes you to the program&rsquo;s own site.</p>
+        {/* Not "the program's own site" any more: the host on the button may be a form platform
+            the program uses, and the footnote must not contradict the button it explains. */}
+        <p className="muted footnote">You apply with the program itself, not on RFPSear.ch.</p>
         <p className="row action-row">
           {entry.website ? (
             <a
@@ -382,7 +403,17 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
               target="_blank"
               rel="noopener noreferrer"
             >
-              <IconLabel icon={GlobeAltIcon}>Program site</IconLabel>
+              <IconLabel icon={GlobeAltIcon}>
+                Program site
+                {siteHost ? (
+                  <>
+                    {/* The space stays OUTSIDE the hidden dot, or the accessible name runs the
+                        two words together: "Program siteexample.org". */}{" "}
+                    <span aria-hidden="true">· </span>
+                    <UntrustedText className="action-host" value={siteHost} />
+                  </>
+                ) : null}
+              </IconLabel>
             </a>
           ) : null}
           <ShareLink />
@@ -409,6 +440,12 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           >
             <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
               Open the program site
+              {siteHost ? (
+                <>
+                  {" "}
+                  on <UntrustedText value={siteHost} />
+                </>
+              ) : null}
             </IconLabel>
           </a>
         ) : operator?.website ? (
