@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-30T10:11:52.308Z",
+  "generatedAt": "2026-10-31T09:47:46.217Z",
   "count": 170,
   "opportunities": [
     {
@@ -58,7 +58,7 @@
         "submittedAt": "2026-10-01T12:40:54.399Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-01T12:40:55.399Z"
+        "verifiedAt": "2026-10-31T01:06:19.127Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -307,7 +307,7 @@
         "submittedAt": "2026-10-01T12:40:55.181Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-01T12:40:55.470Z"
+        "verifiedAt": "2026-10-31T01:06:20.315Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -5148,7 +5148,7 @@
       "source": {
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-01T13:49:07.373Z"
+        "verifiedAt": "2026-10-31T01:06:27.959Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17719,7 +17719,7 @@
         "submittedAt": "2026-10-01T12:40:56.519Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-01T12:40:56.870Z"
+        "verifiedAt": "2026-10-31T01:06:20.745Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17816,7 +17816,7 @@
         "submittedAt": "2026-10-01T12:40:57.242Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-01T12:40:57.910Z"
+        "verifiedAt": "2026-10-31T01:06:21.442Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17883,7 +17883,7 @@
         "submittedAt": "2026-10-01T12:40:57.885Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-01T12:40:58.685Z"
+        "verifiedAt": "2026-10-31T01:06:23.345Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17957,7 +17957,7 @@
         "submittedAt": "2026-10-01T12:40:58.596Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-01T12:40:59.118Z"
+        "verifiedAt": "2026-10-31T01:06:24.653Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -18034,7 +18034,7 @@
         "submittedAt": "2026-10-01T12:40:59.250Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-01T12:40:59.523Z"
+        "verifiedAt": "2026-10-31T01:06:25.825Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -18111,7 +18111,7 @@
         "submittedAt": "2026-10-06T19:12:41.095Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-06T19:12:41.169Z"
+        "verifiedAt": "2026-10-31T01:06:28.024Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -18205,7 +18205,7 @@
         "submittedAt": "2026-10-01T12:40:59.895Z",
         "ingestedVia": "publisher_api",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-01T12:41:00.917Z"
+        "verifiedAt": "2026-10-31T01:06:26.872Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
