@@ -28,6 +28,7 @@
     "onlyBuiltDependencies": ["esbuild"],
     "overrides": {
       "@esbuild-kit/core-utils>esbuild": ">=0.28.1",
+      "@fastify/static>glob": "^14.0.2",
       "vite>esbuild": ">=0.28.1"
     }
   },
