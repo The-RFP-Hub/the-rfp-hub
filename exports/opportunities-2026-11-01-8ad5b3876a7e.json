@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-10-31T09:47:46.217Z",
+  "generatedAt": "2026-11-01T10:38:29.474Z",
   "count": 170,
   "opportunities": [
     {
@@ -15744,7 +15744,7 @@
       "fundingType": "hackathon",
       "title": "HACKER HOUSE GOA 2026",
       "description": "India's Premier Builder Residency\nHacker House Goa 2026 is where India's best builders don't just hack - they ship. \n\nOver 4 days at a private beach resort in Goa, 247 selected developers, designers, and AI-native creators will build, scale, launch, and market real products under one roof.\nThe tracks focus on the intersection of AI × Crypto — multichain, real-world use cases, and what's actually getting built next.\n\nYou can expect:\n\n247 builders selected from \n10,000+ registrations\n4 days of intensive building with daily product reviews\n50+ speakers, mentors, and judges on-site\n$50,000+ in bounties\nVCs on the ground watching teams build in real time\nA public demo day with on-chain voting\n\nThe only hacker house in India that guarantees project numbers to partners before the event starts.\n\nBuild something real. Ship before you leave.\n\n**The bounty pool is published as a floor.** The event description lists \"$50,000+ in bounties\" and the organiser's own site shows the same figure as \"$50k+\" against the label \"Bounties 2026\", so the 50,000 USD on this record is the published minimum of the pool, not an exact total. The bounties are sponsor-side, which is why the hackathon listing's own computed prize value is zero for this event.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "2:47PM Studio",
