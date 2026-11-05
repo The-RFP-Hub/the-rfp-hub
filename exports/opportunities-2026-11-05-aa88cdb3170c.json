@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-11-04T11:07:52.537Z",
+  "generatedAt": "2026-11-05T11:08:53.846Z",
   "count": 170,
   "opportunities": [
     {
@@ -6269,7 +6269,7 @@
         "submittedBy": "optimism",
         "ingestedVia": "import",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-06T01:05:28.412Z"
+        "verifiedAt": "2026-11-05T01:06:17.206Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
