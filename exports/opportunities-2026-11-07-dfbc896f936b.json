@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-11-06T11:05:38.352Z",
+  "generatedAt": "2026-11-07T10:25:15.770Z",
   "count": 170,
   "opportunities": [
     {
@@ -3362,7 +3362,7 @@
         "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-07T01:05:54.094Z"
+        "verifiedAt": "2026-11-07T01:05:35.350Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -7052,7 +7052,7 @@
         "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-07T01:05:52.016Z"
+        "verifiedAt": "2026-11-07T01:05:34.025Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -7170,7 +7170,7 @@
         "submittedBy": "ethereum-foundation",
         "ingestedVia": "import",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-07T01:05:53.148Z"
+        "verifiedAt": "2026-11-07T01:05:34.350Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
