@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-11-08T10:32:29.895Z",
+  "generatedAt": "2026-11-09T11:47:11.508Z",
   "count": 170,
   "opportunities": [
     {
@@ -3420,7 +3420,7 @@
       "fundingType": "hackathon",
       "title": "ETHGlobal Mumbai",
       "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool published on the event's prizes page totals $100,000 across 7 sponsors — World and 1inch at $20,000 each, 0G, Uniswap Foundation and Arkiv at $15,000 each, ENS at $10,000 and Chainlink at $5,000, re-summed 2026-08-13; that total is recorded as the budget. Sponsor pools on an ETHGlobal event that has not yet run move up to the event, so this is a dated reading rather than a final figure: it was $95,000 across the first six of those sponsors when this record was first written on 2026-08-11, before Chainlink was added.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "ETHGlobal",
