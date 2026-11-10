@@ -135,6 +135,39 @@ describe("completing the handoff", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("explains a sign-in the API could not finish, instead of leaving it on the API's JSON", async () => {
+    // What the API's callback redirects to when Google sign-in fails — here, a user row it could
+    // not write. Before this the browser was left on the API origin's service-info document.
+    window.history.replaceState(
+      null,
+      "",
+      "/auth/complete?error=unable_to_create_user&error_description=Call+this+number+now",
+    );
+
+    render(<AuthCompletePage />);
+
+    expect(await screen.findByText(/fault on our side/)).toBeTruthy();
+    expect(screen.getByText("unable_to_create_user")).toBeTruthy();
+    // The description is a sentence from a URL anyone can write. It is never shown.
+    expect(screen.queryByText(/Call this number/)).toBeNull();
+    expect(window.location.search).toBe("");
+    expect(verify).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    // Not a dead end: the same way out as every other failure on this page.
+    fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(openSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a code that is not a plain token as unknown, without echoing it", async () => {
+    window.history.replaceState(null, "", "/auth/complete?error=%3Cb%3Ewin+a+prize%3C%2Fb%3E");
+
+    render(<AuthCompletePage />);
+
+    expect(await screen.findByText(/Google sign-in did not complete/)).toBeTruthy();
+    expect(screen.getByText("unknown_error")).toBeTruthy();
+    expect(screen.queryByText(/win a prize/)).toBeNull();
+  });
+
   it("reports a spent or expired token as the API's own answer, and does not navigate", async () => {
     arriveWithToken();
     verify.mockResolvedValue({
