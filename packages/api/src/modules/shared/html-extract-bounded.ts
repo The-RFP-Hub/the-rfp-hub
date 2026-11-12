@@ -15,6 +15,7 @@
  * nobody needs at this volume.
  */
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { ExtractOptions, ExtractedPage } from "./html-extract.js";
@@ -37,16 +38,20 @@ export interface BoundedExtractOptions extends ExtractOptions {
  *
  * Built (`node dist/server.js`, `node dist/jobs.js`): this module is bundled into an entry at the
  * root of `dist/`, and `html-extract.worker.js` is built next to it. From source (`tsx`, vitest):
- * this module is the `.ts` file beside the worker's `.ts` file, and the worker thread needs the same
- * TypeScript loader the process was started with, which a worker does not inherit.
+ * this module is the `.ts` file beside the worker's `.ts` file, and the worker thread needs a
+ * TypeScript loader, which a worker does not inherit from the process. `--import tsx` in the
+ * worker's `execArgv` is NOT enough on Node 22 (the hooks never reach the worker's own imports,
+ * so `./html-extract.js` is not mapped to the `.ts` file); a tiny bootstrap that registers tsx's
+ * hooks inside the thread with its API and then imports the worker works on 22 and 24 alike.
  */
-function workerEntry(): { url: URL; execArgv: string[] } {
+function workerEntry(): URL {
   const here = import.meta.url;
-  if (here.endsWith(".ts")) {
-    const tsx = pathToFileURL(createRequire(here).resolve("tsx")).href;
-    return { url: new URL("./html-extract.worker.ts", here), execArgv: ["--import", tsx] };
-  }
-  return { url: new URL("./html-extract.worker.js", here), execArgv: [] };
+  if (!here.endsWith(".ts")) return new URL("./html-extract.worker.js", here);
+  const tsxRoot = dirname(createRequire(here).resolve("tsx/package.json"));
+  const api = pathToFileURL(join(tsxRoot, "dist/esm/api/index.mjs")).href;
+  const target = new URL("./html-extract.worker.ts", here).href;
+  const bootstrap = `const { register } = await import(${JSON.stringify(api)}); register(); await import(${JSON.stringify(target)});`;
+  return new URL(`data:text/javascript,${encodeURIComponent(bootstrap)}`);
 }
 
 /**
@@ -73,9 +78,8 @@ export function extractPageBounded(
       void worker.terminate();
     };
 
-    const worker = new Worker(entry.url, {
+    const worker = new Worker(entry, {
       workerData: { html, options: extractOptions },
-      execArgv: entry.execArgv,
       resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB },
     });
     const timer = setTimeout(() => {
