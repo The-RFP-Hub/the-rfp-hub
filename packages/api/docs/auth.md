@@ -392,6 +392,18 @@ credential is minted, so there is nothing for the resolver to resolve; it keeps 
 address-keyed pair of ceilings (10/min for the four mail-sending routes, 120/min for the rest). The
 **two redirects** are anonymous by construction, as above.
 
+Behind the mount's ceilings sits **the auth library's own limiter**, declared in
+`auth/better-auth.ts` (`authRateLimit`) rather than left to its defaults: on in every environment
+(`AUTH_RATE_LIMIT_ENABLED`, refused as false in production), 3 codes sent per 5 minutes and 10 code
+checks per 5 minutes per address, 100 per 10 s elsewhere plus the library's built-in 3 per 10 s on
+`/sign-in*`. **It sees exactly one address, the one this API resolved.** The mount drops the
+caller's `X-Forwarded-For`, `X-Real-IP` and `Forwarded`, and passes `request.ip` (canonicalized as
+in the table above) in a header only the mount writes (`CLIENT_IP_HEADER`). Left to its defaults the
+library read the raw `X-Forwarded-For`: a single forged value was a fresh bucket per request, and a
+two-value header — which is what any caller-supplied value becomes once the load balancer appends
+its own — resolved to no address at all, putting every such caller in one shared bucket per route
+that anyone could spend.
+
 The public read surface — the list, the detail, the feeds, the export — is deliberately **uncapped**
 (`global: false` in `app.ts`); it is the traffic this project exists to serve, and an address-keyed
 cap on it would be one number for a whole organization.
