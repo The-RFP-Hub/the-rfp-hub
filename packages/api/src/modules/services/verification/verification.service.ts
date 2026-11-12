@@ -103,6 +103,8 @@ export interface VerificationOptions {
   transport?: SourceTransport;
   /** Injected so the backfill's per-host spacing can be tested without spending the seconds. */
   clock?: PacerClock;
+  /** Injected by the suites that need extraction to fail in a given way; a deployment uses the worker. */
+  extract?: typeof extractPageBounded;
 }
 
 export class VerificationService {
@@ -110,6 +112,7 @@ export class VerificationService {
   private readonly repos: Repositories;
   private readonly transport: SourceTransport | undefined;
   private readonly clock: PacerClock | undefined;
+  private readonly extract: typeof extractPageBounded;
   /** Ids waiting for a submit-time check. Bounded by `VERIFY_QUEUE_MAX`; overflow drops to cron. */
   private readonly queue: number[] = [];
   private active = 0;
@@ -127,6 +130,7 @@ export class VerificationService {
     this.config = options.config ?? defaultConfig;
     this.transport = options.transport;
     this.clock = options.clock;
+    this.extract = options.extract ?? extractPageBounded;
     this.repos = repositories(db);
   }
 
@@ -253,22 +257,37 @@ export class VerificationService {
     // re-check interval rather than costing a worker at the head of every nightly selection. The
     // price, stated: a legitimate page that only overran because the host was saturated reads as
     // unmatched until the next check or a reviewer's manual one, and the run says why.
-    let extraction: { page: ExtractedPage } | { interrupted: string } | undefined;
+    //
+    // A WORKER THAT COULD NOT RUN IS NOT. Failing to start it, to load its code, or getting no
+    // answer from it says nothing about the page — and treating it as a verdict would let one
+    // broken image or loader quietly unverify every entry a nightly pass touches. That case is
+    // recorded and handled like an unreachable source: the previous verdict stands.
+    let extraction:
+      | { page: ExtractedPage }
+      | { interrupted: string }
+      | { unavailable: string }
+      | undefined;
     if (fetched) {
-      const bounded = await extractPageBounded(fetched.text, {
+      const bounded = await this.extract(fetched.text, {
         textLimit: SNAPSHOT_TEXT_LIMIT,
         timeoutMs: this.config.verification.extractTimeoutMs,
       });
-      extraction = bounded.ok ? { page: bounded.page } : { interrupted: bounded.reason };
+      extraction = bounded.ok
+        ? { page: bounded.page }
+        : bounded.kind === "interrupted"
+          ? { interrupted: bounded.reason }
+          : { unavailable: bounded.reason };
     }
     const assessed =
       fetched && extraction && "page" in extraction
         ? assess(row, fetched, extraction.page)
         : undefined;
     const interrupted = extraction && "interrupted" in extraction ? extraction.interrupted : null;
+    const unavailable = extraction && "unavailable" in extraction ? extraction.unavailable : null;
     // WHETHER THIS RUN IS AN ANSWER ABOUT THE ENTRY, or only about the network in the last ten
     // seconds. See `isTransientFailure` — a timeout is not a verdict, and must not retire the row.
-    const transient = assessed === undefined && isTransientFailure(failure);
+    const transient =
+      assessed === undefined && (isTransientFailure(failure) || unavailable !== null);
     const now = new Date();
 
     return withTransaction(this.db, async (repos) => {
@@ -320,7 +339,9 @@ export class VerificationService {
 
       const failureText = failure ? `${failure.category}: ${failure.message}` : null;
       const transientText = transient
-        ? "not_a_verdict: the source could not be reached, so the previous verdict stands and the entry stays owed a check"
+        ? unavailable !== null
+          ? "not_a_verdict: the page could not be read because extraction was unavailable, so the previous verdict stands and the entry stays owed a check"
+          : "not_a_verdict: the source could not be reached, so the previous verdict stands and the entry stays owed a check"
         : null;
       const staleText = stale
         ? "stale_result: the entry changed while its source was being fetched, so this verdict was recorded but not applied"
@@ -356,7 +377,7 @@ export class VerificationService {
           : (assessed?.snapshotText ?? null),
         snapshotSha256: fetched?.sha256 ?? null,
         error:
-          [staleText, transientText, failureText, interrupted]
+          [staleText, transientText, failureText, interrupted, unavailable]
             .filter((part) => part !== null)
             .join(" — ") || null,
       });
@@ -446,11 +467,17 @@ export class VerificationService {
                     discarded: "stale_result",
                     reason: "the entry changed while its source was being fetched",
                   }
-                : {
-                    discarded: "transient_fetch_failure",
-                    reason: "the source could not be reached, so no verdict was applied",
-                    error: failure?.category ?? "unknown",
-                  }),
+                : unavailable !== null
+                  ? {
+                      discarded: "extraction_unavailable",
+                      reason:
+                        "the page could not be read in this process, so no verdict was applied",
+                    }
+                  : {
+                      discarded: "transient_fetch_failure",
+                      reason: "the source could not be reached, so no verdict was applied",
+                      error: failure?.category ?? "unknown",
+                    }),
               url,
             },
       });
