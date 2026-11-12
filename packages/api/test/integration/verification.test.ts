@@ -640,6 +640,34 @@ run("M3VER verification", () => {
     expect((await latestRun(id))?.snapshotText).toContain("Superchain Builders Fund");
   });
 
+  it("does not let a worker that could not run unverify an entry", async () => {
+    // A broken image or loader is a fact about this process, not about the page. If it counted as a
+    // verdict, one bad deploy would clear `verified_against_source` on every entry a pass touches.
+    const id = await seedEntry("extract-unavailable", MATCH_URL);
+    await serviceWith(fixtureTransport(PAGES)).verify(id);
+    const before = await load(id);
+    expect(before.verifiedAgainstSource).toBe(true);
+
+    const broken = new VerificationService(db, {
+      transport: fixtureTransport(PAGES),
+      config: verifyConfig({}),
+      extract: async () => ({
+        ok: false,
+        kind: "unavailable",
+        reason: "extraction_unavailable: Cannot find module 'html-extract.worker.js'",
+      }),
+    });
+    const view = await broken.verify(id);
+    expect(view.error).toMatch(/not_a_verdict/);
+    expect(view.error).toMatch(/extraction_unavailable/);
+    expect(view.extracted).toBeNull();
+
+    const after = await load(id);
+    expect(after.verifiedAgainstSource, "the previous verdict stands").toBe(true);
+    expect(after.verifiedAt?.getTime()).toBe(before.verifiedAt?.getTime());
+    expect(after.lastSeenAt?.getTime()).toBe(before.lastSeenAt?.getTime());
+  });
+
   // ── a failed fetch is not a verdict ────────────────────────────────────────────
   it("records a transport failure as a run without retiring the entry or its last verdict", async () => {
     const timingOut: SourceTransport = async () => {

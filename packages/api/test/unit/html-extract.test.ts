@@ -338,6 +338,7 @@ describe("extractPageBounded", () => {
     const result = await extractPageBounded(fill("<p>a</p>", 2 * MiB), { timeoutMs: 1 });
     expect(result).toEqual({
       ok: false,
+      kind: "interrupted",
       reason: expect.stringMatching(/^extraction_interrupted: .*within 1 ms/),
     });
     expect(performance.now() - start).toBeLessThan(1_000);

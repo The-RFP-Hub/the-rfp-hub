@@ -24,6 +24,16 @@ export type BoundedExtraction =
   | { ok: true; page: ExtractedPage }
   | {
       ok: false;
+      /**
+       * `interrupted`: the PAGE did it — the deadline passed, or the worker ran out of heap. A fact
+       * about these bytes, recorded as a verdict.
+       *
+       * `unavailable`: the WORKER did it — it could not be started, its code did not load, it
+       * crashed or exited without answering. A fact about this process, not about the page, so the
+       * caller must not let it change what is known about the entry. Telling the two apart is what
+       * keeps a broken image or loader from unverifying every entry the nightly job touches.
+       */
+      kind: "interrupted" | "unavailable";
       /** Why the extraction did not finish, worded for the run's `error` column. */
       reason: string;
     };
@@ -66,7 +76,23 @@ export function extractPageBounded(
   options: BoundedExtractOptions,
 ): Promise<BoundedExtraction> {
   const { timeoutMs, ...extractOptions } = options;
-  const entry = workerEntry();
+  const unavailable = (detail: string): BoundedExtraction => ({
+    ok: false,
+    kind: "unavailable",
+    reason: `extraction_unavailable: ${detail}`,
+  });
+  let worker: Worker;
+  try {
+    worker = new Worker(workerEntry(), {
+      workerData: { html, options: extractOptions },
+      resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB },
+    });
+  } catch (error) {
+    return Promise.resolve(
+      unavailable(`the extraction worker could not be started: ${messageOf(error)}`),
+    );
+  }
+  const started = worker;
   return new Promise((resolve) => {
     let settled = false;
     const settle = (result: BoundedExtraction): void => {
@@ -75,29 +101,36 @@ export function extractPageBounded(
       clearTimeout(timer);
       resolve(result);
       // Done either way: a finished worker exits by itself, an unfinished one is stopped here.
-      void worker.terminate();
+      void started.terminate();
     };
 
-    const worker = new Worker(entry, {
-      workerData: { html, options: extractOptions },
-      resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB },
-    });
     const timer = setTimeout(() => {
       settle({
         ok: false,
+        kind: "interrupted",
         reason: `extraction_interrupted: the page was not extracted within ${timeoutMs} ms`,
       });
     }, timeoutMs);
 
-    worker.once("message", (page: ExtractedPage) => settle({ ok: true, page }));
-    worker.once("error", (error) => {
-      settle({ ok: false, reason: `extraction_interrupted: ${error.message}` });
+    started.once("message", (page: ExtractedPage) => settle({ ok: true, page }));
+    started.once("error", (error: Error & { code?: string }) => {
+      // Running out of heap is the page's doing (`WORKER_HEAP_MB`); anything else is ours.
+      if (error.code === "ERR_WORKER_OUT_OF_MEMORY") {
+        settle({
+          ok: false,
+          kind: "interrupted",
+          reason: `extraction_interrupted: the page needed more than ${WORKER_HEAP_MB} MB to extract`,
+        });
+        return;
+      }
+      settle(unavailable(messageOf(error)));
     });
-    worker.once("exit", (code) => {
-      settle({
-        ok: false,
-        reason: `extraction_interrupted: the extraction worker exited (code ${code}) without a result`,
-      });
+    started.once("exit", (code) => {
+      settle(unavailable(`the extraction worker exited (code ${code}) without a result`));
     });
   });
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
