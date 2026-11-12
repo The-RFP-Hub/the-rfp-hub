@@ -151,8 +151,10 @@ export const reviewController = {
   approveClaim: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);
+    const body = (request.body ?? {}) as { directoryDigest?: string };
     return claims.decide(principal.accountId, idParam(id, "claim"), {
       approve: true,
+      expectedDirectoryDigest: body.directoryDigest,
     });
   }),
 
@@ -165,7 +167,8 @@ export const reviewController = {
   verifyOrganization: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { slug } = paramsOf<{ slug: string }>(request);
-    return reviews.setVerified(principal.accountId, slug, true);
+    const body = (request.body ?? {}) as { directoryDigest?: string };
+    return reviews.setVerified(principal.accountId, slug, true, body.directoryDigest);
   }),
 
   unverifyOrganization: handled(async (request: FastifyRequest) => {

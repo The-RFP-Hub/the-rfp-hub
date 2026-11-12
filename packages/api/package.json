@@ -20,6 +20,7 @@
     "db:create": "tsx scripts/create-db.ts",
     "migrate": "tsx scripts/migrate.ts",
     "grant-admin": "tsx scripts/grant-admin.ts",
+    "orgs:cleanup-rejected": "tsx scripts/cleanup-rejected-org-stubs.ts",
     "seed": "tsx scripts/seed.ts",
     "export": "tsx scripts/export.ts",
     "jobs": "tsx scripts/jobs/run-job.ts",

@@ -1,8 +1,12 @@
-import { and, count, eq, ilike, or } from "drizzle-orm";
+import { and, count, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import {
   type OrganizationInsert,
   type OrganizationRow,
+  opportunities,
+  opportunityClaims,
+  orgMembershipInvites,
+  orgMemberships,
   organizations,
 } from "../../../db/schema.js";
 
@@ -10,16 +14,32 @@ export type OrganizationUpdate = Partial<
   Pick<
     OrganizationRow,
     | "name"
+    | "orgType"
     | "description"
     | "website"
     | "logoUrl"
     | "bannerUrl"
+    | "socialLinks"
     | "ecosystems"
+    | "contacts"
     | "verified"
     | "verifiedAt"
     | "updatedAt"
   >
 >;
+
+function stubFieldsAreEmpty() {
+  return and(
+    sql`${organizations.orgType} is null`,
+    sql`coalesce(${organizations.description}, '') = ''`,
+    sql`coalesce(${organizations.website}, '') = ''`,
+    sql`coalesce(${organizations.logoUrl}, '') = ''`,
+    sql`coalesce(${organizations.bannerUrl}, '') = ''`,
+    sql`coalesce(${organizations.socialLinks}, '[]'::jsonb) = '[]'::jsonb`,
+    sql`coalesce(cardinality(${organizations.ecosystems}), 0) = 0`,
+    sql`coalesce(${organizations.contacts}, '[]'::jsonb) = '[]'::jsonb`,
+  );
+}
 
 export class OrganizationRepository {
   constructor(private readonly exec: DbLike) {}
@@ -148,6 +168,81 @@ export class OrganizationRepository {
       .from(organizations)
       .where(eq(organizations.verified, true));
     return counted[0]?.value ?? 0;
+  }
+
+  /** The slugs among `slugs` that already have a directory row. */
+  async existingSlugs(slugs: string[]): Promise<Set<string>> {
+    if (slugs.length === 0) return new Set();
+    const rows = await this.exec
+      .select({ slug: organizations.slug })
+      .from(organizations)
+      .where(inArray(organizations.slug, slugs));
+    return new Set(rows.map((row) => row.slug));
+  }
+
+  /**
+   * Empty stubs that ONLY rejected entries name: unverified, with no membership, invite or
+   * claim (each of which would cascade on delete), and no non-rejected citation. Includes uncited
+   * rows. What `scripts/cleanup-rejected-org-stubs.ts` reports and,
+   * when told to, deletes. Never a verified organization, whatever else is true.
+   */
+  async citedOnlyByRejected(): Promise<OrganizationRow[]> {
+    return this.exec
+      .select()
+      .from(organizations)
+      .where(
+        and(
+          eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
+          sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs) and o.review_status <> 'rejected')`,
+          sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${opportunityClaims} c where c.organization_id = ${organizations.id})`,
+        ),
+      )
+      .orderBy(organizations.slug);
+  }
+
+  /**
+   * Delete organizations by id, re-checking the same predicate under the delete so a row that
+   * gained a membership, a claim or a live citation since it was listed is left alone.
+   */
+  async deleteIfStillCitedOnlyByRejected(ids: number[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.exec
+      .delete(organizations)
+      .where(
+        and(
+          inArray(organizations.id, ids),
+          eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
+          sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs) and o.review_status <> 'rejected')`,
+          sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${opportunityClaims} c where c.organization_id = ${organizations.id})`,
+        ),
+      )
+      .returning({ slug: organizations.slug });
+    return rows.map((row) => row.slug);
+  }
+
+  /** Remove empty stubs dropped by an edit only when nothing else depends on the row. */
+  async deleteUncitedStubs(slugs: string[]): Promise<OrganizationRow[]> {
+    if (slugs.length === 0) return [];
+    return this.exec
+      .delete(organizations)
+      .where(
+        and(
+          inArray(organizations.slug, slugs),
+          eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
+          sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs))`,
+          sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${opportunityClaims} c where c.organization_id = ${organizations.id})`,
+        ),
+      )
+      .returning();
   }
 
   async insertStubs(values: OrganizationInsert[]): Promise<void> {

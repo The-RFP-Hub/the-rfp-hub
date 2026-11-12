@@ -431,10 +431,11 @@ export function createApiClient(options: ApiClientOptions) {
       claims: (query?: { status?: ClaimStatus }) =>
         request<ClaimList>("GET", "/v1/review/claims", { query }),
       /** Approval also verifies the organization and grants the claimant access. */
-      approveClaim: (claimId: number) =>
+      approveClaim: (claimId: number, directoryDigest?: string) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/approve`, {
           // Older APIs require this field; it never exposes a verification choice in the UI.
-          body: { verifyOrganization: true },
+          // The digest only when the API sent one: an older API's closed body schema refuses it.
+          body: { verifyOrganization: true, ...(directoryDigest ? { directoryDigest } : {}) },
         }),
       rejectClaim: (claimId: number) =>
         request<ClaimResult>("POST", `/v1/review/claims/${claimId}/reject`),
@@ -442,10 +443,11 @@ export function createApiClient(options: ApiClientOptions) {
         request<AccountList>("GET", "/v1/review/accounts", { query }),
       organizations: (query?: { q?: string; verified?: boolean; limit?: number }) =>
         request<OrganizationList>("GET", "/v1/review/organizations", { query }),
-      verifyOrganization: (slug: string) =>
+      verifyOrganization: (slug: string, directoryDigest?: string) =>
         request<OrganizationSummary>(
           "POST",
           `/v1/review/organizations/${encodeURIComponent(slug)}/verify`,
+          directoryDigest ? { body: { directoryDigest } } : undefined,
         ),
       unverifyOrganization: (slug: string) =>
         request<OrganizationSummary>(
