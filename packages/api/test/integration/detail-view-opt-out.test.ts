@@ -100,14 +100,39 @@ run("M5NOCOUNT the leaving page's read is not a detail view", () => {
     expect(await detailViews(startedAt)).toBe(before + 2);
   });
 
-  it("keeps ignoring a parameter it does not know, as it always has", async () => {
+  // The strict-query contract (docs/api-integration.md §4.1, compliance check M2-2): a parameter
+  // the document does not declare is a 400 in the ErrorResponse envelope, never a 200 that quietly
+  // ignored it — and a refused read is not a detail view.
+  it.each([
+    "?utm_source=newsletter",
+    "?definitely_not_a_documented_parameter=1",
+    // A misspelled opt-out must not silently count the read it meant to leave uncounted.
+    "?cuont=false",
+    "?count=false&utm_source=newsletter",
+  ])("refuses an undocumented parameter (%s) with a 400 and counts nothing", async (query) => {
     const before = await detailViews(startedAt);
-    const res = await read("?utm_source=newsletter");
-    expect(res.statusCode, res.body).toBe(200);
-    expect(await detailViews(startedAt)).toBe(before + 1);
+    const res = await read(query);
+    expect(res.statusCode, res.body).toBe(400);
+    const body = res.json();
+    expect(body.error, res.body).toBe("bad_request");
+    expect(typeof body.message, res.body).toBe("string");
+    expect(await detailViews(startedAt)).toBe(before);
   });
 
   it("refuses a count value that is not a boolean rather than guessing", async () => {
-    expect((await read("?count=nope")).statusCode).toBe(400);
+    const res = await read("?count=nope");
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("bad_request");
+  });
+
+  it("publishes the 400 it answers, so a client can read the error schema", async () => {
+    const doc = (await app.inject({ url: "/v1/docs/json" })).json();
+    const op = doc.paths["/v1/opportunities/{id}"].get;
+    expect(op.responses["400"]).toBeDefined();
+    expect(
+      op.parameters
+        .filter((p: { in: string }) => p.in === "query")
+        .map((p: { name: string }) => p.name),
+    ).toEqual(["count"]);
   });
 });

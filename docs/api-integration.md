@@ -198,7 +198,9 @@ Nine of them. Each one has cost somebody an afternoon.
 curl -si "$API/v1/opportunities?funding_type=grant" | head -1 || true   # 400, not "filter ignored"
 ```
 
-Every list and feed endpoint declares `additionalProperties: false`. A typo, a renamed parameter or
+Every list and feed endpoint declares `additionalProperties: false`, and so does the detail read
+`GET /v1/opportunities/{id}` (its one parameter is `count`, see §4.6) — so a tracking parameter
+forwarded onto an API URL is a `400` too. A typo, a renamed parameter or
 a parameter from another API is a `400` naming it — never a silently unfiltered result set. That is
 deliberate: a feed URL is a subscription somebody saves for years, and a typo in it has to fail
 loudly rather than quietly return everything.
