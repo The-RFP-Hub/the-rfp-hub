@@ -244,6 +244,14 @@ export function createAuth(options: CreateAuthOptions = {}) {
     basePath: "/api/auth",
     trustedOrigins: (request) => allowedOrigins(cfg.betterAuth, request),
 
+    // WHERE A FAILED OAUTH CALLBACK LANDS. Without this the library sends every failure — Google
+    // consent cancelled, an expired state, a user row that could not be written — to its own
+    // `/api/auth/error`, which in production answers `302 /?error=<code>`. `/` on THIS origin is
+    // the service-info document, so a person who had just tried to sign in was left looking at raw
+    // JSON on the API's hostname, with no way back. The frontend page that finishes a sign-in is
+    // also the one that explains a sign-in that did not finish; it reads `?error=` as a code only.
+    onAPIError: { errorURL: `${cfg.appBaseUrl}/auth/complete` },
+
     session: { expiresIn: SESSION_EXPIRES_IN, updateAge: SESSION_UPDATE_AGE },
     // OWNER DECISION: session rows keep NO network identity. The library fills `ipAddress` and
     // `userAgent` from request headers by default, which would make every signed-in user's raw

@@ -136,6 +136,23 @@ run("M3MOUNT the auth mount", () => {
     expect(JSON.stringify(doc)).not.toContain("/api/auth");
   });
 
+  it("sends a failed OAuth callback to the frontend, never to this origin's own root", async () => {
+    // THE SYMPTOM THIS PINS: a new Google user whose row could not be written was redirected to
+    // `/api/auth/error`, which in production answers `302 /?error=…` — and `/` here is the
+    // service-info JSON. A callback with no state is the cheapest failure that takes the same exit.
+    const callback = await app.inject({ method: "GET", url: "/api/auth/callback/google?code=x" });
+    expect(callback.statusCode).toBe(302);
+    expect(callback.headers.location).toBe(`${ALLOWED}/auth/complete?error=state_not_found`);
+
+    // And the library's own error route, for anything that still reaches it.
+    const page = await app.inject({
+      method: "GET",
+      url: "/api/auth/error?error=unable_to_create_user",
+    });
+    expect(page.statusCode).toBe(302);
+    expect(page.headers.location).toBe(`${ALLOWED}/auth/complete?error=unable_to_create_user`);
+  });
+
   it("refuses to promise a code it cannot deliver", async () => {
     // THE LOCKED DOOR THAT ANSWERS YES. With no delivery configured the library still answers 200 —
     // it does not await the send, deliberately, so a discarding transport cannot make itself heard

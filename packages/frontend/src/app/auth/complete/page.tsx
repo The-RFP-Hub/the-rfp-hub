@@ -37,6 +37,39 @@ import { useEffect, useRef, useState } from "react";
  */
 const DESTINATION = "/dashboard";
 
+/**
+ * A sign-in the API could not finish arrives here as `?error=<code>` instead of a token.
+ *
+ * ONLY THE CODE IS READ, and only as a key into the sentences below. The query string is whatever
+ * the link said, so neither it nor the `error_description` beside it is ever shown as prose: a page
+ * on this domain must not display a sentence a stranger wrote into a URL. A code that is not a
+ * plain token is reported as `unknown_error`.
+ */
+const RESTART = "Start again from the sign-in panel.";
+const OUR_FAULT =
+  "We could not finish setting up your sign-in with Google. That is a fault on our side, not something you did. Try again, or sign in with a code sent to your email instead.";
+const CALLBACK_ERRORS: Record<string, string> = {
+  access_denied: `Google sign-in was cancelled before it finished, so nothing has changed. ${RESTART}`,
+  state_mismatch: `That sign-in attempt expired, or was finished in a different browser from the one that started it. ${RESTART}`,
+  state_not_found: `That sign-in attempt expired, or was finished in a different browser from the one that started it. ${RESTART}`,
+  please_restart_the_process: `That sign-in attempt expired. ${RESTART}`,
+  account_not_linked:
+    "An account with this Google address already exists here and could not be joined to it automatically. Sign in with a code sent to that address instead.",
+  unable_to_create_user: OUR_FAULT,
+  unable_to_link_account: OUR_FAULT,
+  unable_to_create_session: OUR_FAULT,
+  internal_server_error: OUR_FAULT,
+};
+
+function callbackFailure(rawCode: string): ApiError {
+  const code = /^[A-Za-z0-9_-]{1,64}$/.test(rawCode) ? rawCode : "unknown_error";
+  return new ApiError(
+    0,
+    code,
+    CALLBACK_ERRORS[code] ?? `Google sign-in did not complete. ${RESTART}`,
+  );
+}
+
 export default function AuthCompletePage() {
   const router = useRouter();
   const openSignIn = useSignInOpener();
@@ -73,8 +106,16 @@ export default function AuthCompletePage() {
     // ── synchronous section: capture, then scrub. No `await` may appear between these two. ──
     const fragment = window.location.hash.replace(/^#/, "");
     const token = new URLSearchParams(fragment).get("ott");
+    const callbackError = new URLSearchParams(window.location.search).get("error");
     window.history.replaceState(null, "", window.location.pathname);
     // ── end of the synchronous section ──
+
+    // The API sends a sign-in it could not finish here with a code and no token. A token wins if
+    // both are somehow present: it is single-use and server-checked, a query string is neither.
+    if (!token && callbackError) {
+      setFailure(callbackFailure(callbackError));
+      return;
+    }
 
     if (!token) {
       setFailure(
