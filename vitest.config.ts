@@ -19,9 +19,6 @@ import { configDefaults, defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    // The integration suites share one Postgres. Vitest 4 starts about one worker per core by
-    // default, and at 11 workers whole-suite runs failed intermittently in different files; at 4 they
-    // passed every time, at roughly the pace of the previous default.
     maxWorkers: 4,
     // `.claude/` holds local agent worktrees, whole copies of this repository.
     // `packages/e2e` is Playwright, run only through `pnpm e2e`: its `*.spec.ts` files match
@@ -32,6 +29,24 @@ export default defineConfig({
       "**/.claude/**",
       "packages/frontend/**",
       "packages/e2e/**",
+    ],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          exclude: ["packages/api/test/integration/**"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "api-integration",
+          include: ["packages/api/test/integration/**/*.test.ts"],
+          // Global sweeps mutate other suites' committed fixtures in the shared database.
+          fileParallelism: false,
+        },
+      },
     ],
   },
 });
