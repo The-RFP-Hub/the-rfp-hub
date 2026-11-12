@@ -1,5 +1,25 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
-// Same cap as the root config, for `vitest run` started from this package: the integration suites
-// share one Postgres and fail intermittently with a worker per core.
-export default defineConfig({ test: { maxWorkers: 4 } });
+export default defineConfig({
+  test: {
+    maxWorkers: 4,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          exclude: [...configDefaults.exclude, "test/integration/**"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "api-integration",
+          include: ["test/integration/**/*.test.ts"],
+          // Match the root run: global sweeps must not mutate another suite's fixtures.
+          fileParallelism: false,
+        },
+      },
+    ],
+  },
+});
