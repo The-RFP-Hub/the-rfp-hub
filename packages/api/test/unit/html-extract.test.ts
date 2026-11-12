@@ -290,39 +290,58 @@ describe("extractPage, compared with the regex extractor it replaced", () => {
  * Each shape opens a construct and never closes it, which is what made the regex extractor
  * quadratic: measured at ~20 s for 256 KiB of `<!--` and ~18 s for 256 KiB of `<meta ` before the
  * rewrite, four times as long for every doubling. At 2 MiB (`VERIFY_MAX_BYTES`) each must now be
- * read in well under a quarter of a second. The time is the best of three, so a noisy CI neighbour
- * does not fail the suite; a quadratic regression is three orders of magnitude, not noise.
+ * read in well under a quarter of a second on a developer machine. Shared CI runners are slower
+ * and noisier (the same shapes measured 190-290 ms there), so under `CI` the ceiling is 1 s: still
+ * twenty times below what the regexes took at an eighth of the size.
+ *
+ * A wall-clock ceiling alone depends on the machine, so each shape is also read at half the size:
+ * doubling the page must roughly double the time, not quadruple it. That ratio holds on any
+ * machine and is what catches the quadratic behaviour coming back. Times are the best of several
+ * runs after a warm-up, so a noisy neighbour does not fail the suite.
  */
 const MiB = 1024 * 1024;
 const fill = (unit: string, bytes: number) =>
   unit.repeat(Math.ceil(bytes / unit.length)).slice(0, bytes);
 
-const HOSTILE: Record<string, () => string> = {
-  "`<!--` never closed": () => fill("<!--", 2 * MiB),
-  "`<meta ` with no `>`": () => fill("<meta ", 2 * MiB),
-  "`<` with no `>`": () => fill("<", 2 * MiB),
-  "`<script>` never closed": () => fill("<script>", 2 * MiB),
-  "`<script ` with no `>`": () => fill("<script ", 2 * MiB),
-  "`<script ` openers sharing one `>`": () => `${fill("<script ", 2 * MiB - 1)}>`,
-  "`<style>` never closed": () => fill("<style>", 2 * MiB),
-  "`<noscript>` never closed": () => fill("<noscript>", 2 * MiB),
-  "`<title>` never closed": () => fill("<title>", 2 * MiB),
-  "a JSON-LD opener never closed": () => fill('<script type="application/ld+json">', 2 * MiB),
-  'one `<meta` full of `content="`': () => `<meta ${fill('content="', 2 * MiB - 7)}>`,
+const CEILING_MS = process.env.CI ? 1_000 : 250;
+/** Linear is ~2× per doubling and quadratic ~4×; 3× sits between them with room for noise. */
+const MAX_DOUBLING_RATIO = 3;
+/** Timer and GC jitter on runs of a few milliseconds, so tiny times do not decide the ratio. */
+const RATIO_SLACK_MS = 5;
+
+const HOSTILE: Record<string, (bytes: number) => string> = {
+  "`<!--` never closed": (bytes) => fill("<!--", bytes),
+  "`<meta ` with no `>`": (bytes) => fill("<meta ", bytes),
+  "`<` with no `>`": (bytes) => fill("<", bytes),
+  "`<script>` never closed": (bytes) => fill("<script>", bytes),
+  "`<script ` with no `>`": (bytes) => fill("<script ", bytes),
+  "`<script ` openers sharing one `>`": (bytes) => `${fill("<script ", bytes - 1)}>`,
+  "`<style>` never closed": (bytes) => fill("<style>", bytes),
+  "`<noscript>` never closed": (bytes) => fill("<noscript>", bytes),
+  "`<title>` never closed": (bytes) => fill("<title>", bytes),
+  "a JSON-LD opener never closed": (bytes) => fill('<script type="application/ld+json">', bytes),
+  'one `<meta` full of `content="`': (bytes) => `<meta ${fill('content="', bytes - 7)}>`,
 };
+
+function bestOf(html: string, runs: number): number {
+  extractPage(html); // warm-up: the first run pays for compilation, not for the page
+  let best = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < runs; attempt++) {
+    const start = performance.now();
+    extractPage(html);
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
+}
 
 describe("extractPage on hostile pages", () => {
   for (const [name, make] of Object.entries(HOSTILE)) {
-    it(`reads 2 MiB of ${name} in under 250 ms`, () => {
-      const html = make();
-      let best = Number.POSITIVE_INFINITY;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const start = performance.now();
-        extractPage(html);
-        best = Math.min(best, performance.now() - start);
-      }
-      expect(best).toBeLessThan(250);
-    });
+    it(`reads 2 MiB of ${name} in under ${CEILING_MS} ms, and twice the page takes about twice the time`, () => {
+      const half = bestOf(make(MiB), 5);
+      const full = bestOf(make(2 * MiB), 5);
+      expect(full).toBeLessThan(CEILING_MS);
+      expect(full).toBeLessThan(MAX_DOUBLING_RATIO * half + RATIO_SLACK_MS);
+    }, 30_000);
   }
 });
 
