@@ -306,8 +306,11 @@ const fill = (unit: string, bytes: number) =>
   unit.repeat(Math.ceil(bytes / unit.length)).slice(0, bytes);
 
 const CEILING_MS = process.env.CI ? 1_000 : 250;
-/** For 4× the bytes, linear is ~4× the time and quadratic ~16×; 8× sits between them. */
-const MAX_SCALE_RATIO = 8;
+/**
+ * For 4× the bytes, linear is ~4× the time and quadratic ~16×. 12× leaves room for a loaded runner
+ * (~10.6× was measured with the suite running in parallel) and still fails a quadratic extractor.
+ */
+const MAX_SCALE_RATIO = 12;
 /** Timer and GC jitter on runs of a few milliseconds, so tiny times do not decide the ratio. */
 const RATIO_SLACK_MS = 5;
 
