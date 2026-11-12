@@ -25,6 +25,9 @@ export default defineConfig({
     export: "scripts/export.ts",
     jobs: "scripts/jobs/run-job.ts",
     "grant-admin": "scripts/grant-admin.ts",
+    // One-off cleanup after the directory-stub change (scripts/cleanup-rejected-org-stubs.ts):
+    // reports by default, deletes only with --apply. A dist entry so a deployment can run it.
+    "cleanup-rejected-org-stubs": "scripts/cleanup-rejected-org-stubs.ts",
   },
   format: ["esm"],
   target: "node20",

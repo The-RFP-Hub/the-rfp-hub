@@ -12,6 +12,14 @@ import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { reviewController } from "./review.controller.js";
 
+/** What a reviewer was shown, sent back so a verification cannot land on data nobody saw. */
+const DIRECTORY_DIGEST = {
+  type: "string",
+  pattern: "^[0-9a-f]{64}$",
+  description:
+    "The `digest` of the organization directory entry the reviewer was shown (`OrganizationDirectory`). When sent, the verification is refused with `409 organization_directory_changed` if the entry changed since. Optional for older clients.",
+} as const;
+
 /** A reviewer decides at human pace: 30/min is far above that and far below a stolen session. */
 const REVIEW_DECISION = { max: 30, timeWindow: "1 minute" } as const;
 
@@ -54,10 +62,13 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   const claimApprovalConflict = {
     ...claimDecidedConflict,
     description:
-      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when approval would transfer ownership from a terminal merge loser.",
+      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when approval would transfer ownership from a terminal merge loser; `organization_directory_changed` when a `directoryDigest` was sent and the organization's directory entry no longer matches it.",
     properties: {
       ...claimDecidedConflict.properties,
-      error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
+      error: {
+        type: "string",
+        enum: ["claim_decided", "opportunity_merged", "organization_directory_changed"],
+      },
     },
   };
   const duplicateReopenConflict = {
@@ -455,6 +466,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
               deprecated: true,
               description: "Ignored for compatibility. Approval always verifies the organization.",
             },
+            directoryDigest: DIRECTORY_DIGEST,
           },
         },
         response: {
@@ -503,9 +515,15 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         summary: "Verify an organization — every member becomes a publisher of its namespace",
         security: [{ bearerAuth: [] }],
         params: slugParams,
+        body: {
+          type: ["object", "null"],
+          additionalProperties: false,
+          properties: { directoryDigest: DIRECTORY_DIGEST },
+        },
         response: {
           429: RATE_LIMITED,
           200: { $ref: "OrganizationSummary#" },
+          409: { $ref: "ErrorResponse#" },
           ...errors,
         },
       },

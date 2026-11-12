@@ -761,6 +761,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "note",
       "createdAt",
       "decidedAt",
+      "organizationDirectory",
     ],
     properties: {
       id: { type: "integer" },
@@ -782,6 +783,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       note: { type: ["string", "null"] },
       createdAt: { type: "string", format: "date-time" },
       decidedAt: { type: ["string", "null"], format: "date-time" },
+      organizationDirectory: { $ref: "OrganizationDirectory#" },
     },
   },
   {
@@ -1122,7 +1124,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     $id: "OrganizationSummary",
     type: "object",
     additionalProperties: false,
-    required: ["slug", "name", "verified", "verifiedAt", "website", "ecosystems", "memberCount"],
+    required: [
+      "slug",
+      "name",
+      "verified",
+      "verifiedAt",
+      "website",
+      "ecosystems",
+      "memberCount",
+      "directory",
+    ],
     properties: {
       slug: { type: "string" },
       name: { type: "string" },
@@ -1131,6 +1142,42 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       website: { type: ["string", "null"] },
       ecosystems: { type: "array", items: { type: "string" } },
       memberCount: { type: "integer" },
+      directory: { $ref: "OrganizationDirectory#" },
+    },
+  },
+  {
+    $id: "OrganizationDirectory",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "Everything the directory holds about an organization — what verifying it puts the badge on. A pending submission only ever creates the slug and name; the rest is filled from an APPROVED entry, never over a value, and never on a verified organization.",
+    required: [
+      "name",
+      "orgType",
+      "description",
+      "website",
+      "logoUrl",
+      "bannerUrl",
+      "socialLinks",
+      "ecosystems",
+      "contacts",
+      "digest",
+    ],
+    properties: {
+      name: { type: "string" },
+      orgType: { type: ["string", "null"] },
+      description: { type: ["string", "null"] },
+      website: { type: ["string", "null"] },
+      logoUrl: { type: ["string", "null"] },
+      bannerUrl: { type: ["string", "null"] },
+      socialLinks: { type: "array", items: { type: "object", additionalProperties: true } },
+      ecosystems: { type: "array", items: { type: "string" } },
+      contacts: { type: "array", items: { type: "object", additionalProperties: true } },
+      digest: {
+        type: "string",
+        description:
+          "SHA-256 over the fields above. Send it back as `directoryDigest` when verifying to have the verification refused if the entry changed since it was shown.",
+      },
     },
   },
   {

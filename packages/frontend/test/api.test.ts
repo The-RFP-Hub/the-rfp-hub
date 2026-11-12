@@ -49,6 +49,23 @@ describe("createApiClient", () => {
     expect(calls[0]?.init.method).toBe("POST");
     expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ verifyOrganization: true });
   });
+
+  it("sends the directory digest with a verification only when there is one", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ outcome: "granted" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+    const digest = "a".repeat(64);
+    await api.review.approveClaim(12, digest);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      verifyOrganization: true,
+      directoryDigest: digest,
+    });
+    await api.review.verifyOrganization("indie", digest);
+    expect(calls[1]?.url).toBe("https://api.example.com/v1/review/organizations/indie/verify");
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({ directoryDigest: digest });
+    // An older API answers no digest, and its verify route takes no body: none is sent.
+    await api.review.verifyOrganization("indie");
+    expect(calls[2]?.init.body).toBeUndefined();
+  });
   it("carries Retry-After off a 429 so a page can say how long to wait", async () => {
     const { fetchImpl } = stubFetch(
       () => new Response("{}", { status: 429, headers: { "retry-after": "45" } }),
