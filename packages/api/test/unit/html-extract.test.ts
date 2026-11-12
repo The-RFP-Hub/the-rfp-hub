@@ -294,18 +294,20 @@ describe("extractPage, compared with the regex extractor it replaced", () => {
  * and noisier (the same shapes measured 190-290 ms there), so under `CI` the ceiling is 1 s: still
  * twenty times below what the regexes took at an eighth of the size.
  *
- * A wall-clock ceiling alone depends on the machine, so each shape is also read at half the size:
- * doubling the page must roughly double the time, not quadruple it. That ratio holds on any
- * machine and is what catches the quadratic behaviour coming back. Times are the best of several
- * runs after a warm-up, so a noisy neighbour does not fail the suite.
+ * A wall-clock ceiling alone depends on the machine, so each shape is also read at a quarter of
+ * the size: four times the page must take about four times as long (linear), not sixteen times
+ * (quadratic). That ratio holds on any machine and is what catches the quadratic behaviour coming
+ * back. A single doubling (2× against 4×) left too little room: a CI runner measured 3.3× on a
+ * linear shape. Times are the best of several runs after a warm-up, so a noisy neighbour does not
+ * fail the suite.
  */
 const MiB = 1024 * 1024;
 const fill = (unit: string, bytes: number) =>
   unit.repeat(Math.ceil(bytes / unit.length)).slice(0, bytes);
 
 const CEILING_MS = process.env.CI ? 1_000 : 250;
-/** Linear is ~2× per doubling and quadratic ~4×; 3× sits between them with room for noise. */
-const MAX_DOUBLING_RATIO = 3;
+/** For 4× the bytes, linear is ~4× the time and quadratic ~16×; 8× sits between them. */
+const MAX_SCALE_RATIO = 8;
 /** Timer and GC jitter on runs of a few milliseconds, so tiny times do not decide the ratio. */
 const RATIO_SLACK_MS = 5;
 
@@ -336,11 +338,11 @@ function bestOf(html: string, runs: number): number {
 
 describe("extractPage on hostile pages", () => {
   for (const [name, make] of Object.entries(HOSTILE)) {
-    it(`reads 2 MiB of ${name} in under ${CEILING_MS} ms, and twice the page takes about twice the time`, () => {
-      const half = bestOf(make(MiB), 5);
+    it(`reads 2 MiB of ${name} in under ${CEILING_MS} ms, and four times the page takes about four times as long`, () => {
+      const quarter = bestOf(make(MiB / 2), 5);
       const full = bestOf(make(2 * MiB), 5);
       expect(full).toBeLessThan(CEILING_MS);
-      expect(full).toBeLessThan(MAX_DOUBLING_RATIO * half + RATIO_SLACK_MS);
+      expect(full).toBeLessThan(MAX_SCALE_RATIO * quarter + RATIO_SLACK_MS);
     }, 30_000);
   }
 });
