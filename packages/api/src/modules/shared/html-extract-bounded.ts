@@ -1,0 +1,99 @@
+/**
+ * `extractPage`, off the event loop and against a deadline.
+ *
+ * The extractor is linear now (`html-extract.ts`), and this is the second wall rather than the
+ * first: the page is a stranger's bytes, the API serves everyone from one event loop, and
+ * "linear" is a property of the code as it stands — the next regex added to it, or a pathological
+ * shape nobody thought of, would put the API back at the mercy of whoever controls a submitted
+ * URL. So each extraction runs in its own worker thread, and a worker that has not answered by the
+ * deadline is terminated and the extraction reported as INTERRUPTED. The caller records that as
+ * what happened (`verification.service.ts`), never as a page that said nothing.
+ *
+ * ONE WORKER PER PAGE, not a pool. A worker that hits the deadline has to be killed anyway, the
+ * fetch in front of it is a network round trip that dwarfs a thread's start-up, and the submit-time
+ * queue runs at most two checks at once. A pool would be reuse bought with a recycling protocol
+ * nobody needs at this volume.
+ */
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import { Worker } from "node:worker_threads";
+import type { ExtractOptions, ExtractedPage } from "./html-extract.js";
+
+export type BoundedExtraction =
+  | { ok: true; page: ExtractedPage }
+  | {
+      ok: false;
+      /** Why the extraction did not finish, worded for the run's `error` column. */
+      reason: string;
+    };
+
+export interface BoundedExtractOptions extends ExtractOptions {
+  /** How long the worker may take, start-up included, before it is terminated. */
+  timeoutMs: number;
+}
+
+/**
+ * Where the worker's code is, and how to start it.
+ *
+ * Built (`node dist/server.js`, `node dist/jobs.js`): this module is bundled into an entry at the
+ * root of `dist/`, and `html-extract.worker.js` is built next to it. From source (`tsx`, vitest):
+ * this module is the `.ts` file beside the worker's `.ts` file, and the worker thread needs the same
+ * TypeScript loader the process was started with, which a worker does not inherit.
+ */
+function workerEntry(): { url: URL; execArgv: string[] } {
+  const here = import.meta.url;
+  if (here.endsWith(".ts")) {
+    const tsx = pathToFileURL(createRequire(here).resolve("tsx")).href;
+    return { url: new URL("./html-extract.worker.ts", here), execArgv: ["--import", tsx] };
+  }
+  return { url: new URL("./html-extract.worker.js", here), execArgv: [] };
+}
+
+/**
+ * A ceiling on the worker's heap. A 2 MiB page needs a small fraction of it; a shape that makes the
+ * extractor allocate without bound ends the worker with an out-of-memory error, which is reported
+ * as an interruption like any other, instead of taking the process down with it.
+ */
+const WORKER_HEAP_MB = 256;
+
+export function extractPageBounded(
+  html: string,
+  options: BoundedExtractOptions,
+): Promise<BoundedExtraction> {
+  const { timeoutMs, ...extractOptions } = options;
+  const entry = workerEntry();
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (result: BoundedExtraction): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+      // Done either way: a finished worker exits by itself, an unfinished one is stopped here.
+      void worker.terminate();
+    };
+
+    const worker = new Worker(entry.url, {
+      workerData: { html, options: extractOptions },
+      execArgv: entry.execArgv,
+      resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB },
+    });
+    const timer = setTimeout(() => {
+      settle({
+        ok: false,
+        reason: `extraction_interrupted: the page was not extracted within ${timeoutMs} ms`,
+      });
+    }, timeoutMs);
+
+    worker.once("message", (page: ExtractedPage) => settle({ ok: true, page }));
+    worker.once("error", (error) => {
+      settle({ ok: false, reason: `extraction_interrupted: ${error.message}` });
+    });
+    worker.once("exit", (code) => {
+      settle({
+        ok: false,
+        reason: `extraction_interrupted: the extraction worker exited (code ${code}) without a result`,
+      });
+    });
+  });
+}
