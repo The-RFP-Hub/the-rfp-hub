@@ -601,6 +601,73 @@ run("M3VER verification", () => {
     expect(capped).toEqual(all.slice(0, capped.length));
   });
 
+  // ── a page that cannot be read in time ─────────────────────────────────────────
+  it("records an extraction that ran out of time as interrupted, and applies it as unmatched", async () => {
+    // A 1 ms deadline is shorter than a worker's start-up, so the extraction of an ordinary page is
+    // what gets interrupted here — the same path a hostile page takes when it overruns two seconds.
+    const id = await seedEntry("extract-interrupted", MATCH_URL);
+    await serviceWith(fixtureTransport(PAGES)).verify(id);
+    expect((await load(id)).verifiedAgainstSource).toBe(true);
+
+    const view = await serviceWith(fixtureTransport(PAGES), { extractTimeoutMs: 1 }).verify(id);
+    expect(view.httpStatus).toBe(200);
+    expect(view.existsAtSource).toBe(false);
+    expect(view.matched).toBe(false);
+    expect(view.error).toMatch(/^extraction_interrupted: /);
+    expect(view.error).not.toMatch(/not_a_verdict/);
+    expect(view.fieldDiff).toBeNull();
+    expect(view.extracted).toEqual({
+      extractionInterrupted: true,
+      contentType: expect.stringContaining("text/html"),
+      truncated: false,
+      redirects: [],
+    });
+    expect(
+      (await latestRun(id))?.snapshotText,
+      "nothing was read, so nothing is stored",
+    ).toBeNull();
+
+    // A verdict: the page answered and could not be read, which corroborates nothing.
+    const row = await load(id);
+    expect(row.verifiedAgainstSource).toBe(false);
+    expect(row.verifiedAt).toBeTruthy();
+
+    // And the next readable check of the SAME bytes is not called "unchanged": the interrupted run
+    // stored no snapshot, so there is nothing to carry forward from it.
+    const again = await serviceWith(fixtureTransport(PAGES)).verify(id);
+    expect(again.matched).toBe(true);
+    expect((again.extracted as Record<string, unknown>).snapshotUnchanged).toBeUndefined();
+    expect((await latestRun(id))?.snapshotText).toContain("Superchain Builders Fund");
+  });
+
+  it("does not let a worker that could not run unverify an entry", async () => {
+    // A broken image or loader is a fact about this process, not about the page. If it counted as a
+    // verdict, one bad deploy would clear `verified_against_source` on every entry a pass touches.
+    const id = await seedEntry("extract-unavailable", MATCH_URL);
+    await serviceWith(fixtureTransport(PAGES)).verify(id);
+    const before = await load(id);
+    expect(before.verifiedAgainstSource).toBe(true);
+
+    const broken = new VerificationService(db, {
+      transport: fixtureTransport(PAGES),
+      config: verifyConfig({}),
+      extract: async () => ({
+        ok: false,
+        kind: "unavailable",
+        reason: "extraction_unavailable: Cannot find module 'html-extract.worker.js'",
+      }),
+    });
+    const view = await broken.verify(id);
+    expect(view.error).toMatch(/not_a_verdict/);
+    expect(view.error).toMatch(/extraction_unavailable/);
+    expect(view.extracted).toBeNull();
+
+    const after = await load(id);
+    expect(after.verifiedAgainstSource, "the previous verdict stands").toBe(true);
+    expect(after.verifiedAt?.getTime()).toBe(before.verifiedAt?.getTime());
+    expect(after.lastSeenAt?.getTime()).toBe(before.lastSeenAt?.getTime());
+  });
+
   // ── a failed fetch is not a verdict ────────────────────────────────────────────
   it("records a transport failure as a run without retiring the entry or its last verdict", async () => {
     const timingOut: SourceTransport = async () => {

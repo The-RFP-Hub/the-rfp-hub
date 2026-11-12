@@ -120,6 +120,13 @@ export interface VerificationConfig {
   onSubmit: boolean;
   timeoutMs: number;
   maxBytes: number;
+  /**
+   * How long reading one fetched page may take before its worker is terminated and the run is
+   * recorded as `extraction_interrupted` (`modules/shared/html-extract-bounded.ts`). The linear
+   * extractor reads 2 MiB of hostile markup in well under a tenth of this; the deadline is the wall
+   * that holds when something about a page, or a future change to the extractor, is not linear.
+   */
+  extractTimeoutMs: number;
   queueMax: number;
   /**
    * How many runs per entry survive the backfill's prune. A run carries up to 200 KB of
@@ -937,6 +944,7 @@ export const config: AppConfig = {
     onSubmit: readBoolean(process.env.VERIFY_ON_SUBMIT, process.env.NODE_ENV !== "test"),
     timeoutMs: readPositiveInt(process.env.VERIFY_TIMEOUT_MS, 10_000),
     maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
+    extractTimeoutMs: readPositiveInt(process.env.VERIFY_EXTRACT_TIMEOUT_MS, 2_000),
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
     runsKeep: readPositiveInt(process.env.VERIFICATION_RUNS_KEEP, 5),
     recheckDays: readPositiveInt(process.env.VERIFY_RECHECK_DAYS, 30),

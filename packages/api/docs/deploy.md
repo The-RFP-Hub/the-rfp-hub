@@ -147,6 +147,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
 | `VERIFY_TIMEOUT_MS` | `10000` | |
 | `VERIFY_MAX_BYTES` | `2097152` | Streamed cap |
+| `VERIFY_EXTRACT_TIMEOUT_MS` | `2000` | Deadline for reading one fetched page. The page is read in a worker thread (`dist/html-extract.worker.js`, built next to `server.js`), terminated at the deadline; the run is recorded as `extraction_interrupted` and applied as unmatched |
 | `VERIFY_QUEUE_MAX` | `100` | Full → the submit-time trigger is skipped and the entry stays in the job's predicate |
 | `VERIFY_RECHECK_DAYS` | `30` | How old a check may be before the entry is fetched again. Without a TTL an entry is checked exactly once, and `staleness` then closes the rolling half of the corpus 90 days later |
 | `VERIFY_NIGHTLY_LIMIT` | `500` | Entries one `verification-backfill` **invocation** checks — not one pass: the job always reports `remaining: 0` so `--passes` cannot multiply it, and to drain a backlog you raise `--limit`. The TTL means the selection never drains, so this cap, not the predicate, is what bounds the nightly run |
