@@ -267,6 +267,33 @@ describeWithDb("M3ODIR the organization directory", () => {
     expect((await decide(id, "reject")).statusCode).toBe(200);
   });
 
+  it("keeps a filled sponsor after approval, requeue and removal from a pending entry", async () => {
+    const host = org("filled-host");
+    const sponsor = org("filled-sponsor");
+    const id = `${host}:one`;
+    const details = { sponsoringOrganizations: [plantedOrganization(sponsor)] };
+    expect((await submit(id, host, details)).statusCode).toBe(201);
+    expect((await decide(id, "approve")).statusCode).toBe(200);
+    const before = await directoryRow(sponsor);
+    for (const over of [details, { sponsoringOrganizations: [] }]) {
+      const response = await app.inject({
+        method: "PUT",
+        url: `/v1/opportunities/${id}`,
+        headers: bearer(submitterToken),
+        payload: submission(id, host, { ...over, title: "Changed after approval" }),
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json().reviewStatus).toBe("pending");
+    }
+    expect(await directoryRow(sponsor)).toEqual(before);
+    const report = await cleanupRejectedOrganizationStubs(repositories(db), {
+      apply: false,
+      log: () => {},
+      only: (s) => s === sponsor,
+    });
+    expect(report.found).toEqual([]);
+  });
+
   it("preserves dropped organizations cited elsewhere or protected by membership or verification", async () => {
     const host = org("edit-protected-host");
     const shared = org("edit-shared");
@@ -297,6 +324,23 @@ describeWithDb("M3ODIR the organization directory", () => {
     expect(response.statusCode, response.body).toBe(200);
     for (const kept of [shared, verified, member]) expect(await directoryRow(kept)).toBeTruthy();
     expect(await directoryRow(removable)).toBeUndefined();
+    const removals = await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.subjectKind, "organization"));
+    expect(removals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actorAccountId: expect.any(Number),
+          action: "update_organization",
+          patch: expect.objectContaining({
+            deleted: true,
+            reason: "uncited_after_pending_edit",
+            directory: expect.objectContaining({ name: removable }),
+          }),
+        }),
+      ]),
+    );
     expect((await decide(id, "reject")).statusCode).toBe(200);
     expect((await decide(`${shared}:other`, "reject")).statusCode).toBe(200);
   });

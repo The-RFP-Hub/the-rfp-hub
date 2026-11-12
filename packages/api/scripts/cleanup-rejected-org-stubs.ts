@@ -4,8 +4,10 @@
  * Before submissions stopped writing directory details (`modules/shared/organization-directory.ts`),
  * the first submission to name a slug wrote that organization's website, logo, description, social
  * links and contacts, and rejecting the submission left all of it behind. This lists every such
- * row that nothing else holds on to, and with `--apply` deletes them:
+ * row with empty directory fields that nothing else holds on to, and with `--apply` deletes them.
+ * Populated legacy entries are preserved for manual review:
  *
+ *   - all directory fields except slug and name empty;
  *   - not verified (a verified organization is never touched, whatever names it);
  *   - not named by any opportunity that is not rejected, including uncited stubs;
  *   - no membership, no invite and no claim — each would be deleted with it by cascade, which is

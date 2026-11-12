@@ -74,6 +74,7 @@ import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shar
 import { reviewerPins } from "../../shared/link-out.js";
 import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
 import { comparableOpportunity as comparable } from "../../shared/opportunity-content.js";
+import { organizationDirectoryView } from "../../shared/organization-directory.js";
 import { diffFields } from "../../shared/patch.js";
 import { urlPolicyProblems } from "../../shared/url-policy.js";
 import { violatedConstraint } from "../auth/account.service.js";
@@ -859,22 +860,35 @@ export class OpportunityWriteService {
       throw translateWriteFailure(error, document);
     });
     if (!stored) throw new Error(`failed to persist ${document.id}`);
+    const actor = {
+      actorKind: principal.credentialKind === "api_key" ? ("api_key" as const) : ("user" as const),
+      actorAccountId: principal.accountId,
+      actorApiKeyId: principal.apiKeyId ?? null,
+    };
     if (existing?.reviewStatus === "pending") {
       const retained = new Set(cited.map((org) => org.slug));
-      await repos.organizations.deleteUncitedStubs(
+      const deleted = await repos.organizations.deleteUncitedStubs(
         existing.orgSlugs.filter((slug) => !retained.has(slug)),
       );
+      for (const row of deleted) {
+        await repos.audit.record({
+          ...actor,
+          subjectKind: "organization",
+          subjectId: row.id,
+          action: "update_organization",
+          patch: {
+            deleted: true,
+            reason: "uncited_after_pending_edit",
+            directory: organizationDirectoryView(row),
+          },
+        });
+      }
     }
 
     const patch = diffFields(
       existing ? (comparable(existing) as Record<string, unknown>) : {},
       comparable(stored) as Record<string, unknown>,
     );
-    const actor = {
-      actorKind: principal.credentialKind === "api_key" ? ("api_key" as const) : ("user" as const),
-      actorAccountId: principal.accountId,
-      actorApiKeyId: principal.apiKeyId ?? null,
-    };
     await repos.audit.record({
       ...actor,
       subjectKind: "opportunity",

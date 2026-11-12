@@ -28,6 +28,19 @@ export type OrganizationUpdate = Partial<
   >
 >;
 
+function stubFieldsAreEmpty() {
+  return and(
+    sql`${organizations.orgType} is null`,
+    sql`coalesce(${organizations.description}, '') = ''`,
+    sql`coalesce(${organizations.website}, '') = ''`,
+    sql`coalesce(${organizations.logoUrl}, '') = ''`,
+    sql`coalesce(${organizations.bannerUrl}, '') = ''`,
+    sql`coalesce(${organizations.socialLinks}, '[]'::jsonb) = '[]'::jsonb`,
+    sql`coalesce(cardinality(${organizations.ecosystems}), 0) = 0`,
+    sql`coalesce(${organizations.contacts}, '[]'::jsonb) = '[]'::jsonb`,
+  );
+}
+
 export class OrganizationRepository {
   constructor(private readonly exec: DbLike) {}
 
@@ -168,7 +181,7 @@ export class OrganizationRepository {
   }
 
   /**
-   * Every organization that ONLY rejected entries name: unverified, with no membership, invite or
+   * Empty stubs that ONLY rejected entries name: unverified, with no membership, invite or
    * claim (each of which would cascade on delete), and no non-rejected citation. Includes uncited
    * rows. What `scripts/cleanup-rejected-org-stubs.ts` reports and,
    * when told to, deletes. Never a verified organization, whatever else is true.
@@ -180,6 +193,7 @@ export class OrganizationRepository {
       .where(
         and(
           eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
           sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs) and o.review_status <> 'rejected')`,
           sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
           sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
@@ -201,6 +215,7 @@ export class OrganizationRepository {
         and(
           inArray(organizations.id, ids),
           eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
           sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs) and o.review_status <> 'rejected')`,
           sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
           sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
@@ -211,21 +226,23 @@ export class OrganizationRepository {
     return rows.map((row) => row.slug);
   }
 
-  /** Remove citations dropped by an edit only when nothing else depends on the row. */
-  async deleteUncitedStubs(slugs: string[]): Promise<void> {
-    if (slugs.length === 0) return;
-    await this.exec
+  /** Remove empty stubs dropped by an edit only when nothing else depends on the row. */
+  async deleteUncitedStubs(slugs: string[]): Promise<OrganizationRow[]> {
+    if (slugs.length === 0) return [];
+    return this.exec
       .delete(organizations)
       .where(
         and(
           inArray(organizations.slug, slugs),
           eq(organizations.verified, false),
+          stubFieldsAreEmpty(),
           sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs))`,
           sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
           sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
           sql`not exists (select 1 from ${opportunityClaims} c where c.organization_id = ${organizations.id})`,
         ),
-      );
+      )
+      .returning();
   }
 
   async insertStubs(values: OrganizationInsert[]): Promise<void> {
