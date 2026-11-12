@@ -63,6 +63,9 @@ function testConfig(secret: string): AuthConfig {
       // Exactly one, so the CORS accept/reject cases have something concrete to be about.
       trustedOrigins: ["http://127.0.0.1:3005"],
       previewOriginPattern: undefined,
+      // On, as in production: the suites share one address (127.0.0.1), so a case that exercises
+      // the limiter gives each simulated client its own `remoteAddress`.
+      rateLimitEnabled: true,
     },
     google: { clientId: undefined, clientSecret: undefined },
     email,

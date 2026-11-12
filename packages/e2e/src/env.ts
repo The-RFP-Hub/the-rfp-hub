@@ -116,6 +116,11 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   // tenant: the API is the identity provider now, and the only thing it needs is something to sign
   // sessions with.
   env.BETTER_AUTH_SECRET = input.authSecret;
+  // The auth library's limiter keys on the address the API resolved, which a caller can no longer
+  // choose with `X-Forwarded-For`. Every identity in this suite signs in from 127.0.0.1, a dozen
+  // within minutes, so with the production ceilings (3 codes per 5 minutes) the run would be
+  // throttled by its own fixtures. The API refuses this setting under NODE_ENV=production.
+  env.AUTH_RATE_LIMIT_ENABLED = "false";
   // The callback base — the API's own origin. Deliberately not `PUBLIC_BASE_URL`, which is the
   // OpenAPI `servers[0].url` and may legitimately differ.
   env.BETTER_AUTH_URL = `http://127.0.0.1:${input.port}`;
