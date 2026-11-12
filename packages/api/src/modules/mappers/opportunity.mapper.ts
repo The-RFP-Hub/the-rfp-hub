@@ -149,7 +149,10 @@ function dateOrUndef(v: string | null | undefined): Date | undefined {
  * `organizations` a complete directory; the opportunity's own (order-significant) arrays are
  * stored on the opportunity row itself.
  */
-export function organizationInserts(std: Opportunity): OrganizationInsert[] {
+export function organizationInserts(std: {
+  operatingOrganizations: readonly Opportunity["operatingOrganizations"][number][];
+  sponsoringOrganizations?: readonly Opportunity["operatingOrganizations"][number][] | undefined;
+}): OrganizationInsert[] {
   const all = [...std.operatingOrganizations, ...(std.sponsoringOrganizations ?? [])];
   const bySlug = new Map<string, OrganizationInsert>();
   for (const o of all) {

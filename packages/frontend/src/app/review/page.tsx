@@ -64,6 +64,7 @@ import type {
   MergeResult,
   Opportunity,
   OrgRole,
+  OrganizationDirectory,
   OrganizationSummary,
 } from "@/lib/types";
 import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
@@ -650,6 +651,80 @@ function LastDecision({
   );
 }
 
+// ── what verification puts the badge on ─────────────────────────────────────────
+
+/**
+ * The organization's directory entry, shown inside the confirmation that would verify it.
+ *
+ * Verified organizations are listed publicly with their name, website, logo and description, so
+ * this is what the badge will vouch for. None of it has been checked by anyone at the hub: a
+ * submission creates an organization with its slug and name only, and the rest is filled from the
+ * first APPROVED listing that named it. The digest of exactly this is sent with the decision, and
+ * the API refuses the verification if the entry changed after it was shown here.
+ *
+ * Absent when the API predates the directory review; the panel then reads as it always did.
+ */
+function DirectoryEntry({ directory }: { directory: OrganizationDirectory | undefined }) {
+  if (!directory) return null;
+  const links = directory.socialLinks
+    .map((link) => link.url)
+    .filter((url): url is string => typeof url === "string" && url !== "");
+  const contacts = directory.contacts
+    .map((contact) => [contact.name, contact.email, contact.role].filter(Boolean).join(" · "))
+    .filter((line) => line !== "");
+  return (
+    <section aria-label="Directory entry to verify">
+      <p>
+        <strong>This is what verifying will publish under the badge.</strong> Nobody at the hub has
+        checked it: it comes from the listings that named this organization. Compare it with the
+        organization's own site, and correct it before verifying if any of it is wrong.
+      </p>
+      <dl>
+        <dt>Name</dt>
+        <dd>
+          <UntrustedText value={directory.name} />
+        </dd>
+        <dt>Website</dt>
+        <dd>
+          <UntrustedText value={directory.website} />
+        </dd>
+        <dt>Logo</dt>
+        <dd>
+          <UntrustedText value={directory.logoUrl} />
+        </dd>
+        <dt>Description</dt>
+        <dd>
+          <UntrustedText value={directory.description} />
+        </dd>
+        <dt>Links</dt>
+        <dd>
+          {links.length === 0 ? (
+            <UntrustedText value={null} />
+          ) : (
+            links.map((url) => (
+              <div key={url}>
+                <UntrustedText value={url} />
+              </div>
+            ))
+          )}
+        </dd>
+        <dt>Contacts</dt>
+        <dd>
+          {contacts.length === 0 ? (
+            <UntrustedText value={null} />
+          ) : (
+            contacts.map((line) => (
+              <div key={line}>
+                <UntrustedText value={line} />
+              </div>
+            ))
+          )}
+        </dd>
+      </dl>
+    </section>
+  );
+}
+
 // ── claims ────────────────────────────────────────────────────────────────────────
 
 /** Reviewer approval verifies the organization and grants publisher ownership together. */
@@ -771,7 +846,10 @@ function Claims({
                                 onCancel={() => setPanel(null)}
                                 onConfirm={() =>
                                   void run(async () => {
-                                    const result = await api.review.approveClaim(claim.id);
+                                    const result = await api.review.approveClaim(
+                                      claim.id,
+                                      claim.organizationDirectory?.digest,
+                                    );
                                     setPanel(null);
                                     claims.reload();
                                     return result.message;
@@ -791,6 +869,9 @@ function Claims({
                                   namespace without review. Personal submission attribution stays
                                   unchanged.
                                 </p>
+                                {claim.organizationVerified ? null : (
+                                  <DirectoryEntry directory={claim.organizationDirectory} />
+                                )}
                               </ConfirmPanel>
                             ) : (
                               <ConfirmPanel
@@ -1981,7 +2062,7 @@ function OrgRow({
                 onCancel={() => setConfirming(false)}
                 onConfirm={() =>
                   void run(async () => {
-                    await api.review.verifyOrganization(org.slug);
+                    await api.review.verifyOrganization(org.slug, org.directory?.digest);
                     setConfirming(false);
                     reload();
                     return `${org.slug} is verified — its ${org.memberCount} ${org.memberCount === 1 ? "member now publishes" : "members now publish"} into that namespace without review.`;
@@ -1999,6 +2080,7 @@ function OrgRow({
                   Withdrawing later stops future writes but already-published listings stay
                   published.
                 </p>
+                <DirectoryEntry directory={org.directory} />
               </ConfirmPanel>
             )}
           </td>

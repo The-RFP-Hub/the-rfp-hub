@@ -311,6 +311,25 @@ export interface ClaimSummary {
   note: string | null;
   createdAt: string;
   decidedAt: string | null;
+  /** What approving would verify. Absent from APIs older than the directory review. */
+  organizationDirectory?: OrganizationDirectory;
+}
+
+/**
+ * Everything the directory holds about an organization — what verifying it puts the badge on.
+ * `digest` goes back with the verification so the API can refuse it if the entry changed since.
+ */
+export interface OrganizationDirectory {
+  name: string;
+  orgType: string | null;
+  description: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  socialLinks: { platform?: string; url?: string }[];
+  ecosystems: string[];
+  contacts: { name?: string; email?: string; role?: string; url?: string }[];
+  digest: string;
 }
 
 export interface ClaimList {
@@ -485,6 +504,8 @@ export interface OrganizationSummary {
   website: string | null;
   ecosystems: string[];
   memberCount: number;
+  /** Absent from APIs older than the directory review. */
+  directory?: OrganizationDirectory;
 }
 
 export interface OrganizationList {

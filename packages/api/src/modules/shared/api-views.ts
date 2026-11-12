@@ -310,6 +310,8 @@ export interface ClaimSummaryView {
   note: string | null;
   createdAt: string;
   decidedAt: string | null;
+  /** The organization's directory entry, which approving the claim verifies. */
+  organizationDirectory: OrganizationDirectoryView;
 }
 
 export interface ClaimListView {
@@ -508,6 +510,26 @@ export interface OrganizationSummaryView {
   website: string | null;
   ecosystems: string[];
   memberCount: number;
+  /** Everything the directory holds, as a reviewer is shown it before verifying. */
+  directory: OrganizationDirectoryView;
+}
+
+/**
+ * An organization's directory entry, whole — what verification puts the badge on. `digest` is sent
+ * back with a verification to have it refused if the entry changed after it was shown
+ * (`modules/shared/organization-directory.ts`).
+ */
+export interface OrganizationDirectoryView {
+  name: string;
+  orgType: string | null;
+  description: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  socialLinks: unknown[];
+  ecosystems: string[];
+  contacts: unknown[];
+  digest: string;
 }
 
 export interface OrganizationListView {

@@ -72,6 +72,7 @@ import type {
   NotificationReadAllView,
   NotificationView,
   OpenConfirmationView,
+  OrganizationDirectoryView,
   OrganizationListView,
   OrganizationSummaryView,
   OwnedDuplicateListView,
@@ -320,6 +321,7 @@ describe("closed response components vs their producers", () => {
       "NotificationReadAll",
       "OpenConfirmation",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
+      "OrganizationDirectory",
       "OrganizationList",
       "OrganizationSummary",
       "OwnedDuplicateList",
@@ -515,6 +517,18 @@ describe("M3 closed components vs their view types", () => {
     organizationSlug: "example-org",
     message: "…",
   };
+  const organizationDirectory = {
+    name: "Example",
+    orgType: null,
+    description: null,
+    website: null,
+    logoUrl: null,
+    bannerUrl: null,
+    socialLinks: [{ platform: "twitter", url: "https://x.example/one" }],
+    ecosystems: [],
+    contacts: [{ name: "Someone", email: "someone@example.com" }],
+    digest: "0".repeat(64),
+  };
   const claimSummary: ClaimSummaryView = {
     id: 1,
     opportunityId: "example-org:one",
@@ -528,6 +542,7 @@ describe("M3 closed components vs their view types", () => {
     note: null,
     createdAt: "2026-08-14T00:00:00.000Z",
     decidedAt: null,
+    organizationDirectory,
   };
   const insightsTotals: InsightsTotalsView = {
     listViews: 12,
@@ -615,6 +630,7 @@ describe("M3 closed components vs their view types", () => {
     website: null,
     ecosystems: [],
     memberCount: 1,
+    directory: organizationDirectory,
   };
   const membershipInvite: MembershipInviteView = {
     id: 1,
@@ -746,6 +762,7 @@ describe("M3 closed components vs their view types", () => {
     AccountSummary: accountSummary,
     AccountList: { items: [accountSummary] } satisfies AccountListView,
     OrganizationSummary: organizationSummary,
+    OrganizationDirectory: organizationDirectory satisfies OrganizationDirectoryView,
     OrganizationList: { items: [organizationSummary] } satisfies OrganizationListView,
     MembershipResult: {
       organizationSlug: "example-org",
