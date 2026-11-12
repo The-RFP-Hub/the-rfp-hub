@@ -30,10 +30,12 @@
  *      attribution impersonation, forged submission times, and deliberate collisions against the
  *      `ux_opp_source` unique key. Every one of them is server-set below; `originalId` is accepted
  *      only from a credential that could publish here, because it is half of that unique key.
- *   6. **Organizations are INSERT … ON CONFLICT DO NOTHING.** Never the read path's
- *      `upsertOrganization`, whose `onConflictDoUpdate` rewrites name, website, logo, banner, social
- *      links, ecosystems and contacts — reusing it here would let any submitter overwrite a
- *      verified organization's branding by naming its slug (D-9).
+ *   6. **Organizations are INSERT … ON CONFLICT DO NOTHING, at the write's standing.** Never the
+ *      read path's `upsertOrganization`, whose `onConflictDoUpdate` rewrites name, website, logo,
+ *      banner, social links, ecosystems and contacts — reusing it here would let any submitter
+ *      overwrite a verified organization's branding by naming its slug (D-9). A write that is not
+ *      approved creates slug-and-name stubs only, at most `MAX_NEW_ORGANIZATIONS_PER_SUBMISSION`
+ *      of them; an approved one fills empty fields of unverified rows (`cited-organizations.ts`).
  *   7. **The mutation and its audit row share one transaction**, so history and state commit
  *      together or not at all.
  *
@@ -82,6 +84,7 @@ import {
   resolvePublishAuthority,
 } from "../auth/publish-authority.js";
 import type { DuplicateCheckResult } from "../dedupe/dedupe.service.js";
+import { fillCitedOrganizations, stubCitedOrganizations } from "./cited-organizations.js";
 
 /** Per-field caps, enforced before anything is persisted. The body cap is on the route. */
 export const FIELD_CAPS = {
@@ -826,7 +829,25 @@ export class OpportunityWriteService {
       await this.assertPendingHeadroom(repos, principal.accountId);
     }
 
-    await insertOrganizationStubs(repos, document);
+    // ORGANIZATIONS AT THE STANDING OF THIS WRITE (`cited-organizations.ts`). An approved write
+    // creates what is missing and fills empty fields of unverified rows; anything else leaves only
+    // slug-and-name stubs, and a bounded number of them.
+    const cited = organizationInserts(document);
+    if (values.reviewStatus === "approved") {
+      await fillCitedOrganizations(
+        repos,
+        cited,
+        {
+          actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
+          actorAccountId: principal.accountId,
+          actorApiKeyId: principal.apiKeyId ?? null,
+        },
+        document.id,
+        now,
+      );
+    } else {
+      await stubCitedOrganizations(repos, cited);
+    }
 
     const stored = await (existing === undefined
       ? repos.opportunities.insert(values)
@@ -961,20 +982,6 @@ export class OpportunityWriteService {
  */
 async function lockAccountRow(repos: Repositories, accountId: number) {
   return repos.accounts.lockById(accountId);
-}
-
-/**
- * Directory stubs for organizations this entry names — created, never updated.
- *
- * This is the whole of D-9 in three lines: a slug nobody knows becomes a stub, and a slug that is
- * already a verified publisher keeps every field it has.
- */
-export async function insertOrganizationStubs(
-  repos: Repositories,
-  document: Opportunity,
-): Promise<void> {
-  const orgs = organizationInserts(document);
-  await repos.organizations.insertStubs(orgs);
 }
 
 /** The document, as an object, or a 400 that says what arrived instead. */

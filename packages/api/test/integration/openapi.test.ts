@@ -213,6 +213,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(approveClaimConflict.properties.error.enum).toEqual([
       "claim_decided",
       "opportunity_merged",
+      "organization_directory_changed",
     ]);
     expect(approveClaimConflict.description).toContain("opportunity_merged");
     const rejectClaimConflict =

@@ -18,6 +18,7 @@
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow, OrganizationRow } from "../../../db/schema.js";
+import { organizationInserts } from "../../mappers/opportunity.mapper.js";
 import {
   type OrganizationUpdate,
   type Repositories,
@@ -35,6 +36,10 @@ import type {
 import { isPastDue, latestFixedDeadlineAt } from "../../shared/deadlines.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { reviewerPins } from "../../shared/link-out.js";
+import {
+  assertDirectoryUnchanged,
+  organizationDirectoryView,
+} from "../../shared/organization-directory.js";
 import { closingDriver, inactivityClosesAt } from "../../shared/staleness.js";
 import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
@@ -44,6 +49,7 @@ import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
 } from "../notifications/notification-dispatch.queue.js";
+import { fillCitedOrganizations } from "../opportunities/cited-organizations.js";
 import { earliestInactivityClosings } from "./closing-soon.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
@@ -135,6 +141,17 @@ export class ReviewService {
           // pins nothing: it is not public, and nothing it stores is being vouched for.
           ...(approve ? reviewerPins(row) : {}),
         })) ?? row;
+      // THE APPROVAL IS WHAT LETS THE ENTRY SPEAK FOR ITS ORGANIZATIONS: their stubs get the entry's
+      // details where they have none (`cited-organizations.ts`). A rejection writes nothing.
+      if (approve) {
+        await fillCitedOrganizations(
+          repos,
+          organizationInserts(row),
+          { actorKind: "user", actorAccountId: reviewerId },
+          row.publicId,
+          now,
+        );
+      }
       await repos.audit.record({
         subjectKind: "opportunity",
         subjectId: row.id,
@@ -343,6 +360,12 @@ export class ReviewService {
     reviewerId: number,
     slug: string,
     verified: boolean,
+    /**
+     * The `directory.digest` the reviewer was shown. When given, verifying is refused with a 409 if
+     * the directory entry no longer matches it — the badge goes on the data somebody looked at.
+     * Optional so an older client keeps working; the dashboard always sends it.
+     */
+    expectedDirectoryDigest?: string,
   ): Promise<OrganizationSummaryView> {
     const settled = await withTransaction(this.db, async (repos) => {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
@@ -350,6 +373,7 @@ export class ReviewService {
       const row = await lockOrganization(repos, slug);
       if (row.verified === verified)
         return { summary: await this.summarize(repos, row), notificationIds: [] };
+      if (verified) assertDirectoryUnchanged(row, expectedDirectoryDigest);
       const now = new Date();
       const next =
         (await repos.organizations.update(row.id, {
@@ -662,6 +686,17 @@ export class ReviewService {
           // alone for the same reason: the hub's link-out vouches only for what a HUB reviewer saw.
           // A link the reviewer already pinned stays vouched; a new one gets the leaving page.
         })) ?? row;
+      // The same directory fill as the staff route's approval, for the same reason: this is the
+      // entry being approved. Verified organizations are untouched by it either way.
+      if (decision.approve) {
+        await fillCitedOrganizations(
+          repos,
+          organizationInserts(row),
+          { actorKind: "user", actorAccountId: accountId },
+          row.publicId,
+          now,
+        );
+      }
 
       await repos.audit.record({
         subjectKind: "opportunity",
@@ -723,6 +758,7 @@ export class ReviewService {
       website: row.website,
       ecosystems: row.ecosystems,
       memberCount: await repos.memberships.countForOrganization(row.id),
+      directory: organizationDirectoryView(row),
     };
   }
 }

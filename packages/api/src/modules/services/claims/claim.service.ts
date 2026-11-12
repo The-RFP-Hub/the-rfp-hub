@@ -11,6 +11,10 @@ import { type Repositories, repositories, withTransaction } from "../../reposito
 import type { ClaimResultView, ClaimSummaryView } from "../../shared/api-views.js";
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
+import {
+  assertDirectoryUnchanged,
+  organizationDirectoryView,
+} from "../../shared/organization-directory.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 import { buildPublisherVerifiedNotifications } from "../notifications/email-notification-events.js";
 import {
@@ -278,6 +282,9 @@ export class ClaimService {
         note: claim.note,
         createdAt: claim.createdAt.toISOString(),
         decidedAt: claim.decidedAt?.toISOString() ?? null,
+        // What approving would verify. A directory entry may still be the stub, or the details
+        // the first approved entry naming it supplied — nobody at the hub has confirmed either.
+        organizationDirectory: organizationDirectoryView(organization),
       }),
     );
   }
@@ -290,6 +297,11 @@ export class ClaimService {
       approve: boolean;
       /** @deprecated Approval always verifies; retained for existing service callers. */
       verifyOrganization?: boolean;
+      /**
+       * The `organizationDirectory.digest` the reviewer was shown. When given, an approval that would
+       * verify the organization is refused with a 409 if its directory entry changed since.
+       */
+      expectedDirectoryDigest?: string;
     },
   ): Promise<ClaimResultView> {
     const settled = await withTransaction(this.db, async (repos) => {
@@ -307,6 +319,11 @@ export class ClaimService {
       }
 
       if (decision.approve) await assertClaimOpen(repos, entry);
+      // The organization row is locked with the claim (`lockWithOrganization` is FOR UPDATE over
+      // the join), so the entry compared here is the one the verification below applies to.
+      if (decision.approve && !found.organization.verified) {
+        assertDirectoryUnchanged(found.organization, decision.expectedDirectoryDigest);
+      }
 
       const now = new Date();
       await repos.claims.decide(

@@ -699,8 +699,52 @@ describe("deciding a claim", () => {
     });
     expect(panel.textContent).toContain("can edit and manage it");
     fireEvent.click(within(panel).getByRole("button", { name: "Approve and verify" }));
-    await waitFor(() => expect(approveClaim).toHaveBeenCalledWith(claim.id));
+    await waitFor(() => expect(approveClaim).toHaveBeenCalledWith(claim.id, undefined));
     expect(await screen.findByText("Organization verified and claim approved.")).toBeTruthy();
+  });
+
+  // What the badge will vouch for is on the screen when the reviewer confirms, and the decision
+  // carries the digest of exactly that, so the API can refuse it if the entry moved since.
+  it("shows the organization's directory entry and sends its digest with the approval", async () => {
+    tab.current = "claims";
+    const api = client();
+    const approveClaim = vi.fn(async () => ({ message: "approved" }));
+    api.review.approveClaim = approveClaim as unknown as ApiClient["review"]["approveClaim"];
+    api.review.claims = async () => ({
+      items: [
+        {
+          ...claim,
+          organizationDirectory: {
+            name: "Indie Collective",
+            orgType: null,
+            description: "Planted description",
+            website: "https://planted.example",
+            logoUrl: null,
+            bannerUrl: null,
+            socialLinks: [{ platform: "twitter", url: "https://x.example/indie" }],
+            ecosystems: [],
+            contacts: [{ name: "Mallory", email: "mallory@planted.example" }],
+            digest: "d".repeat(64),
+          },
+        },
+      ],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Approve and verify…" }));
+    const panel = screen.getByRole("group", {
+      name: "Approve the claim and verify indie-collective?",
+    });
+    const entry = within(panel).getByRole("region", { name: "Directory entry to verify" });
+    expect(entry.textContent).toContain("https://planted.example");
+    expect(entry.textContent).toContain("Planted description");
+    expect(entry.textContent).toContain("https://x.example/indie");
+    expect(entry.textContent).toContain("Mallory · mallory@planted.example");
+    fireEvent.click(within(panel).getByRole("button", { name: "Approve and verify" }));
+    await waitFor(() => expect(approveClaim).toHaveBeenCalledWith(claim.id, "d".repeat(64)));
   });
 
   it("discloses a reviewer deciding their own claim in the row and confirmation", async () => {
@@ -1251,12 +1295,50 @@ describe("the organizations tab", () => {
     expect(verifyOrganization).not.toHaveBeenCalled();
 
     fireEvent.click(within(panel).getByRole("button", { name: "Verify organization" }));
-    await waitFor(() => expect(verifyOrganization).toHaveBeenCalledWith("indie-collective"));
+    await waitFor(() =>
+      expect(verifyOrganization).toHaveBeenCalledWith("indie-collective", undefined),
+    );
     expect(
       await screen.findByText(
         "indie-collective is verified — its 1 member now publishes into that namespace without review.",
       ),
     ).toBeTruthy();
+  });
+
+  it("shows the directory entry before verifying, and sends its digest", async () => {
+    const api = client();
+    const withDirectory = org({
+      directory: {
+        name: "Indie Collective",
+        orgType: null,
+        description: null,
+        website: "https://planted.example",
+        logoUrl: "https://planted.example/logo.png",
+        bannerUrl: null,
+        socialLinks: [],
+        ecosystems: [],
+        contacts: [],
+        digest: "e".repeat(64),
+      },
+    });
+    api.review.organizations = (async (query?: { verified?: boolean }) => ({
+      items: query?.verified ? [verifiedOrg] : [withDirectory],
+    })) as ApiClient["review"]["organizations"];
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Verify…" }));
+    const panel = screen.getByRole("group", { name: "Verify Indie Collective?" });
+    const entry = within(panel).getByRole("region", { name: "Directory entry to verify" });
+    expect(entry.textContent).toContain("https://planted.example/logo.png");
+    fireEvent.click(within(panel).getByRole("button", { name: "Verify organization" }));
+    await waitFor(() =>
+      expect(verifyOrganization).toHaveBeenCalledWith("indie-collective", "e".repeat(64)),
+    );
   });
 
   it("grants a membership, resolving the handle the reviewer knows to the id the API wants", async () => {

@@ -53,6 +53,14 @@ an unverified directory stub by the **first submission that names it** in
 `operatingOrganizations`, inside that submission's own transaction, whether or not the entry is
 ever approved.
 
+**The stub holds the slug and the name, nothing else.** Website, logo, description, links and
+contacts are filled only when an entry naming the organization is APPROVED, only into fields that
+are still empty, and never once the organization is verified. So an organization verified before
+any of its entries is approved has an almost empty directory entry: check what the verify
+confirmation shows (`directory` on `GET /v1/review/organizations`), and fill or correct it with
+`PATCH /v1/review/organizations/:slug` before verifying — the verification is refused with
+`409 organization_directory_changed` if the entry moves after you were shown it.
+
 So if the applicant has not submitted anything yet, `POST /v1/review/organizations/:slug/verify`
 has nothing to verify. Reply on the issue asking them to sign in and submit one program naming
 their organization — it will land `pending`, which is correct and expected — and pick the thread up
