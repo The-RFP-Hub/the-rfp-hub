@@ -88,11 +88,14 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
           properties: { id: { type: "string", description: "Public id, e.g. fundingmap:1459" } },
           required: ["id"],
         },
-        // DELIBERATELY OPEN (no `additionalProperties: false`). This route never declared a
-        // querystring, so it has always ignored one — a cache-buster, a tracking parameter a client
-        // forwards — and closing it now would turn those reads into 400s.
+        // STRICT, like every other public read that declares a querystring (docs/api-integration.md
+        // §4.1). Declaring `count` put a query parameter in the published document, and from then on
+        // the compliance contract (M2-2, scripts/compliance/checks/openapi.mjs) holds this route to
+        // "an undocumented parameter is a 400, never a silently ignored 200". A misspelled
+        // `?cuont=false` quietly counting the read is exactly the failure that contract exists for.
         querystring: {
           type: "object",
+          additionalProperties: false,
           properties: {
             count: {
               type: "boolean",
@@ -104,6 +107,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         },
         response: {
           200: { $ref: "Opportunity#" },
+          400: { $ref: "ErrorResponse#" },
           404: {
             oneOf: [{ $ref: "ErrorResponse#" }, { $ref: "MergedOpportunityErrorResponse#" }],
           },
