@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -8,7 +8,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
-          exclude: ["test/integration/**"],
+          exclude: [...configDefaults.exclude, "test/integration/**"],
         },
       },
       {
