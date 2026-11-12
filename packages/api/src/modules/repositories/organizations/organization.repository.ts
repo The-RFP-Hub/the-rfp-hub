@@ -169,8 +169,8 @@ export class OrganizationRepository {
 
   /**
    * Every organization that ONLY rejected entries name: unverified, with no membership, invite or
-   * claim (each of which would cascade on delete), named by at least one opportunity and by no
-   * opportunity that is not rejected. What `scripts/cleanup-rejected-org-stubs.ts` reports and,
+   * claim (each of which would cascade on delete), and no non-rejected citation. Includes uncited
+   * rows. What `scripts/cleanup-rejected-org-stubs.ts` reports and,
    * when told to, deletes. Never a verified organization, whatever else is true.
    */
   async citedOnlyByRejected(): Promise<OrganizationRow[]> {
@@ -180,7 +180,6 @@ export class OrganizationRepository {
       .where(
         and(
           eq(organizations.verified, false),
-          sql`exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs))`,
           sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs) and o.review_status <> 'rejected')`,
           sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
           sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
@@ -210,6 +209,23 @@ export class OrganizationRepository {
       )
       .returning({ slug: organizations.slug });
     return rows.map((row) => row.slug);
+  }
+
+  /** Remove citations dropped by an edit only when nothing else depends on the row. */
+  async deleteUncitedStubs(slugs: string[]): Promise<void> {
+    if (slugs.length === 0) return;
+    await this.exec
+      .delete(organizations)
+      .where(
+        and(
+          inArray(organizations.slug, slugs),
+          eq(organizations.verified, false),
+          sql`not exists (select 1 from ${opportunities} o where ${organizations.slug} = any(o.org_slugs))`,
+          sql`not exists (select 1 from ${orgMemberships} m where m.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${orgMembershipInvites} i where i.organization_id = ${organizations.id})`,
+          sql`not exists (select 1 from ${opportunityClaims} c where c.organization_id = ${organizations.id})`,
+        ),
+      );
   }
 
   async insertStubs(values: OrganizationInsert[]): Promise<void> {

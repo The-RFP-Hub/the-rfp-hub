@@ -7,7 +7,7 @@
  * row that nothing else holds on to, and with `--apply` deletes them:
  *
  *   - not verified (a verified organization is never touched, whatever names it);
- *   - named by at least one opportunity, and by no opportunity that is not rejected;
+ *   - not named by any opportunity that is not rejected, including uncited stubs;
  *   - no membership, no invite and no claim — each would be deleted with it by cascade, which is
  *     not this script's decision to make.
  *

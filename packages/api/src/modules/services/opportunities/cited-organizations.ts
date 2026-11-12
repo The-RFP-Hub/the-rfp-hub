@@ -39,7 +39,9 @@ export async function stubCitedOrganizations(
       `this entry names ${fresh.length} organizations the directory does not know yet; an entry that is not published directly may add at most ${MAX_NEW_ORGANIZATIONS_PER_SUBMISSION}. Organizations already in the directory do not count.`,
     );
   }
-  await repos.organizations.insertStubs(organizationStubs(fresh));
+  await repos.organizations.insertStubs(
+    organizationStubs(fresh.sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0))),
+  );
 }
 
 /**
@@ -59,8 +61,8 @@ export async function fillCitedOrganizations(
   now: Date,
 ): Promise<void> {
   if (cited.length === 0) return;
-  await repos.organizations.insertStubs(cited);
   const ordered = [...cited].sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+  await repos.organizations.insertStubs(ordered);
   for (const from of ordered) {
     const row = await repos.organizations.lockBySlug(from.slug);
     if (!row) continue;

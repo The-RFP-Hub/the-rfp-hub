@@ -21,7 +21,13 @@ import { auditLog, opportunities, organizations } from "../../src/db/schema.js";
 import { repositories } from "../../src/modules/repositories/index.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import { MAX_NEW_ORGANIZATIONS_PER_SUBMISSION } from "../../src/modules/shared/organization-directory.js";
-import { bearer, seedIdentity, seedOrganization, testAuth } from "../helpers/auth.js";
+import {
+  bearer,
+  grantMembership,
+  seedIdentity,
+  seedOrganization,
+  testAuth,
+} from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
@@ -50,7 +56,7 @@ function plantedOrganization(s: string) {
     website: "https://attacker.example",
     logoUrl: "https://attacker.example/logo.png",
     description: "Not who they say they are.",
-    socialLinks: [{ platform: "twitter", url: "https://x.example/attacker" }],
+    socialLinks: [{ platform: "twitter" as const, url: "https://x.example/attacker" }],
     contacts: [{ name: "Mallory", email: "mallory@attacker.example" }],
   };
 }
@@ -64,6 +70,7 @@ describeWithDb("M3ODIR the organization directory", () => {
   let submitterToken: string;
   let reviewerToken: string;
   let claimantToken: string;
+  let claimantAccountId: number;
   const userIds: string[] = [];
 
   beforeAll(async () => {
@@ -79,6 +86,7 @@ describeWithDb("M3ODIR the organization directory", () => {
     submitterToken = submitter.token;
     reviewerToken = reviewer.token;
     claimantToken = claimant.token;
+    claimantAccountId = claimant.account.id;
   }, 60_000);
 
   afterAll(async () => {
@@ -232,6 +240,121 @@ describeWithDb("M3ODIR the organization directory", () => {
     expect(atCap.statusCode, atCap.body).toBe(201);
   });
 
+  it("does not accumulate stubs through repeated PUTs on a pending submission", async () => {
+    const host = org("edit-host");
+    const id = `${host}:one`;
+    const batches = Array.from({ length: 4 }, (_, batch) =>
+      Array.from({ length: 9 }, (_, i) => org(`edit-${batch}-${i}`)),
+    );
+    const seen: string[] = [];
+    for (const [batch, sponsors] of batches.entries()) {
+      const payload = submission(id, host, {
+        operatingOrganizations: [{ name: host, slug: host }],
+        sponsoringOrganizations: sponsors.map((s) => ({ name: s, slug: s })),
+      });
+      const response = await app.inject({
+        method: batch === 0 ? "POST" : "PUT",
+        url: batch === 0 ? "/v1/opportunities" : `/v1/opportunities/${id}`,
+        headers: bearer(submitterToken),
+        payload,
+      });
+      expect(response.statusCode, response.body).toBe(batch === 0 ? 201 : 200);
+      expect(response.json().reviewStatus).toBe("pending");
+      for (const old of seen) expect(await directoryRow(old), old).toBeUndefined();
+      for (const current of sponsors) expect(await directoryRow(current), current).toBeTruthy();
+      seen.push(...sponsors);
+    }
+    expect((await decide(id, "reject")).statusCode).toBe(200);
+  });
+
+  it("preserves dropped organizations cited elsewhere or protected by membership or verification", async () => {
+    const host = org("edit-protected-host");
+    const shared = org("edit-shared");
+    const verified = org("edit-verified");
+    const member = org("edit-member");
+    const removable = org("edit-removable");
+    await seedOrganization({ slug: verified, verified: true });
+    const memberRow = await seedOrganization({ slug: member });
+    await grantMembership(claimantAccountId, memberRow.id);
+    expect((await submit(`${shared}:other`, shared)).statusCode).toBe(201);
+    const id = `${host}:one`;
+    expect(
+      (
+        await submit(id, host, {
+          sponsoringOrganizations: [shared, verified, member, removable].map((slug) => ({
+            name: slug,
+            slug,
+          })),
+        })
+      ).statusCode,
+    ).toBe(201);
+    const response = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(submitterToken),
+      payload: submission(id, host),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    for (const kept of [shared, verified, member]) expect(await directoryRow(kept)).toBeTruthy();
+    expect(await directoryRow(removable)).toBeUndefined();
+    expect((await decide(id, "reject")).statusCode).toBe(200);
+    expect((await decide(`${shared}:other`, "reject")).statusCode).toBe(200);
+  });
+
+  for (const path of ["namespace approval", "auto-approved write"]) {
+    it(`fills only empty unverified fields through ${path}`, async () => {
+      const host = org(path === "namespace approval" ? "ns-host" : "auto-host");
+      const sponsor = org(`${host}-sponsor`);
+      const verified = org(`${host}-verified`);
+      const hostRow = await seedOrganization({ slug: host, verified: true });
+      await seedOrganization({ slug: sponsor });
+      await db
+        .update(organizations)
+        .set({ website: "https://kept.example" })
+        .where(eq(organizations.slug, sponsor));
+      await seedOrganization({ slug: verified, verified: true });
+      await grantMembership(claimantAccountId, hostRow.id);
+      const id = `${host}:one`;
+      const details: NonNullable<Parameters<typeof submission>[2]> = {
+        operatingOrganizations: [plantedOrganization(host)],
+        sponsoringOrganizations: [plantedOrganization(sponsor), plantedOrganization(verified)],
+      };
+      if (path === "namespace approval") {
+        expect((await submit(id, host, details)).statusCode).toBe(201);
+        expect((await directoryRow(sponsor))?.logoUrl).toBeNull();
+        const response = await app.inject({
+          method: "POST",
+          url: `/v1/organizations/${host}/opportunities/${id}/approve`,
+          headers: bearer(claimantToken),
+          payload: {},
+        });
+        expect(response.statusCode, response.body).toBe(200);
+      } else {
+        const response = await app.inject({
+          method: "POST",
+          url: "/v1/opportunities",
+          headers: bearer(claimantToken),
+          payload: submission(id, host, details),
+        });
+        expect(response.statusCode, response.body).toBe(201);
+        expect(response.json().reviewStatus).toBe("approved");
+      }
+      expect(await directoryRow(sponsor)).toMatchObject({
+        website: "https://kept.example",
+        logoUrl: "https://attacker.example/logo.png",
+        description: "Not who they say they are.",
+        verified: false,
+      });
+      for (const untouched of [host, verified]) {
+        expect(await directoryRow(untouched)).toMatchObject({
+          website: null,
+          logoUrl: null,
+          verified: true,
+        });
+      }
+    });
+  }
+
   it("verifies only the directory entry the reviewer was shown", async () => {
     const s = org("digest");
     await seedOrganization({ slug: s, name: "Digest", verified: false });
@@ -350,6 +473,8 @@ describeWithDb("M3ODIR the organization directory", () => {
   });
 
   it("finds organizations only rejected entries name, and deletes them only when told to", async () => {
+    const uncited = org("uncited");
+    await seedOrganization({ slug: uncited });
     const orphan = org("orphan");
     const shared = org("shared");
     const orphanId = `${orphan}:spam`;
@@ -378,6 +503,7 @@ describeWithDb("M3ODIR the organization directory", () => {
       only: (s) => s.startsWith(`${NS}-`),
     });
     expect(dryRun.found).toContain(orphan);
+    expect(dryRun.found).toContain(uncited);
     expect(dryRun.found).not.toContain(shared);
     expect(dryRun.deleted).toEqual([]);
     expect(await directoryRow(orphan), "a dry run deletes nothing").toBeTruthy();
@@ -388,6 +514,8 @@ describeWithDb("M3ODIR the organization directory", () => {
       only: (s) => s.startsWith(`${NS}-`),
     });
     expect(applied.deleted).toContain(orphan);
+    expect(applied.deleted).toContain(uncited);
+    expect(await directoryRow(uncited)).toBeUndefined();
     expect(await directoryRow(orphan)).toBeUndefined();
     expect(await directoryRow(shared)).toBeTruthy();
     // The rejected entry itself is untouched: it keeps its own copy of what it said.

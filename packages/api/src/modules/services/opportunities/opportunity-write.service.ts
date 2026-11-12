@@ -859,6 +859,12 @@ export class OpportunityWriteService {
       throw translateWriteFailure(error, document);
     });
     if (!stored) throw new Error(`failed to persist ${document.id}`);
+    if (existing?.reviewStatus === "pending") {
+      const retained = new Set(cited.map((org) => org.slug));
+      await repos.organizations.deleteUncitedStubs(
+        existing.orgSlugs.filter((slug) => !retained.has(slug)),
+      );
+    }
 
     const patch = diffFields(
       existing ? (comparable(existing) as Record<string, unknown>) : {},
