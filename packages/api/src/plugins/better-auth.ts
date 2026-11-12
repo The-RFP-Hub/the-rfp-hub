@@ -34,8 +34,8 @@
 import type { FastifyCorsOptions } from "@fastify/cors";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Auth } from "../auth/better-auth.js";
-import { type AuthConfig, isAllowedOrigin } from "../auth/better-auth.js";
-import { RATE_LIMIT_HEADERS } from "../modules/routes/shared/rate-limit-key.js";
+import { type AuthConfig, CLIENT_IP_HEADER, isAllowedOrigin } from "../auth/better-auth.js";
+import { RATE_LIMIT_HEADERS, addressBucket } from "../modules/routes/shared/rate-limit-key.js";
 import { deliversEmail } from "../modules/services/email/email-transport.js";
 import { HttpError, badRequest, unauthorized } from "../modules/shared/http-error.js";
 
@@ -112,14 +112,45 @@ function pathOf(url: string): string {
   return query === -1 ? url : url.slice(0, query);
 }
 
+/**
+ * Address headers a caller sent, never handed to the auth library. `request.ip` already is the
+ * answer to "who is this" (Fastify walked the proxy chain under `TRUST_PROXY`); the raw headers are
+ * the question, partly written by the caller. `CLIENT_IP_HEADER` is on the list so a caller cannot
+ * pre-fill the one header the library does read.
+ */
+const CALLER_ADDRESS_HEADERS: ReadonlySet<string> = new Set([
+  "x-forwarded-for",
+  "x-real-ip",
+  "forwarded",
+  CLIENT_IP_HEADER,
+]);
+
+/**
+ * `request.ip` in the form the auth library accepts as ONE address, or undefined.
+ *
+ * Reduced through the same canonicalization the `/v1` limiters key on (`addressBucket`): the port
+ * and IPv6 scope are dropped, an IPv4-mapped address folds back to IPv4, and IPv6 is cut to its /64
+ * (the library groups by /64 as well; cutting here only makes the two agree). An address that is not
+ * an address — only possible with a `TRUST_PROXY` set higher than the real hop count — is sent as
+ * nothing, which the library treats as unknown, just as the `/v1` limiters send it to `ip:invalid`.
+ */
+export function clientAddressForAuth(ip: string): string | undefined {
+  const bucket = addressBucket(ip);
+  if (bucket === "ip:invalid") return undefined;
+  return bucket.slice("ip:".length).replace(/\/64$/, "");
+}
+
 /** The Fastify request, as the Web `Request` the auth handler consumes. */
-function toWebRequest(request: FastifyRequest, baseUrl: string): Request {
+export function toWebRequest(request: FastifyRequest, baseUrl: string): Request {
   const url = new URL(request.url, baseUrl);
   const headers = new Headers();
   for (const [key, value] of Object.entries(request.headers)) {
     if (value === undefined) continue;
+    if (CALLER_ADDRESS_HEADERS.has(key.toLowerCase())) continue;
     for (const one of Array.isArray(value) ? value : [value]) headers.append(key, one);
   }
+  const address = clientAddressForAuth(request.ip);
+  if (address !== undefined) headers.set(CLIENT_IP_HEADER, address);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   return new Request(url, {
     method: request.method,

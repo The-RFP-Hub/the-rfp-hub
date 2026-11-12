@@ -22,7 +22,7 @@
  * no dual-secret verification. That is a documented property, not an oversight — see
  * `config.ts:readBetterAuthSecret` and docs/auth.md.
  */
-import { betterAuth } from "better-auth";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, emailOTP, oneTimeToken } from "better-auth/plugins";
 import type { BetterAuthConfig, EmailConfig, GoogleConfig } from "../config.js";
@@ -95,6 +95,79 @@ const SESSION_UPDATE_AGE = 60 * 60 * 24;
 const OTP_LENGTH = 6;
 const OTP_EXPIRES_IN = 300;
 const OTP_ALLOWED_ATTEMPTS = 3;
+
+/**
+ * THE ONE HEADER THE AUTH LIBRARY READS A CLIENT ADDRESS FROM, and nobody outside this process
+ * writes it.
+ *
+ * Left to its defaults the library reads `X-Forwarded-For` straight off the request. A caller who
+ * sends their own `X-Forwarded-For` reaches us with two values in it (theirs, then the load
+ * balancer's), the library trusts only single-value headers, and every such request resolves to
+ * "no address" — one shared `no-trusted-ip` bucket per route. Anyone could spend that bucket and
+ * lock out sign-in for everybody else who arrives with a multi-value header.
+ *
+ * So the mount (`plugins/better-auth.ts`, `toWebRequest`) drops every forwarding header the caller
+ * sent, drops this one too if the caller tried it, and sets this one to `request.ip` — the address
+ * Fastify already resolved under `TRUST_PROXY`, the same one the `/v1` limiters key on. The library
+ * is told to read this header and nothing else.
+ */
+export const CLIENT_IP_HEADER = "x-rfphub-client-ip";
+
+/**
+ * The library's own limiter, WRITTEN OUT.
+ *
+ * It is on by default only under `NODE_ENV=production`, with rules that live in two places in the
+ * dependency (its defaults and the email-OTP plugin's). Declared here so the numbers are a decision
+ * in this file and hold in every environment. Keys are the library's paths, relative to
+ * `/api/auth`. These sit BEHIND the mount's own address-keyed Fastify ceilings (10/min for the
+ * mail-sending routes, 120/min for the rest), and are tighter only where a code is involved:
+ *
+ *   sending a code   3 per 5 minutes per address — a person asks for a code, maybe twice. The
+ *                    library's default was 3 per minute.
+ *   checking a code  10 per 5 minutes per address — room for typos across a few codes; each code
+ *                    still dies after OTP_ALLOWED_ATTEMPTS wrong guesses. Default was 3 per minute.
+ *
+ * Everything else keeps the library's defaults: the general 100 per 10 s, restated here so a
+ * dependency bump cannot move it silently, and the library's built-in 3 per 10 s on `/sign-in*`,
+ * `/sign-up*`, `/change-password*` and `/change-email*` (the OAuth sign-in start among them).
+ *
+ * IN MEMORY, PER PROCESS — the same as every other limiter in this API (`docs/auth.md`, "The
+ * ceilings are per PROCESS"). `storage: "database"` would need a `rateLimit` table and a migration.
+ */
+export const OTP_SEND_RATE_LIMIT = { window: 300, max: 3 } as const;
+export const OTP_CHECK_RATE_LIMIT = { window: 300, max: 10 } as const;
+export const OTP_SEND_PATHS = [
+  "/email-otp/send-verification-otp",
+  "/email-otp/request-password-reset",
+  "/forget-password/email-otp",
+  "/email-otp/request-email-change",
+] as const;
+export const OTP_CHECK_PATHS = [
+  "/email-otp/check-verification-otp",
+  "/email-otp/verify-email",
+  "/sign-in/email-otp",
+  "/email-otp/reset-password",
+  "/email-otp/change-email",
+] as const;
+
+/**
+ * ON IN EVERY ENVIRONMENT unless `AUTH_RATE_LIMIT_ENABLED=false`, which `config.ts` refuses under
+ * `NODE_ENV=production`. The one stack that turns it off is the e2e runner: it signs in a dozen
+ * identities from 127.0.0.1 in a few minutes, and now that a caller cannot pick its own address
+ * (the point of `CLIENT_IP_HEADER`) it has no other way to be several people.
+ */
+export function authRateLimit(enabled: boolean) {
+  return {
+    enabled,
+    storage: "memory",
+    window: 10,
+    max: 100,
+    customRules: Object.fromEntries([
+      ...OTP_SEND_PATHS.map((path) => [path, { ...OTP_SEND_RATE_LIMIT }]),
+      ...OTP_CHECK_PATHS.map((path) => [path, { ...OTP_CHECK_RATE_LIMIT }]),
+    ]),
+  } satisfies BetterAuthOptions["rateLimit"];
+}
 
 /**
  * The origins allowed to drive sign-in — CSRF, `callbackURL`, the handoff redirect and the
@@ -283,6 +356,12 @@ export function createAuth(options: CreateAuthOptions = {}) {
       // immediate redirects.
       oneTimeToken({ expiresIn: 3, disableClientRequest: true }),
     ],
+
+    rateLimit: authRateLimit(cfg.betterAuth.rateLimitEnabled),
+    // The address is the one the mount resolved, in a header only the mount writes. See
+    // `CLIENT_IP_HEADER`. No `trustedProxies`: the header carries exactly one address by
+    // construction, and the proxy chain was already walked by Fastify under `TRUST_PROXY`.
+    advanced: { ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] } },
 
     // Explicit, because the package ships a telemetry dependency and "off" should be a decision in
     // this file rather than an environment variable somebody forgets.

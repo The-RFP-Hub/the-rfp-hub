@@ -40,6 +40,13 @@ export interface BetterAuthConfig {
   trustedOrigins: string[];
   /** Staging only: an anchored preview-origin predicate. Never a bare `*.vercel.app`. */
   previewOriginPattern: RegExp | undefined;
+  /**
+   * The auth library's own limiter (`authRateLimit` in `auth/better-auth.ts`). True everywhere by
+   * default — the library's own default was production only — and refused as false under
+   * `NODE_ENV=production`. Off only in the e2e stack, which signs many identities in from one
+   * address.
+   */
+  rateLimitEnabled: boolean;
 }
 
 /** Optional social sign-in. Absent client id → the provider is not registered at all. */
@@ -583,6 +590,18 @@ export function readOverlapMinSimilarity(raw: string | undefined, fallback: numb
  * `NODE_ENV=production` it is not a value that gets ignored: the process refuses to start, loudly,
  * rather than serving with the guard off.
  */
+/** `AUTH_RATE_LIMIT_ENABLED`: default true, and never false in production. */
+export function readAuthRateLimitEnabled(raw: string | undefined, production: boolean): boolean {
+  const enabled = readBoolean(raw, true);
+  if (!enabled && production) {
+    throw new Error(
+      "AUTH_RATE_LIMIT_ENABLED is false under NODE_ENV=production. It turns off the sign-in and " +
+        "code limits of the auth library and exists only for the e2e stack. Unset it.",
+    );
+  }
+  return enabled;
+}
+
 export function readAllowPrivateHosts(raw: string | undefined, production: boolean): boolean {
   const allow = readBoolean(raw, false);
   if (allow && production) {
@@ -864,6 +883,7 @@ export const config: AppConfig = {
       readOptional(process.env.BETTER_AUTH_URL) ?? `http://127.0.0.1:${readPort(process.env.PORT)}`,
     trustedOrigins: readList(process.env.TRUSTED_ORIGINS),
     previewOriginPattern: readPreviewOriginPattern(process.env.PREVIEW_ORIGIN_PATTERN),
+    rateLimitEnabled: readAuthRateLimitEnabled(process.env.AUTH_RATE_LIMIT_ENABLED, isProduction),
   },
 
   google: {

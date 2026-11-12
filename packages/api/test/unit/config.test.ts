@@ -13,6 +13,7 @@ import {
   readAllowPrivateHosts,
   readAnalyticsHmacKey,
   readAppBaseUrl,
+  readAuthRateLimitEnabled,
   readBoolean,
   readDbPoolMax,
   readEmailTransport,
@@ -357,6 +358,22 @@ describe("readAllowPrivateHosts", () => {
     // …and is a no-op when it is not enabled.
     expect(readAllowPrivateHosts("false", true)).toBe(false);
     expect(readAllowPrivateHosts(undefined, true)).toBe(false);
+  });
+});
+
+describe("readAuthRateLimitEnabled", () => {
+  it("is on by default, in every environment", () => {
+    expect(readAuthRateLimitEnabled(undefined, false)).toBe(true);
+    expect(readAuthRateLimitEnabled(undefined, true)).toBe(true);
+    expect(readAuthRateLimitEnabled("true", true)).toBe(true);
+  });
+
+  // The e2e stack turns it off to sign a dozen identities in from one address. A deployment that
+  // did the same would have no limit on sending or guessing codes.
+  it("may be turned off outside production, and refuses to boot when it is turned off in it", () => {
+    expect(readAuthRateLimitEnabled("false", false)).toBe(false);
+    expect(() => readAuthRateLimitEnabled("false", true)).toThrow(/AUTH_RATE_LIMIT_ENABLED/);
+    expect(() => readAuthRateLimitEnabled("0", true)).toThrow(/production/);
   });
 });
 
