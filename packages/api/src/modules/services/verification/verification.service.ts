@@ -74,7 +74,12 @@ import type { OpportunityRow, VerificationRunRow } from "../../../db/schema.js";
 import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import type { VerificationRunView } from "../../shared/api-views.js";
 import { type FieldDiff, fieldDiff, isMatched, siteOf } from "../../shared/field-diff.js";
-import { detectBotChallenge, detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
+import { extractPageBounded } from "../../shared/html-extract-bounded.js";
+import {
+  type ExtractedPage,
+  detectBotChallenge,
+  detectSoftNotFound,
+} from "../../shared/html-extract.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
 import { type AuditActor, SYSTEM_ACTOR } from "../audit/audit.service.js";
 import type { JobResult } from "../jobs/types.js";
@@ -237,7 +242,30 @@ export class VerificationService {
             );
     }
 
-    const assessed = fetched ? assess(row, fetched) : undefined;
+    // EXTRACTION IS BOUNDED, and an extraction that ran out of time is recorded as exactly that.
+    // The page is a stranger's bytes; it is read in a worker that is terminated at the deadline
+    // (`html-extract-bounded.ts`), so a hostile page costs this process a thread for two seconds
+    // instead of the event loop for as long as the page likes.
+    //
+    // AN INTERRUPTED EXTRACTION IS A VERDICT, not a transient failure: the source answered, and
+    // what it answered could not be read. Applying it clears `verified_against_source` — a page
+    // nobody can read corroborates nothing — and stamps `verified_at`, so the entry waits for the
+    // re-check interval rather than costing a worker at the head of every nightly selection. The
+    // price, stated: a legitimate page that only overran because the host was saturated reads as
+    // unmatched until the next check or a reviewer's manual one, and the run says why.
+    let extraction: { page: ExtractedPage } | { interrupted: string } | undefined;
+    if (fetched) {
+      const bounded = await extractPageBounded(fetched.text, {
+        textLimit: SNAPSHOT_TEXT_LIMIT,
+        timeoutMs: this.config.verification.extractTimeoutMs,
+      });
+      extraction = bounded.ok ? { page: bounded.page } : { interrupted: bounded.reason };
+    }
+    const assessed =
+      fetched && extraction && "page" in extraction
+        ? assess(row, fetched, extraction.page)
+        : undefined;
+    const interrupted = extraction && "interrupted" in extraction ? extraction.interrupted : null;
     // WHETHER THIS RUN IS AN ANSWER ABOUT THE ENTRY, or only about the network in the last ten
     // seconds. See `isTransientFailure` — a timeout is not a verdict, and must not retire the row.
     const transient = assessed === undefined && isTransientFailure(failure);
@@ -281,8 +309,10 @@ export class VerificationService {
       // it. Nothing is re-fetched to do this; it is the row already in front of us.
       const applied = !stale && !transient;
       const previous = fetched ? await repos.verificationRuns.latest(row.id) : undefined;
+      // An interrupted extraction has nothing of its own to compare or carry forward.
       const unchanged =
         fetched !== undefined &&
+        assessed !== undefined &&
         fetched.truncated === false &&
         previous?.snapshotSha256 != null &&
         previous.snapshotSha256 === fetched.sha256 &&
@@ -310,7 +340,15 @@ export class VerificationService {
                 ? { snapshotUnchanged: true, snapshotUnchangedSince: previous?.runAt.toISOString() }
                 : {}),
             }
-          : null,
+          : fetched && interrupted
+            ? {
+                // What is known without reading the page, plus the flag a reviewer filters on.
+                extractionInterrupted: true,
+                contentType: fetched.contentType,
+                truncated: fetched.truncated,
+                redirects: fetched.redirects,
+              }
+            : null,
         fieldDiff: (assessed?.diff ?? null) as Record<string, unknown> | null,
         matched: assessed?.matched ?? false,
         snapshotText: unchanged
@@ -318,8 +356,9 @@ export class VerificationService {
           : (assessed?.snapshotText ?? null),
         snapshotSha256: fetched?.sha256 ?? null,
         error:
-          [staleText, transientText, failureText].filter((part) => part !== null).join(" — ") ||
-          null,
+          [staleText, transientText, failureText, interrupted]
+            .filter((part) => part !== null)
+            .join(" — ") || null,
       });
       if (!run) throw new Error(`failed to record a verification run for ${row.publicId}`);
 
@@ -389,6 +428,7 @@ export class VerificationService {
               finalUrl: fetched?.finalUrl ?? null,
               httpStatus: fetched?.status ?? failure?.status ?? null,
               ...(failure ? { error: failure.category } : {}),
+              ...(interrupted ? { error: "extraction_interrupted" } : {}),
               // A before/after pair, because this one DID change the entry: from here its apply
               // link-out goes through the leaving page until a reviewer pins it again.
               ...(landingFlagged && landing
@@ -616,7 +656,7 @@ const TRANSIENT_FETCH_FAILURES = new Set(["timeout", "transport_failure", "dns_f
  * other way claims a page is unchanged on the strength of its first two megabytes.
  */
 function wasComplete(extracted: Record<string, unknown> | null): boolean {
-  return extracted?.truncated === false;
+  return extracted?.truncated === false && extracted.extractionInterrupted !== true;
 }
 
 function isTransientFailure(failure: SourceFetchError | undefined): boolean {
@@ -682,8 +722,7 @@ interface Assessment {
  * heuristic fired is recorded, since a heuristic whose reasoning is invisible is one a reviewer has
  * to take on faith.
  */
-function assess(row: OpportunityRow, fetched: FetchedSource): Assessment {
-  const page = extractPage(fetched.text, { textLimit: SNAPSHOT_TEXT_LIMIT });
+function assess(row: OpportunityRow, fetched: FetchedSource, page: ExtractedPage): Assessment {
   const soft = detectSoftNotFound(page);
   const challenge = detectBotChallenge(page);
   const ok = fetched.status >= 200 && fetched.status < 300;

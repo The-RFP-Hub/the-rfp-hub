@@ -25,6 +25,9 @@ export default defineConfig({
     export: "scripts/export.ts",
     jobs: "scripts/jobs/run-job.ts",
     "grant-admin": "scripts/grant-admin.ts",
+    // Not a task: the thread a fetched page is read in (`html-extract-bounded.ts`), which looks
+    // for it next to the entry that started it — `server.js` or `jobs.js`, both in this directory.
+    "html-extract.worker": "src/modules/shared/html-extract.worker.ts",
   },
   format: ["esm"],
   target: "node20",

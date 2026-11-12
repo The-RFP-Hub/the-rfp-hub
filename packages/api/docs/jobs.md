@@ -1000,7 +1000,7 @@ Before the first M3 job run on any deployment, in order:
 | `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES`, `DEDUPE_OVERLAP_ENABLED`, `DEDUPE_OVERLAP_THRESHOLD`, `DEDUPE_OVERLAP_MIN_TOKENS`, `DEDUPE_OVERLAP_MIN_SIMILARITY` |
-| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFY_HOST_MIN_GAP_MS` (default 1000), `VERIFICATION_RUNS_KEEP` (default 5) |
+| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFY_EXTRACT_TIMEOUT_MS` (default 2000), `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFY_HOST_MIN_GAP_MS` (default 1000), `VERIFICATION_RUNS_KEEP` (default 5) |
 | `stale-listing-reminders` | `STALE_LISTING_REMINDER_DAYS` (default 60), `STALE_LISTING_REMINDER_CADENCE_DAYS` (default 30) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |

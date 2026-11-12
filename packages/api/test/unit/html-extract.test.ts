@@ -8,6 +8,7 @@
  * they answer 404, so status alone would mark half the dead links verified.
  */
 import { describe, expect, it } from "vitest";
+import { extractPageBounded } from "../../src/modules/shared/html-extract-bounded.js";
 import {
   MIN_CONTENT_CHARS,
   decodeEntities,
@@ -15,6 +16,8 @@ import {
   detectSoftNotFound,
   extractPage,
 } from "../../src/modules/shared/html-extract.js";
+import { extractPageWithRegexes } from "../helpers/html-extract-regex-reference.js";
+import { sourcePage } from "../helpers/verify-transport.js";
 
 const PAGE = `<!doctype html>
 <html><head>
@@ -120,5 +123,223 @@ describe("detectBotChallenge", () => {
       heuristic: expect.stringContaining("automated-access challenge"),
     });
     expect(detectBotChallenge(extractPage(PAGE)).suspected).toBe(false);
+  });
+});
+
+/*
+ * THE SCANNER FINDS WHAT THE REGEXES FOUND.
+ *
+ * `extractPage` used to be a chain of backtracking regexes and is now a linear scanner
+ * (`html-extract.ts`, "THE SCANNER"). The rewrite is a fix for its running time and must change
+ * nothing else: same title, same meta, same JSON-LD, same visible text. The old expressions are
+ * kept as an oracle (`test/helpers/html-extract-regex-reference.ts`) and both are run over every
+ * page this suite and the verification suites use, over the edge cases the scanner reasons about
+ * one by one, and over generated tag soup built from exactly those edges.
+ */
+const FIXTURES: Record<string, string> = {
+  "this suite's page": PAGE,
+  "a verification source page": sourcePage({
+    title: "Superchain Builders Fund",
+    ogTitle: "Superchain Builders Fund | Example Foundation",
+    deadline: "March 1, 2099",
+    amount: "50,000",
+    organization: "Example Foundation",
+  }),
+  "a source page without og:title": sourcePage({ title: "Superchain Builders Fund" }),
+  "a soft 404":
+    "<!doctype html><html><head><title>Page not found</title></head><body>Gone.</body></html>",
+  "a challenge page":
+    "<!doctype html><html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue</body></html>",
+  "the fetcher's page":
+    "<!doctype html><html><head><title>A programme</title></head><body>Hi.</body></html>",
+  "unclosed markup": "<html><body><p>unclosed <b>bold</body>",
+  "single-quoted meta": `<meta name=description content='single quoted'>`,
+  "broken JSON-LD": '<script type="application/ld+json">{not json</script>',
+  // The edges the scanner handles explicitly.
+  "an opener that is a longer word": "<scripts>a</scripts><titles>b</titles><metadata x>c",
+  "case and whitespace in closers": "<SCRIPT>x</script \n><Title>T</TITLE\t>y<StYlE>z</style>w",
+  "a closer with an attribute": "<script>a</script x>still script</script>after",
+  "an unclosed comment after a closed one": "<!-- a -->b<!-- c <script>d</script>",
+  "the shortest non-comment": "<!-->x<!--->y-->z",
+  "a script opener with no >": "<p>a</p><script src=x",
+  "JSON-LD in a non-JSON-LD script's body":
+    '<script>var s = \'<script type="application/ld+json">{"a":1}</script>\';</script>',
+  "several openers sharing one >":
+    '<script <script type="application/ld+json" <script x>{"b":2}</script>',
+  "JSON-LD type in mixed case": "<script TYPE = 'Application/LD+JSON'>{\"c\":3}</script>",
+  "non-ASCII letters that look like ASCII": "<ſcript>x</ſcript><tİtle>y</tİtle><title>İ</title>",
+  "a Unicode space inside a closer": "<title>a</title >b<title>c</title >",
+  "a script inside a comment": "<!-- <script>x</script> -->visible",
+  "a comment inside a script": "<script><!-- x --></script>visible",
+};
+
+const ATOMS = [
+  "<",
+  ">",
+  "<!--",
+  "-->",
+  "--",
+  "<!-->",
+  "<script",
+  "<SCRIPT",
+  "<scripts",
+  "</script",
+  "</script>",
+  "</SCRIPT >",
+  "</script\n>",
+  "</script x>",
+  "<style",
+  "</style>",
+  "<noscript",
+  "</noscript>",
+  "<title",
+  "<TITLE>",
+  "</title>",
+  "</title >",
+  "<meta",
+  "<META",
+  "<metadata",
+  " name=description",
+  " property='og:title'",
+  ' content="x &amp; y"',
+  " content=z",
+  ' type="application/ld+json"',
+  " type=application/ld+json",
+  " TYPE = 'application/LD+JSON'",
+  '{"a":1}',
+  "{bad",
+  " ",
+  "\n",
+  " ",
+  " ",
+  "text",
+  "&amp;",
+  "&#39;",
+  "&#x2014;",
+  "x",
+  "_",
+  "1",
+  "İ",
+  "ſcript",
+  '<script type="application/ld+json">',
+  '<script x type=application/ld+json y>{"b":2}</script>',
+  '{"c":3}',
+  "<meta name=a content=b>",
+  "<title>T</title>",
+  "<p>",
+  "</p>",
+  "=",
+  '"',
+  "'",
+  "<script>",
+  "<title>",
+  "<meta >",
+];
+
+/** A seeded generator, so a failure names a case that can be reproduced. */
+function soup(seed: number, count: number): string[] {
+  let state = seed;
+  const next = () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff;
+    return state / 0x7fffffff;
+  };
+  const pages: string[] = [];
+  for (let i = 0; i < count; i++) {
+    let html = "";
+    const atoms = 1 + Math.floor(next() * 14);
+    for (let k = 0; k < atoms; k++) html += ATOMS[Math.floor(next() * ATOMS.length)];
+    pages.push(html);
+  }
+  return pages;
+}
+
+describe("extractPage, compared with the regex extractor it replaced", () => {
+  for (const [name, html] of Object.entries(FIXTURES)) {
+    it(`agrees on ${name}`, () => {
+      expect(extractPage(html)).toEqual(extractPageWithRegexes(html));
+    });
+  }
+
+  it("agrees on 20 000 pages of generated tag soup", () => {
+    const pages = soup(12345, 20_000);
+    const disagreements = pages.filter(
+      (html) => JSON.stringify(extractPage(html)) !== JSON.stringify(extractPageWithRegexes(html)),
+    );
+    expect(disagreements.slice(0, 5)).toEqual([]);
+    // The soup is only worth something if it reaches every output.
+    expect(pages.filter((html) => extractPageWithRegexes(html).title).length).toBeGreaterThan(500);
+    expect(
+      pages.filter((html) => extractPageWithRegexes(html).jsonLd.length).length,
+    ).toBeGreaterThan(500);
+    expect(
+      pages.filter((html) => Object.keys(extractPageWithRegexes(html).meta).length).length,
+    ).toBeGreaterThan(500);
+  });
+
+  it("honours the text limit the same way", () => {
+    const html = `<title>t</title><body>${"word ".repeat(400)}</body>`;
+    expect(extractPage(html, { textLimit: 77 })).toEqual(
+      extractPageWithRegexes(html, { textLimit: 77 }),
+    );
+  });
+});
+
+/*
+ * HOSTILE PAGES, at the fetcher's own byte cap.
+ *
+ * Each shape opens a construct and never closes it, which is what made the regex extractor
+ * quadratic: measured at ~20 s for 256 KiB of `<!--` and ~18 s for 256 KiB of `<meta ` before the
+ * rewrite, four times as long for every doubling. At 2 MiB (`VERIFY_MAX_BYTES`) each must now be
+ * read in well under a quarter of a second. The time is the best of three, so a noisy CI neighbour
+ * does not fail the suite; a quadratic regression is three orders of magnitude, not noise.
+ */
+const MiB = 1024 * 1024;
+const fill = (unit: string, bytes: number) =>
+  unit.repeat(Math.ceil(bytes / unit.length)).slice(0, bytes);
+
+const HOSTILE: Record<string, () => string> = {
+  "`<!--` never closed": () => fill("<!--", 2 * MiB),
+  "`<meta ` with no `>`": () => fill("<meta ", 2 * MiB),
+  "`<` with no `>`": () => fill("<", 2 * MiB),
+  "`<script>` never closed": () => fill("<script>", 2 * MiB),
+  "`<script ` with no `>`": () => fill("<script ", 2 * MiB),
+  "`<script ` openers sharing one `>`": () => `${fill("<script ", 2 * MiB - 1)}>`,
+  "`<style>` never closed": () => fill("<style>", 2 * MiB),
+  "`<noscript>` never closed": () => fill("<noscript>", 2 * MiB),
+  "`<title>` never closed": () => fill("<title>", 2 * MiB),
+  "a JSON-LD opener never closed": () => fill('<script type="application/ld+json">', 2 * MiB),
+  'one `<meta` full of `content="`': () => `<meta ${fill('content="', 2 * MiB - 7)}>`,
+};
+
+describe("extractPage on hostile pages", () => {
+  for (const [name, make] of Object.entries(HOSTILE)) {
+    it(`reads 2 MiB of ${name} in under 250 ms`, () => {
+      const html = make();
+      let best = Number.POSITIVE_INFINITY;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const start = performance.now();
+        extractPage(html);
+        best = Math.min(best, performance.now() - start);
+      }
+      expect(best).toBeLessThan(250);
+    });
+  }
+});
+
+describe("extractPageBounded", () => {
+  it("returns what extractPage returns, read in a worker", async () => {
+    const result = await extractPageBounded(PAGE, { timeoutMs: 30_000, textLimit: 100 });
+    expect(result).toEqual({ ok: true, page: extractPage(PAGE, { textLimit: 100 }) });
+  });
+
+  it("reports an extraction that misses its deadline as interrupted, instead of waiting for it", async () => {
+    // One millisecond is less than a worker takes to start, so the deadline always wins here.
+    const start = performance.now();
+    const result = await extractPageBounded(fill("<p>a</p>", 2 * MiB), { timeoutMs: 1 });
+    expect(result).toEqual({
+      ok: false,
+      reason: expect.stringMatching(/^extraction_interrupted: .*within 1 ms/),
+    });
+    expect(performance.now() - start).toBeLessThan(1_000);
   });
 });
