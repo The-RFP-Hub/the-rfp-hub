@@ -48,7 +48,8 @@ test.describe("open claims", () => {
       operatingOrganizations: [aggregator, ...operating].map((slug) => ({ name: slug, slug })),
     });
     const submitter = await api("submitter");
-    expect((await submitter.post("/v1/opportunities", document)).status).toBe(201);
+    const created = await submitter.post("/v1/opportunities", document);
+    expect(created.status, created.text.slice(0, 300)).toBe(201);
     const id = document.id as string;
     const reviewer = await api("reviewer");
     expect(
@@ -170,22 +171,32 @@ test.describe("open claims", () => {
     const stamp = Date.now();
     const base = `${stack.namespaces.publisher}-cap${stamp}`;
     const slugs = Array.from({ length: 11 }, (_, index) => `${base}-${index}`);
-    const { id } = await publishedEntry(
-      db,
-      api,
-      opportunityFixture,
-      slugs[0] as string,
-      `cap-${stamp}`,
-      slugs,
-    );
+    // A write that is not published directly may add at most ten new organizations
+    // (`too_many_new_organizations`), and each entry also names its own aggregator. Eleven
+    // organizations to claim therefore need two entries; the pending cap is per account, so it
+    // still counts claims across both.
+    const halves = [slugs.slice(0, 6), slugs.slice(6)];
+    const claims: Array<{ path: string; slug: string }> = [];
+    for (const [index, half] of halves.entries()) {
+      const { id } = await publishedEntry(
+        db,
+        api,
+        opportunityFixture,
+        half[0] as string,
+        `cap-${stamp}-${index}`,
+        half,
+      );
+      const path = `/v1/opportunities/${encodeURIComponent(id)}/claim`;
+      for (const slug of half) claims.push({ path, slug });
+    }
 
     const claimant = clientFor(stack, (await freshIdentity(stack, `cap-${stamp}`)).token);
-    const path = `/v1/opportunities/${encodeURIComponent(id)}/claim`;
-    for (const slug of slugs.slice(0, 10)) {
+    for (const { path, slug } of claims.slice(0, 10)) {
       const filed = await claimant.post(path, { organizationSlug: slug });
       expect(filed.status, `${slug} → ${filed.text.slice(0, 160)}`).toBe(202);
     }
-    const over = await claimant.post<{ error: string }>(path, { organizationSlug: slugs[10] });
+    const last = claims[10] as { path: string; slug: string };
+    const over = await claimant.post<{ error: string }>(last.path, { organizationSlug: last.slug });
     expect(over.status).toBe(409);
     expect(over.body.error).toBe("too_many_pending_claims");
   });
