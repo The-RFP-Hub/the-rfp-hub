@@ -1,9 +1,339 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-11-25T13:09:04.981Z",
-  "count": 170,
+  "generatedAt": "2026-11-26T12:49:25.124Z",
+  "count": 188,
   "opportunities": [
+    {
+      "specVersion": "1.0.1",
+      "id": "1inch:smart-contracts-bug-bounty",
+      "fundingType": "bounty",
+      "title": "1inch Smart Contracts Bug Bounty",
+      "description": "1inch runs an Immunefi bug bounty for its smart contracts, which aggregate liquidity across decentralized exchanges. It is separate from the 1inch Aqua program. The program went live June 11, 2026 and was last updated November 23, 2026. It has no closing date.\n\nRewards: Critical pays 10% of funds directly affected, from $30,000 up to $500,000. High pays $10,000 to $30,000. Medium has a $2,000 base and can go up to $10,000. Low has a $100 base and can go up to $2,000. A Critical reward requires the impact to be live on a mainnet deployment; otherwise it is graded High. The program follows Primacy of Rules and applies only to the latest tags and releases.\n\n1inch pays rewards directly in USDC on Ethereum.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "1inch",
+          "slug": "1inch",
+          "orgType": "protocol",
+          "website": "https://1inch.com",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/1inch",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://github.com/1inch",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "1inch",
+        "submittedAt": "2026-11-26T00:38:09.867Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:38:10.133Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Immunefi",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "payout": {
+              "cap": 500000,
+              "basis": "value_at_risk",
+              "floor": 30000,
+              "model": "percentage",
+              "percent": 10
+            },
+            "severity": "critical",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "max": 30000,
+              "min": 10000,
+              "model": "range"
+            },
+            "severity": "high",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "max": 10000,
+              "min": 2000,
+              "model": "range"
+            },
+            "severity": "medium",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "max": 2000,
+              "min": 100,
+              "model": "range"
+            },
+            "severity": "low",
+            "assetType": "smart_contract"
+          }
+        ],
+        "severityScheme": "Immunefi Vulnerability Severity Classification System v2.3"
+      },
+      "summary": "Immunefi bug bounty for 1inch's aggregation smart contracts, up to $500,000 for critical bugs, paid in USDC on Ethereum. Ongoing.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "DeFi",
+        "DEX",
+        "Smart Contract"
+      ],
+      "eligibility": "KYC is required for payout. Payouts may be checked against OFAC, EU and UK sanctions lists.",
+      "prerequisites": "A proof of concept is required for all severities. Report within 24 hours of discovery. Bugs in imported contracts are out of scope. Public disclosure needs 1inch's approval.",
+      "additionalReferences": "Scope: https://immunefi.com/bug-bounty/1inch-SmartContracts/scope/ · Audits: https://github.com/1inch/1inch-audits · Other 1inch programs: https://immunefi.com/bug-bounty/1inch-infrastructure/information/ , https://immunefi.com/bug-bounty/1inch-web/information/",
+      "applicationUrl": "https://immunefi.com/bug-bounty/1inch-SmartContracts/information/",
+      "website": "https://immunefi.com/bug-bounty/1inch-SmartContracts/information/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/1inch",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USDC",
+        "maxAward": 500000
+      },
+      "deadlines": [
+        {
+          "label": "submission",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-06-11T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:38:09.865Z",
+      "updatedAt": "2026-11-26T00:38:09.867Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "arbitrum-foundation:mentorship-program-cohort-2",
+      "fundingType": "accelerator",
+      "title": "Arbitrum Mentorship Program Cohort 2",
+      "description": "The Arbitrum Mentorship Program is back for Cohort 2, run with Robinhood Chain. It is a 12-week program for early-stage teams building on Arbitrum One or Robinhood Chain, built around fundraising support and hands-on execution help.\n\nTeams get investment-readiness sessions, pitch workshops and reviews, curated introductions to venture funds, and sessions on product strategy, go-to-market, growth, tokenomics, stablecoin infrastructure, AI tooling and building on Robinhood Chain. Mentors come from Robinhood Chain, Pantera, Pendle, Variational, USD.AI, Paxos, Entropy, Offchain Labs and the Arbitrum Foundation.\n\nThe top-performing teams share $100K in prizes. Kick-off is planned for January 5, 2027, and the program ends with a Demo Day on March 25, 2027 in front of 50+ investors. Applications are reviewed on a rolling basis and close December 6, 2026.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.\n\nThe program dates are given as dates only. This listing stores start dates at 00:00 UTC and end dates at 23:59:59 UTC.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Arbitrum Foundation",
+          "slug": "arbitrum-foundation",
+          "orgType": "foundation",
+          "website": "https://arbitrum.foundation",
+          "ecosystems": [
+            "Ethereum",
+            "Arbitrum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/arbitrum",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "arbitrum-foundation",
+        "submittedAt": "2026-11-26T00:46:05.329Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:46:05.572Z"
+      },
+      "fundingDetails": {
+        "fundingType": "accelerator",
+        "stage": "seed",
+        "online": true,
+        "programDurationWeeks": 12
+      },
+      "summary": "12-week program from the Arbitrum Foundation and Robinhood Chain for pre-seed and seed teams building on Arbitrum One or Robinhood Chain. $100K in prizes and a Demo Day with 50+ investors. Apply by December 6, 2026.",
+      "sponsoringOrganizations": [
+        {
+          "name": "Robinhood Chain",
+          "slug": "robinhood-chain",
+          "orgType": "company",
+          "website": "https://docs.robinhood.com/chain/"
+        }
+      ],
+      "ecosystems": [
+        "Ethereum",
+        "Arbitrum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Accelerator",
+        "L2",
+        "DeFi"
+      ],
+      "eligibility": "Pre-seed or seed teams with a working prototype, MVP, testnet deployment or early live product, committed to launch or scale on Arbitrum One or Robinhood Chain. Teams do not need to be deployed on Arbitrum yet. Prizes depend on KYC, sanctions screening and a legal agreement that may include exclusivity, milestones or KPIs.",
+      "prerequisites": "Apply through the Tally form linked from the announcement. Shortlisted teams go through review and an interview.",
+      "additionalReferences": "Program terms: https://docs.google.com/document/d/1mXAbnCDvPC1j5oWDjPThwQFZ_3zdYxkyFFDnIlWttg0/edit · Announcement: https://x.com/ArbitrumDevs/status/2124867504816443764",
+      "applicationUrl": "https://tally.so/r/Xx6xqO",
+      "website": "https://blog.arbitrum.foundation/arbitrum-mentorship-program-cohort-2-applications-now-open/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/arbitrum",
+          "platform": "twitter"
+        },
+        {
+          "url": "https://x.com/ArbitrumDevs",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "budget": 100000
+      },
+      "deadlines": [
+        {
+          "date": "2026-12-06T23:59:59.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2027-01-05T00:00:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2027-03-25T23:59:59.000Z",
+          "label": "event end",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-10-22T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:46:05.327Z",
+      "updatedAt": "2026-11-26T00:46:05.329Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "arbitrum-foundation:open-house-sao-paulo-2027",
+      "fundingType": "hackathon",
+      "title": "Arbitrum Open House São Paulo: Online Buildathon",
+      "description": "Arbitrum Open House comes to São Paulo, Brazil, in 2027, run with Robinhood Chain. It has two phases with $335K in prizes and grants in total.\n\nThe online Buildathon runs February 8-28, 2027. Founders can build a new idea, improve an existing product or MVP, or explore the Arbitrum ecosystem. Prizes:\n- Open Category, $55K in USDG: 1st $30K, 2nd $15K, 3rd $10K. At least one top-three spot goes to a project on Robinhood Chain.\n- Promising Products, $15K shared by the top three. The announcement does not name the currency for this pool. At least one spot goes to a product on Robinhood Chain.\n- Milestone Grants, $30K in USDG, awarded case by case to winning teams.\n\nOne month after the Buildathon, selected founders join a three-day in-person Founder House in São Paulo with $235K in prizes and grants. Details for Founder House come later. The announcement does not give a registration cut-off. It gives the buildathon dates only, with no time or time zone.\n\nThis listing stores the buildathon start at 00:00 UTC and its end at 23:59:59 UTC.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Arbitrum Foundation",
+          "slug": "arbitrum-foundation",
+          "orgType": "foundation",
+          "website": "https://arbitrum.foundation",
+          "ecosystems": [
+            "Ethereum",
+            "Arbitrum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/arbitrum",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "arbitrum-foundation",
+        "submittedAt": "2026-11-26T00:46:06.568Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:46:06.696Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": true,
+        "prizes": [
+          {
+            "track": "Open Category",
+            "amount": 30000
+          },
+          {
+            "track": "Open Category",
+            "amount": 15000
+          },
+          {
+            "track": "Open Category",
+            "amount": 10000
+          },
+          {
+            "track": "Promising Products",
+            "amount": 15000
+          },
+          {
+            "track": "Milestone Grants",
+            "amount": 30000
+          }
+        ],
+        "tracks": [
+          "Open Category",
+          "Promising Products",
+          "Milestone Grants"
+        ],
+        "location": null
+      },
+      "summary": "Arbitrum Foundation and Robinhood Chain online buildathon, February 8-28, 2027, with $100K in prizes and milestone grants, followed by an in-person Founder House in São Paulo with $235K more. Registration open now.",
+      "sponsoringOrganizations": [
+        {
+          "name": "Robinhood Chain",
+          "slug": "robinhood-chain",
+          "orgType": "company",
+          "website": "https://docs.robinhood.com/chain/"
+        }
+      ],
+      "ecosystems": [
+        "Ethereum",
+        "Arbitrum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "L2",
+        "DeFi",
+        "Payments"
+      ],
+      "eligibility": "Founders building onchain businesses on the Arbitrum Platform or Robinhood Chain, with a new idea or an existing product. Subject to the Buildathon Terms & Conditions.",
+      "prerequisites": "Register for the online Buildathon on openhouse.arbitrum.io.",
+      "additionalReferences": "Buildathon terms: https://openhouse.arbitrum.io/sao_paulo_version_open_house_buildathon_terms_and_conditions.pdf · Founder House terms: https://openhouse.arbitrum.io/irl_founder_house_sao_paulo_terms___conditions.pdf · Announcement: https://x.com/arbitrum/status/2125286429786067070",
+      "applicationUrl": "https://openhouse.arbitrum.io/",
+      "website": "https://blog.arbitrum.foundation/arbitrum-open-house-brings-335k-in-founder-support-to-sao-paulo-with-robinhood-chain/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/arbitrum",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "budget": 100000
+      },
+      "deadlines": [
+        {
+          "date": "2027-02-08T00:00:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2027-02-28T23:59:59.000Z",
+          "label": "event end",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-11-25T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:46:06.566Z",
+      "updatedAt": "2026-11-26T00:46:06.568Z"
+    },
     {
       "specVersion": "1.0.1",
       "id": "arbitrum-foundation:open-house-singapore-2026",
@@ -208,6 +538,309 @@
       "postedAt": "2026-08-13T00:00:00.000Z",
       "createdAt": "2026-10-01T12:40:54.397Z",
       "updatedAt": "2026-10-30T04:33:14.127Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "arbitrum-foundation:stablecoin-growth-program",
+      "fundingType": "grant",
+      "title": "Arbitrum Stablecoin Growth Program",
+      "description": "The Arbitrum Stablecoin Growth Program supports stablecoin-centric protocols, such as lending, yield, AMMs or payments, that make Global Dollar (USDG) their primary stablecoin, collateral or on-ramp asset on Arbitrum.\n\nAccepted teams may get performance-based incentives tied to their growth on the Arbitrum Platform. They may also get marketing and co-marketing, partner introductions, integration and technical support, and possible access to the DeFi Renaissance Incentive Program (DRIP).\n\nThe program also has a 2M ARB prize pool. The first 10 teams to reach $10M of USDG TVL, measured as a 30-day average, get 200K ARB each. Applications are open with no published deadline. The Arbitrum team reviews every application and contacts teams that fit.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Arbitrum Foundation",
+          "slug": "arbitrum-foundation",
+          "orgType": "foundation",
+          "website": "https://arbitrum.foundation",
+          "ecosystems": [
+            "Ethereum",
+            "Arbitrum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/arbitrum",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "arbitrum-foundation",
+        "submittedAt": "2026-11-26T00:38:11.142Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:38:11.340Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": false,
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "other"
+        ]
+      },
+      "summary": "Performance-based incentives from the Arbitrum Foundation for stablecoin-centric protocols that make USDG their primary stablecoin on Arbitrum. The first 10 teams to reach $10M USDG TVL get 200K ARB each. Rolling.",
+      "ecosystems": [
+        "Ethereum",
+        "Arbitrum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Incentives",
+        "Stablecoins",
+        "DeFi",
+        "L2"
+      ],
+      "eligibility": "Protocols with at least $1M in stablecoin balances at application (verified on DefiLlama), stablecoins at the core of the product, a live product with audited contracts, and a commitment to build on Arbitrum with USDG as the primary stablecoin and at least $1M of TVL moving into USDG.",
+      "prerequisites": "Apply through the Airtable form. Participation needs Arbitrum Foundation approval and acceptance of the Program Terms & Conditions.",
+      "additionalReferences": "Program terms: https://docs.google.com/document/d/1fNYZBgLJA4OwuU3-vTi7We5QCws3vqVd3lH5gaJv3YM/edit · USDG on Arbitrum: https://arbitrum.io/products/usdg-on-arbitrum · Announcement: https://x.com/arbitrum/status/2125680793800659302",
+      "applicationUrl": "https://airtable.com/appNPlINVhkcwnyaZ/shrHJBg8jQdc3sJEa",
+      "website": "https://blog.arbitrum.io/stablecoin-growth-program/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/arbitrum",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "ARB",
+        "budget": 2000000,
+        "maxAward": 200000
+      },
+      "deadlines": [
+        {
+          "label": "application",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-10-15T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:38:11.140Z",
+      "updatedAt": "2026-11-26T00:38:11.142Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "base:everest-audit-competition",
+      "fundingType": "bounty",
+      "title": "Base Everest Audit Competition",
+      "description": "Immunefi runs a time-boxed audit competition for Base's Everest upgrade codebase, about 135,275 lines of Rust and Solidity. Recent upgrades in scope include Everest (Base Transactions, EIP-8430), Denim (200 ms blocks), Cobalt (validity transactions) and Beryl (B20, Reth-v2, faster withdrawals).\n\nThe reward pool is set by the most severe valid finding: $250,000 if a Critical is found, $125,000 for a High, $70,000 for a Medium, $30,000 for a Low, and $20,000 if none of these apply. The pool includes a $175,000 primary pool, a $50,000 All Stars pool and a $25,000 podium pool. Rewards are paid in USDC on Base and shared among researchers under Immunefi's standardized competition terms.\n\nThe competition runs from November 19, 2026 17:00 UTC to December 1, 2026 12:00 UTC. Results are planned for December 24 and payment by December 25, 2026.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Base",
+          "slug": "base",
+          "orgType": "company",
+          "website": "https://base.org",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "Ethereum L2 incubated by Coinbase.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/base",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "base",
+        "submittedAt": "2026-11-26T00:38:12.396Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:38:12.628Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Immunefi",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "label": "Pool if a Critical is found",
+            "payout": {
+              "model": "fixed",
+              "amount": 250000
+            },
+            "severity": "critical"
+          },
+          {
+            "label": "Pool if a High is the top finding",
+            "payout": {
+              "model": "fixed",
+              "amount": 125000
+            },
+            "severity": "high"
+          },
+          {
+            "label": "Pool if a Medium is the top finding",
+            "payout": {
+              "model": "fixed",
+              "amount": 70000
+            },
+            "severity": "medium"
+          },
+          {
+            "label": "Pool if a Low is the top finding",
+            "payout": {
+              "model": "fixed",
+              "amount": 30000
+            },
+            "severity": "low"
+          },
+          {
+            "label": "Pool if no valid finding above applies",
+            "payout": {
+              "model": "fixed",
+              "amount": 20000
+            }
+          }
+        ],
+        "severityScheme": "Immunefi Vulnerability Severity Classification System v2.3",
+        "rewardPoolStatus": "funded"
+      },
+      "summary": "Immunefi audit competition on Base's Everest codebase (about 135,000 lines). Pool up to $250,000 USDC on Base, set by the most severe valid finding. Ends December 1, 2026, 12:00 UTC.",
+      "ecosystems": [
+        "Ethereum",
+        "Base"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Audit Competition",
+        "L2",
+        "Infrastructure"
+      ],
+      "eligibility": "KYC is required for payout. Residents of countries restricted by Immunefi's Terms of Use and people under 18 cannot receive rewards. Auditors who audited the in-scope code may join only with Base's permission.",
+      "prerequisites": "A runnable proof of concept is required for every severity. Test only on local devnets or local forks; testing against the public sequencer endpoint is prohibited. Submit through the Immunefi dashboard.",
+      "additionalReferences": "Scope: https://immunefi.com/audit-competition/audit-comp-base-everest/scope/ · Everest overview: https://docs.base.org/upgrades/everest/overview",
+      "applicationUrl": "https://immunefi.com/audit-competition/audit-comp-base-everest/information/",
+      "website": "https://immunefi.com/audit-competition/audit-comp-base-everest/information/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/base",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USDC",
+        "budget": 250000
+      },
+      "opensAt": "2026-11-19T17:00:00.000Z",
+      "deadlines": [
+        {
+          "date": "2026-12-01T12:00:00.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:38:12.394Z",
+      "updatedAt": "2026-11-26T00:38:12.396Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "base:stocks-maxxing-season",
+      "fundingType": "hackathon",
+      "title": "Base Stocks Maxxing Season",
+      "description": "Stocks Maxxing Season asks builders to ship tokenized-stock products on Base: apps, agents, communities or financial tools. Teams can build something new, or add a new stock-linked product or feature to a project that launched a token between August 5 and November 4, 2026. Launching a token is optional.\n\nThere are three tracks, each with a Base prize pool. Launchpad partners add their own prizes and support on top:\n- Meme and Community Economies: $61,000 in prizes, 9 partners.\n- Agentic Stock Finance: $21,000 in prizes, 3 partners.\n- Programmable Stock Markets: $23,000 in prizes, 4 partners. Examples are custom portfolios, indexes, structured products, financing tools, prediction markets and market infrastructure.\n\nPartners are o1 Exchange, Bankr, Stonks Exchange, BaseStonk, Feel.cash, Hydropump by Hydrex, Clanker and Sento. Applications opened November 5. The build and launch phase runs November 13 to December 12, and projects are due December 12, 2026.\n\nBase advertises $100,000+ in rewards. The page's own figures do not agree on the exact total: its FAQ lists $50,000 in Base-track prizes, $48,000 across partner prizes and $6,000 for the community-voted build-in-public award ($104,000), while the three track pools above add up to $105,000. Partner reward programs use their own terms. Submissions close December 12, 2026 at 23:59 UTC.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Base",
+          "slug": "base",
+          "orgType": "protocol",
+          "website": "https://www.base.org/",
+          "ecosystems": [
+            "Ethereum",
+            "Base"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/base",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://x.com/buildonbase",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "base",
+        "submittedAt": "2026-11-26T00:38:13.656Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:38:14.220Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": true,
+        "prizes": [
+          {
+            "track": "Meme and Community Economies",
+            "amount": 61000
+          },
+          {
+            "track": "Agentic Stock Finance",
+            "amount": 21000
+          },
+          {
+            "track": "Programmable Stock Markets",
+            "amount": 23000
+          }
+        ],
+        "tracks": [
+          "Meme and Community Economies",
+          "Agentic Stock Finance",
+          "Programmable Stock Markets"
+        ],
+        "location": null
+      },
+      "summary": "One-month Base builder season for tokenized-stock products, November 5 to December 12, 2026, with $100,000+ in rewards across three tracks plus partner prizes. Submit by December 12.",
+      "ecosystems": [
+        "Ethereum",
+        "Base"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "RWA",
+        "Tokenized Stocks",
+        "AI Agents",
+        "DeFi"
+      ],
+      "eligibility": "Participants must be 18 or older. Teams that launched tokens before are not eligible by default and must ship a new stock-linked product or feature during the season. Builders are responsible for their own legal and regulatory compliance. Partner programs follow each partner's own terms.",
+      "prerequisites": "Apply through the Google Form linked from the Stocks Maxxing page and submit the project by December 12, 2026. Read the Official Rules.",
+      "additionalReferences": "Official rules: https://www.base.org/stocksmaxxing/rules · Ideas: https://x.com/buildonbase/status/2120841565950062839 · Tokenized Stocks API: https://docs.base.org/sdks/tokenized-stocks/overview · Deadline extension: https://x.com/buildonbase/status/2124889998365495631",
+      "applicationUrl": "https://docs.google.com/forms/d/1zotYvkeAtDjR2MKk3qNxyNIAfJ_IPQtzTtjNhOAF8js/viewform",
+      "website": "https://www.base.org/stocksmaxxing",
+      "socialLinks": [
+        {
+          "url": "https://x.com/base",
+          "platform": "twitter"
+        },
+        {
+          "url": "https://x.com/buildonbase",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "opensAt": "2026-11-05T00:00:00.000Z",
+      "deadlines": [
+        {
+          "date": "2026-11-13T00:00:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-12-12T23:59:00.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:38:13.653Z",
+      "updatedAt": "2026-11-26T00:38:13.656Z"
     },
     {
       "specVersion": "1.0.1",
@@ -10690,6 +11323,312 @@
     },
     {
       "specVersion": "1.0.1",
+      "id": "decentraland:creator-success",
+      "fundingType": "grant",
+      "title": "Decentraland Creator Success",
+      "description": "Creator Success is a guided, paid path into game development in Decentraland for individual developers and small indie studios. It is not a buildathon: funding comes in stages as the game is built and tested with real players.\n\nFunding stages: V0, a small vertical slice, pays $1,000. If V0 succeeds, a four-week V1 scope pays $3,100 and produces the first complete playable version, released in Decentraland. Games with strong player retention can get V2 at $2,800, and later V3. Progression is not automatic, and each stage is awarded separately. The program does not publish a total cap per game.\n\nThe program looks for high-retention social games: a clear game loop, meaningful social play and a reason to return. The first round of V0 applications is open until November 30, 2026, with weekly review. Applicants can reapply while applications are open. V0 is paid once the agreed V0 scope is completed and playable.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Decentraland Foundation",
+          "slug": "decentraland",
+          "orgType": "foundation",
+          "website": "https://decentraland.org",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/decentraland",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "decentraland",
+        "submittedAt": "2026-11-26T00:46:07.807Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:46:08.139Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "milestoneBased": true,
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Staged, paid path for indie game developers to build social games in Decentraland: $1,000 for a V0 vertical slice, $3,100 for a V1 scope, then $2,800 for V2, with V3 possible. First V0 round open until November 30, 2026.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Gaming",
+        "Metaverse",
+        "Creators"
+      ],
+      "eligibility": "Individual game developers and small indie studios. Applicants must be over 18.",
+      "prerequisites": "Play at least three Featured games in Decentraland (90 minutes in total, returning to two on another day). Build a first scene with Creator Hub. Create a GitHub repository for the game with a Game Design Document at /design/gdd.md and a deployed test scene with at least one game interaction. Then submit the V0 application form and give the Foundation's GitHub accounts access to the repository.",
+      "additionalReferences": "Creator Fund (for games already live): https://docs.decentraland.org/creator/earn-in-decentraland/program-rules · How to earn in Decentraland: https://docs.decentraland.org/creator/earn-in-decentraland/earn",
+      "applicationUrl": "https://docs.google.com/forms/d/e/1FAIpQLSc2xYxbrn75q2SjX-_MGyWmjQaEVOGVDg8-Uj9iXMMYA_zT_A/viewform",
+      "website": "https://docs.decentraland.org/creator/earn-in-decentraland/studio-onboarding",
+      "socialLinks": [
+        {
+          "url": "https://x.com/decentraland",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "minAward": 1000
+      },
+      "deadlines": [
+        {
+          "date": "2026-11-30T23:59:59.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:46:07.805Z",
+      "updatedAt": "2026-11-26T00:46:07.807Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "ethchiangmai:hackathon-2026",
+      "fundingType": "hackathon",
+      "title": "ETHChiangmai & Longevity Hackathon 2026",
+      "description": "ETHChiangmai & Longevity Hackathon 2026 brings builders from Web3, AI and longevity to Chiang Mai, Thailand, on December 26-27, 2026. Teams of 1 to 4 build products for real users over two days. Registration is free.\n\nThe prize pool is 10,000 USDT across four tracks:\n- PayFi & RWA (3,000 USDT): stablecoin payments, crypto cards, merchant acceptance, remittances, real-world assets and agentic payments.\n- Longevity (3,000 USDT): movement, sleep, biohacking and AI health companions. This track has no Web3 requirement.\n- Privacy & Data Sovereignty (3,000 USDT): ZK, FHE, private identity, health data sovereignty and private AI.\n- Cosmo-Localism (bonus, 1,000 USDT): products for real users in Southeast Asia. It can be combined with any other track.\n\nAI is welcome in every track, and any tech stack is allowed. Applications are open on Devfolio.\n\nThe Longevity track does not require Web3, and teams can use any stack. The Ethereum link is in the Web3 tracks. The organizer does not publish a registration cut-off.\n\nThe organizer gives the event dates only, with no time or time zone. This listing stores the start at 00:00 UTC and the end at 23:59:59 UTC.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "ETHChiangmai",
+          "slug": "ethchiangmai",
+          "orgType": "other",
+          "website": "https://ethchiangmai.com",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "Ethereum community event in Chiang Mai, Thailand.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/ETHChiangmai",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://t.me/ethchiangmai",
+              "platform": "telegram"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ethchiangmai",
+        "submittedAt": "2026-11-26T00:46:09.067Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:46:10.151Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": false,
+        "prizes": [
+          {
+            "track": "PayFi & RWA",
+            "amount": 3000
+          },
+          {
+            "track": "Longevity",
+            "amount": 3000
+          },
+          {
+            "track": "Privacy & Data Sovereignty",
+            "amount": 3000
+          },
+          {
+            "track": "Cosmo-Localism",
+            "amount": 1000
+          }
+        ],
+        "tracks": [
+          "PayFi & RWA",
+          "Longevity",
+          "Privacy & Data Sovereignty",
+          "Cosmo-Localism"
+        ],
+        "location": "Chiang Mai, Thailand",
+        "teamSize": {
+          "max": 4,
+          "min": 1
+        }
+      },
+      "summary": "In-person hackathon in Chiang Mai, Thailand, December 26-27, 2026, for teams of 1-4, with 10,000 USDT across four tracks. Free to register.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "Payments",
+        "RWA",
+        "Privacy",
+        "AI"
+      ],
+      "eligibility": "Developers, designers, researchers and health enthusiasts. Teams of 1 to 4 people. The event is in person in Chiang Mai.",
+      "prerequisites": "Apply on the Devfolio event page and follow the Devfolio Code of Conduct.",
+      "applicationUrl": "https://chiangmai.devfolio.co/",
+      "website": "https://ethchiangmai.com/",
+      "socialLinks": [
+        {
+          "url": "https://x.com/ETHChiangmai",
+          "platform": "twitter"
+        },
+        {
+          "url": "https://t.me/ethchiangmai",
+          "platform": "telegram"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USDT",
+        "budget": 10000
+      },
+      "deadlines": [
+        {
+          "date": "2026-12-26T00:00:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-12-27T23:59:59.000Z",
+          "label": "event end",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:46:09.065Z",
+      "updatedAt": "2026-11-26T00:46:09.067Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "ethglobal:agentic-markets-2026",
+      "fundingType": "hackathon",
+      "title": "ETHGlobal Agentic Markets",
+      "description": "Agentic Markets is an online async hackathon run by ETHGlobal from December 3 to 10, 2026. Builders can start from scratch, extend an open-source project or ship a feature to an existing one.\n\nSponsor prize pools published so far: Uniswap Foundation $5,000, ENS $5,000 and Hedera $15,000. Hedera is a separate network, not an Ethereum chain, so its track does not involve Ethereum. The top 10 teams become Agentic Markets Finalists. Finalist prizes depend on team size: a solo hacker gets 250 USDC, a team of 2 gets 250 USDC per person plus 250 USDC travel per person, and a team of 3-5 gets 1,000 USDC per person plus 500 USDC travel per person. ETHGlobal does not publish a total prize figure on its official pages.\n\nThe official event schedule lists the deadline to apply on December 2, 2026 at 17:00 UTC, hacking from December 3 at 17:00 UTC, project submissions due December 6 at 17:00 UTC, and closing ceremonies on December 10 at 17:00 UTC.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "ETHGlobal",
+          "slug": "ethglobal",
+          "orgType": "company",
+          "website": "https://ethglobal.com",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/ethglobal",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "ethglobal",
+        "submittedAt": "2026-11-26T00:38:14.942Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:38:15.454Z"
+      },
+      "fundingDetails": {
+        "fundingType": "hackathon",
+        "online": true,
+        "prizes": [
+          {
+            "track": "Hedera",
+            "amount": 15000
+          },
+          {
+            "track": "Uniswap Foundation",
+            "amount": 5000
+          },
+          {
+            "track": "ENS",
+            "amount": 5000
+          }
+        ],
+        "location": null,
+        "teamSize": {
+          "max": 5,
+          "min": 1
+        }
+      },
+      "summary": "ETHGlobal async online hackathon on agents and markets, December 3-10, 2026. Sponsor prizes from Uniswap Foundation, ENS and Hedera, plus USDC awards for the top 10 finalist teams. Apply by December 2.",
+      "sponsoringOrganizations": [
+        {
+          "name": "Hedera",
+          "slug": "hedera",
+          "orgType": "company",
+          "website": "https://hedera.com"
+        },
+        {
+          "name": "Uniswap Foundation",
+          "slug": "uniswap-foundation",
+          "orgType": "foundation",
+          "website": "https://uniswapfoundation.org"
+        },
+        {
+          "name": "ENS",
+          "slug": "ens",
+          "orgType": "dao",
+          "website": "https://ens.domains"
+        }
+      ],
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Hackathon",
+        "AI Agents",
+        "DeFi"
+      ],
+      "eligibility": "Open to builders worldwide who apply and are accepted to attend. Solo hackers and teams of up to 5 can enter.",
+      "prerequisites": "Apply to attend on the ETHGlobal event page. Submit the project through the ETHGlobal dashboard before the submission deadline.",
+      "additionalReferences": "Prizes: https://ethglobal.com/events/agenticmarkets/prizes · Rules: https://ethglobal.com/events/agenticmarkets/info",
+      "applicationUrl": "https://ethglobal.com/events/agenticmarkets",
+      "website": "https://ethglobal.com/events/agenticmarkets",
+      "socialLinks": [
+        {
+          "url": "https://x.com/ethglobal",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "date": "2026-12-02T17:00:00.000Z",
+          "label": "registration",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-12-03T17:00:00.000Z",
+          "label": "event start",
+          "deadlineType": "fixed"
+        },
+        {
+          "date": "2026-12-06T17:00:00.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:38:14.940Z",
+      "updatedAt": "2026-11-26T00:38:14.942Z"
+    },
+    {
+      "specVersion": "1.0.1",
       "id": "fundingmap:1013",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 1",
@@ -10773,7 +11712,7 @@
         "ingestedVia": "import",
         "originalId": "1021",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-27T01:05:54.089Z"
+        "verifiedAt": "2026-11-26T01:05:58.295Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -11159,7 +12098,7 @@
         "ingestedVia": "import",
         "originalId": "1059",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-27T01:05:53.509Z"
+        "verifiedAt": "2026-11-26T01:05:57.656Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -16615,7 +17554,7 @@
         "ingestedVia": "import",
         "originalId": "1496",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-27T01:05:56.357Z"
+        "verifiedAt": "2026-11-26T01:06:00.296Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -17122,7 +18061,7 @@
         "ingestedVia": "import",
         "originalId": "969",
         "verifiedAgainstSource": true,
-        "verifiedAt": "2026-10-27T01:05:54.900Z"
+        "verifiedAt": "2026-11-26T01:05:58.896Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17606,7 +18545,7 @@
         "ingestedVia": "import",
         "originalId": "996",
         "verifiedAgainstSource": false,
-        "verifiedAt": "2026-10-27T01:05:53.765Z"
+        "verifiedAt": "2026-11-26T01:05:57.971Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -17662,6 +18601,555 @@
       "postedAt": "2025-09-30T15:52:18.000Z",
       "createdAt": "2025-11-12T19:45:46.000Z",
       "updatedAt": "2026-08-14T20:36:42.918Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "lido:community-staking-grants",
+      "fundingType": "grant",
+      "title": "Lido Community Staking Grants",
+      "description": "The Community Staking Grants committee is part of Lido's Community Lifeguards Initiative (CLI). It funds grassroots work that benefits community operators, home stakers and the wider Ethereum staking ecosystem. The Lido operator portal states that grants are capped at $10,000 USD, with a total quarterly budget of $50,000 USD. Requests above $10,000, or out of scope, are sent to LEGO (Lido Ecosystem Grants Organization).\n\nScope, as listed by Lido: community resources (guides, tutorials); sponsorship of community events focused on Lido and Ethereum staking; research on the Community Staking parts of the Lido protocol; integrations and analytics used by home stakers and independent operators, such as integrating the Community Staking Module (CSM) or Simple DVT into tools like eth-docker, Dappnode, Sedge or Stereum. Integration grants may exceed the $10,000 cap, with Lido contributors helping the request through LEGO.\n\nProcess: contact a committee member (Lido Discord, or the CSM Product Manager on Telegram or X). The committee reviews the pitch and holds an internal vote. The cap is set in USD; Lido pays the grant in DAI on Ethereum mainnet. The grantee shares a report when the work is done.\n\nStatus: the CLI reform of February 2026 turned the initiative into a grants-only committee with a $50,000 quarterly budget. The committee's forum updates report $5,100 in 3 grants in Q2 2026 and $1,000 in 1 grant in Q3 2026 (posted 20 October 2026). ETHPrague thanked the program for supporting its Lido staking meetups in posts on 16 and 24 November 2026.\n\nDeadline: the program page invites proposals and gives no deadline, so this listing marks it as rolling. Lido does not state how much of the current quarter's budget is still available.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Lido",
+          "slug": "lido",
+          "orgType": "protocol",
+          "website": "https://lido.fi",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "Lido DAO, funding this program through the Community Lifeguards Initiative (CLI), a grants committee for the community staking ecosystem.",
+          "socialLinks": [
+            {
+              "url": "https://research.lido.fi/",
+              "platform": "forum"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "lido",
+        "submittedAt": "2026-11-26T00:54:43.165Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:54:43.370Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "programModel": "grant",
+        "fundingMechanisms": [
+          "proactive"
+        ]
+      },
+      "summary": "Small Lido grants, capped at $10,000 and paid in DAI on Ethereum, for guides, community events, research and tools that help home stakers and community operators. Rolling, no deadline.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Staking",
+        "Validators",
+        "Community",
+        "Education",
+        "Public Goods"
+      ],
+      "eligibility": "Projects that benefit community operators, home stakers and the broader Ethereum staking ecosystem. The page names no restriction on who can apply.",
+      "prerequisites": "Send a short pitch to a committee member: title; authors, with experience and previous achievements; purpose (how it helps the Lido operator community and why it matters); a 3-4 sentence summary; details with timelines and expense estimates.",
+      "additionalReferences": "Program page: https://operatorportal.lido.fi/community-lifeguards-initiative · Grantee guide: https://operatorportal.lido.fi/community-lifeguards-initiative/grantee-must-read · CLI reform and quarterly spending updates: https://research.lido.fi/t/community-lifeguards-initiative-cli-reform-proposal/11216 · Community Staking Module: https://operatorportal.lido.fi/modules/community-staking-module · Larger requests: LEGO, https://lido.fi/lego",
+      "applicationUrl": "https://operatorportal.lido.fi/community-lifeguards-initiative",
+      "website": "https://operatorportal.lido.fi/community-lifeguards-initiative",
+      "socialLinks": [
+        {
+          "url": "https://research.lido.fi/",
+          "platform": "forum"
+        },
+        {
+          "url": "https://x.com/LidoFinance",
+          "platform": "twitter"
+        },
+        {
+          "url": "https://discord.gg/lido",
+          "platform": "discord"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 10000
+      },
+      "deadlines": [
+        {
+          "label": "application",
+          "deadlineType": "rolling"
+        }
+      ],
+      "createdAt": "2026-11-26T00:54:43.164Z",
+      "updatedAt": "2026-11-26T00:54:43.165Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "lido:rfp-open-ethereum-validator-signers",
+      "fundingType": "rfp",
+      "title": "RFP: Open Ethereum Validator Signers for On-Prem and Isolated Hardware",
+      "description": "A request for proposals posted to the Lido research forum (Community Grants / Initiatives) on 18 November 2026 by TheDZhon. It follows two Lido node operators exiting validators after infrastructure compromises (September 2025 and September 2026). The RFP seeks alternative implementations of signers \"where getting root on the host doesn't get you the key or a slashable signature\", usable by any Ethereum validator, alongside Lido contributors' own pre-release tee-signer.\n\nWhat can be proposed: anything that keeps the validator key inside a hardware boundary the operator controls. Examples given: CPU TEEs on the operator's own servers (AMD SEV-SNP, Intel TDX, Arm CCA), Arm TrustZone boards; a microcontroller with a secure element, including community firmware for hardware wallets; mobile phones with hardware secret management, if the key and checks stay out of reach of the phone OS; professional on-prem HSMs; or an existing remote signer (Web3Signer, a client team's signer) made to run inside one of these.\n\nConditions: on-prem support is required, cloud TEE support is optional. The signer must work over the standard remote-signing API with the stock (or patched upstream) validator clients of at least 3 consensus clients, tested by the applicant. No tee-signer code inside; two projects with the same hardware and codebase are discouraged. Threshold signing is not required but \"greatly appreciated\".\n\nFunding: grants are up to Boulder-size in Lido LEGO terms, but applicants should \"expect to be well below $50k\". Adapting an existing signer should be priced lower than writing one. Dev hardware can go into the budget. Payment is in stablecoins: 25% on approval, 50% when the signer meets the appendix and has 30 days of live duties (Hoodi or mainnet), 25% over the first 9 months of maintenance, paid quarterly. Grantees commit to 18 months of maintenance from first release; the grant pays for the first 9, renewed yearly if a Curated Module operator runs the signer on mainnet.\n\nReview: no deadline, proposals reviewed as they come. The LEGO Council aims to decide within two weeks, with input from NOM (Node Operator Management) and staking tech contributors. As of 2026-11-25 the thread is open, with two linked proposals (eth-dvt-signer and eth-hw-signer).",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Lido",
+          "slug": "lido",
+          "orgType": "protocol",
+          "website": "https://lido.fi",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "Lido DAO, issuing this RFP through its LEGO (Lido Ecosystem Grants Organisation) grants program.",
+          "socialLinks": [
+            {
+              "url": "https://research.lido.fi/",
+              "platform": "forum"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "lido",
+        "submittedAt": "2026-11-25T23:51:49.927Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-25T23:51:50.629Z"
+      },
+      "fundingDetails": {
+        "fundingType": "rfp",
+        "scope": "Open-source Ethereum validator remote signers that keep the signing key inside an operator-controlled hardware boundary (on-prem TEEs, secure elements, hardware-wallet firmware, phones with hardware secret storage, on-prem HSMs, or an existing remote signer ported into one of these), with specs, maintenance and support for Lido Curated Module node operators.",
+        "requirements": [
+          "Code written under the grant is open source (Apache-2.0 or MIT preferred). Closed vendor platforms underneath (CPU, chip or HSM firmware) are allowed but must be listed.",
+          "Implements the remote-signing API v1.4+ and works with the stock validator clients of at least 3 different consensus-layer client implementations.",
+          "The key never leaves the boundary in plaintext: generated inside or imported encrypted. Recovery is an encrypted copy to another device, or a new key.",
+          "The signer parses each request and computes the signing root itself, inside the boundary, and never signs a root the host hands it.",
+          "Slashing protection: ideally EIP-3076 protection lives inside the boundary and the record is written before the signature goes out, surviving host clock changes, restarts and rollback of stored state.",
+          "Fee recipient, exit permissions and similar settings cannot change without an additional explicit (semi-)manual confirmation; the signer rejects builder registrations and exits that do not match them.",
+          "Signed releases, reproducible builds, and crypto dependencies pinned to exact versions.",
+          "A short threat model and a list of what the design trusts.",
+          "Run consensus-spec-tests, the EIP-3076 interchange tests and a load test (target about 100 attestations per slot, not a hard floor) and publish the results.",
+          "7 days on Hoodi plus NOM and staking-tech review before Curated operators can go live; 30 days of live duties on Hoodi or mainnet, with no slashable signature, for the second payment.",
+          "Nice to have: threshold signing, a formal model of the slashing-safety logic (TLA+, Lean), third-party-verifiable remote attestation, protection against cloned devices."
+        ]
+      },
+      "summary": "Lido LEGO grants for open-source remote signers that keep Ethereum validator keys inside an operator-controlled hardware boundary (TEE, secure element, HSM). Expected well below $50k each, paid in stablecoins; rolling review, no deadline.",
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Infrastructure",
+        "Staking",
+        "Validators",
+        "Open Source"
+      ],
+      "eligibility": "Open to any team or individual. The signer must be usable by any Ethereum validator, not only Lido operators. Single-contributor teams may apply, but the author states that being a single contributor \"counts against a proposal\". Projects reusing tee-signer code are out of scope; signers that only serve their own client are out of scope.",
+      "prerequisites": "Post a short proposal in the Lido forum category Community Grants / Initiatives and link it in the RFP thread. Cover: team and prior work; design (the hardware, where the boundary is, what is closed source); validators per signer and which validator clients you tested or will test; the amount requested and when you expect to hit the 30-day live mark; licence and maintenance commitment.",
+      "additionalReferences": "RFP thread: https://research.lido.fi/t/rfp-open-ethereum-validator-signers-for-on-prem-and-isolated-hardware/12209 · Lido LEGO grant sizes: https://lido.fi/lego · LEGO terms: https://research.lido.fi/t/10836 · Lido's own signer (pre-release, not to be reused): https://github.com/lidofinance/tee-signer · Remote-signing API: https://github.com/ethereum/remote-signing-api · Linked proposals as of 2026-11-25: eth-dvt-signer (https://research.lido.fi/t/lego-grant-proposal-eth-dvt-signer/12211), eth-hw-signer (https://research.lido.fi/t/lego-grant-proposal-eth-hw-signer/12227)",
+      "serviceAgreement": "Stablecoin grant paid 25% on approval, 50% after the appendix checks and 30 days of live duties, and 25% across the first 9 months of maintenance, paid after each quarter. The grantee commits to 18 months of maintenance from first release (keeping up with forks, fixing security issues); the grant pays the first 9, renewed yearly if a Curated operator runs the signer on mainnet. Usual Lido LEGO terms apply.",
+      "applicationUrl": "https://research.lido.fi/t/rfp-open-ethereum-validator-signers-for-on-prem-and-isolated-hardware/12209",
+      "website": "https://research.lido.fi/t/rfp-open-ethereum-validator-signers-for-on-prem-and-isolated-hardware/12209",
+      "socialLinks": [
+        {
+          "url": "https://research.lido.fi/",
+          "platform": "forum"
+        }
+      ],
+      "deadlines": [
+        {
+          "label": "application",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-11-18T19:34:00.000Z",
+      "createdAt": "2026-11-25T23:51:49.925Z",
+      "updatedAt": "2026-11-25T23:51:49.927Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "logos:rfp-021",
+      "fundingType": "rfp",
+      "title": "Logos RFP-021: Trustless Ethereum State Attestation for LEZ",
+      "description": "Logos asks for a reusable primitive in the Logos Execution Zone (LEZ) that lets a LEZ program act on a fact about Ethereum state with no trusted intermediary. The module verifies Ethereum consensus and finality, verifies that a piece of state is included under a finalised Ethereum header, checks a predicate over that state, and returns a verified statement. The output carries no application action. Minting, escrow release and settlement belong to the consuming program.\n\nThe wrapped-token bridge in RFP-022 is the main consumer. Teams need experience with Ethereum consensus, the light-client and verified proxy protocols, and LEZ program development. A central feasibility question is whether in-program BLS12-381 verification fits the LEZ per-transaction cycle budget.\n\nThe RFP is tier M in the Logos RFP Program. The program does not publish a fixed budget: the proposing team sets milestones and asks for payment in USD per milestone. Proposals that cover both RFP-021 and RFP-022 get preference. Logos reviews proposals weekly and usually answers within 14 days.\n\nThe submission deadline in the program README is 27 November 2026.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Logos",
+          "slug": "logos",
+          "orgType": "other",
+          "website": "https://logos.co",
+          "description": "Decentralised technology stack with a privacy-preserving L1 (the Logos Execution Zone, LEZ), storage and messaging.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/Logos_devs",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://github.com/logos-co",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "logos",
+        "submittedAt": "2026-11-26T00:46:10.255Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:46:10.523Z"
+      },
+      "fundingDetails": {
+        "fundingType": "rfp",
+        "scope": "The attestation module only, plus the tooling and documentation a consumer needs to integrate it. Application actions such as minting are out of scope.",
+        "requirements": [
+          "Verify Ethereum consensus and finality inside LEZ",
+          "Verify inclusion of referenced state under a finalised Ethereum header",
+          "Evaluate a predicate and emit a verified statement with no application action",
+          "Measure and document proving cost, including whether BLS12-381 verification fits the per-transaction cycle budget"
+        ]
+      },
+      "summary": "Logos RFP for a reusable LEZ module that verifies Ethereum consensus, finality and state inclusion, and returns a proven statement any LEZ program can use. Paid per milestone in USD. Proposals due November 27, 2026.",
+      "ecosystems": [
+        "Ethereum",
+        "Logos"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "RFP",
+        "Infrastructure",
+        "Privacy",
+        "Interoperability"
+      ],
+      "eligibility": "Independent developers and teams. Logos contributors and their contractors are not eligible. Work must be open source under MIT and Apache 2.0 unless agreed otherwise. A grant exists only after a signed Grant Agreement.",
+      "prerequisites": "Open a GitHub issue in logos-co/rfp with the proposal template. Read the RFP spec and the program Terms & Conditions first.",
+      "additionalReferences": "Spec: https://github.com/logos-co/rfp/blob/master/RFPs/RFP-021-ethereum-state-attestation.md · Program README: https://github.com/logos-co/rfp · Terms: https://github.com/logos-co/rfp/blob/master/TERMS_AND_CONDITIONS.md · Announcement: https://x.com/Logos_devs/status/2125684803420962904",
+      "applicationUrl": "https://github.com/logos-co/rfp/issues/new?template=proposal.yml",
+      "website": "https://github.com/logos-co/rfp/blob/master/RFPs/RFP-021-ethereum-state-attestation.md",
+      "socialLinks": [
+        {
+          "url": "https://x.com/Logos_devs",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "date": "2026-11-27T23:59:59.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:46:10.252Z",
+      "updatedAt": "2026-11-26T00:46:10.255Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "logos:rfp-022",
+      "fundingType": "rfp",
+      "title": "Logos RFP-022: Privacy-Preserving Wrapped ERC-20 and Ether Bridge for LEZ",
+      "description": "Logos asks for a lock-and-mint bridge between Ethereum and the Logos Execution Zone (LEZ). An Ethereum vault contract escrows ERC-20 tokens and native ETH. A LEZ program mints a one-to-one wrapped token only after it verifies the deposit cryptographically, using the attestation primitive from RFP-021. Redemption burns the wrapped token on LEZ and releases the original from the vault, again on proof alone.\n\nNeither leg may publish data that links its two ends. Only amount, token and timing may remain observable, and the proposal must document any correlation that stays. The bridge must support at least USDC, USDT, DAI and WETH. Teams need experience with zero-knowledge proofs, privacy protocol design, Solidity and LEZ program development.\n\nThe RFP is tier L in the Logos RFP Program. The program does not publish a fixed budget: the proposing team sets milestones and asks for payment in USD per milestone. Proposals that cover both RFP-021 and RFP-022 get preference. Logos reviews proposals weekly and usually answers within 14 days.\n\nThe submission deadline in the program README is 27 November 2026.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Logos",
+          "slug": "logos",
+          "orgType": "other",
+          "website": "https://logos.co",
+          "description": "Decentralised technology stack with a privacy-preserving L1 (the Logos Execution Zone, LEZ), storage and messaging.",
+          "socialLinks": [
+            {
+              "url": "https://x.com/Logos_devs",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://github.com/logos-co",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "logos",
+        "submittedAt": "2026-11-26T00:46:11.469Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:46:11.728Z"
+      },
+      "fundingDetails": {
+        "fundingType": "rfp",
+        "scope": "Ethereum vault contract, LEZ mint and burn program, redemption flow and privacy guarantees. It consumes the RFP-021 attestation primitive and does not rebuild it.",
+        "requirements": [
+          "Escrow ERC-20 tokens and ETH in an Ethereum vault and mint one-to-one on LEZ only on verified deposits",
+          "Redeem by burning on LEZ and releasing on Ethereum on proof alone",
+          "No link between an Ethereum deposit and its LEZ mint, or a LEZ burn and its Ethereum release, beyond amount, token and timing",
+          "Support at least USDC, USDT, DAI and WETH"
+        ]
+      },
+      "summary": "Logos RFP for a trustless, privacy-preserving lock-and-mint bridge that moves ERC-20 tokens and ETH from Ethereum into LEZ and back. Paid per milestone in USD. Proposals due November 27, 2026.",
+      "ecosystems": [
+        "Ethereum",
+        "Logos"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "RFP",
+        "Infrastructure",
+        "Privacy",
+        "Interoperability"
+      ],
+      "eligibility": "Independent developers and teams. Logos contributors and their contractors are not eligible. Work must be open source under MIT and Apache 2.0 unless agreed otherwise. A grant exists only after a signed Grant Agreement.",
+      "prerequisites": "Open a GitHub issue in logos-co/rfp with the proposal template. Read the RFP spec and the program Terms & Conditions first.",
+      "additionalReferences": "Spec: https://github.com/logos-co/rfp/blob/master/RFPs/RFP-022-wrapped-erc20.md · Program README: https://github.com/logos-co/rfp · Terms: https://github.com/logos-co/rfp/blob/master/TERMS_AND_CONDITIONS.md · Announcement: https://x.com/Logos_devs/status/2125684803420962904",
+      "applicationUrl": "https://github.com/logos-co/rfp/issues/new?template=proposal.yml",
+      "website": "https://github.com/logos-co/rfp/blob/master/RFPs/RFP-022-wrapped-erc20.md",
+      "socialLinks": [
+        {
+          "url": "https://x.com/Logos_devs",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "date": "2026-11-27T23:59:59.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:46:11.467Z",
+      "updatedAt": "2026-11-26T00:46:11.469Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "metric:bug-bounty",
+      "fundingType": "bounty",
+      "title": "Metric Bug Bounty",
+      "description": "Metric is a decentralized exchange for active pools: pools with custom pricing and liquidity that change with new information. Metric launched this Immunefi bug bounty with its mainnet deployment. It went live November 10, 2026 and was last updated November 20, 2026.\n\nThe team asks researchers to look for loss or freezing of user or LP funds, swaps at the wrong price, abuse of the oracle or extension logic, and ways around access controls and timelocks. Main concerns are the pool, factory, oracle, extension and router contracts.\n\nRewards: Critical pays 20% of funds directly affected, from $50,000 up to $500,000 (permanent freezing is capped at $200,000). High pays $10,000 to $50,000. Medium pays $2,500 to $10,000. Low pays a flat $1,000. High and Medium are 20% of funds affected within their bands. The program follows Primacy of Impact. Rewards are paid in USDC on Ethereum.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Metric",
+          "slug": "metric",
+          "orgType": "protocol",
+          "website": "https://www.metric.xyz",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://github.com/Metricxyz",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "metric",
+        "submittedAt": "2026-11-26T00:38:16.172Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:38:16.387Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Immunefi",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "payout": {
+              "cap": 500000,
+              "basis": "value_at_risk",
+              "floor": 50000,
+              "model": "percentage",
+              "percent": 20
+            },
+            "severity": "critical",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "max": 50000,
+              "min": 10000,
+              "model": "range"
+            },
+            "severity": "high",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "max": 10000,
+              "min": 2500,
+              "model": "range"
+            },
+            "severity": "medium",
+            "assetType": "smart_contract"
+          },
+          {
+            "payout": {
+              "model": "fixed",
+              "amount": 1000
+            },
+            "severity": "low",
+            "assetType": "smart_contract"
+          }
+        ],
+        "severityScheme": "Immunefi Vulnerability Severity Classification System v2.3"
+      },
+      "summary": "Immunefi bug bounty for the Metric DEX (Ethereum and BSC), up to $500,000 for critical bugs, paid in USDC on Ethereum. No KYC. Ongoing.",
+      "ecosystems": [
+        "Ethereum",
+        "BNB Chain"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "DeFi",
+        "DEX",
+        "Smart Contract"
+      ],
+      "eligibility": "No KYC is required for payout.",
+      "prerequisites": "A runnable proof of concept is required for all severities. Issues in the Zellic and Sherlock audit reports and the published known-issues list are not eligible. Test only on local forks.",
+      "additionalReferences": "Scope: https://immunefi.com/bug-bounty/metric/scope/ · Known issues and audits: https://github.com/Metricxyz/Known_issues",
+      "applicationUrl": "https://immunefi.com/bug-bounty/metric/information/",
+      "website": "https://www.metric.xyz",
+      "socialLinks": [
+        {
+          "url": "https://github.com/Metricxyz",
+          "platform": "github"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USDC",
+        "maxAward": 500000
+      },
+      "deadlines": [
+        {
+          "label": "submission",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-11-10T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:38:16.170Z",
+      "updatedAt": "2026-11-26T00:38:16.172Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "osero:sdk-swap-api-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Osero SDK and Swap API Bug Bounty",
+      "description": "Osero builds stablecoin savings products on top of Sky Ecosystem contracts. This Sherlock bug bounty covers the application layer: the public TypeScript SDK `@osero/client` 1.1.0 (white-box) and the live Swap & Routing API at api.osero.org (black-box). The main concern is any manipulation of the SDK or API that makes users or wallets sign and execute malicious transactions. The underlying USDS and sUSDS contracts are covered by Sky's own Immunefi bounty.\n\nRewards in USDC: Critical $7,500 to $15,000, High $1,500 to $3,500, Medium $500 to $1,000, Low $100 to $250. The full $15,000 is reserved for end-to-end exploits that drain user funds or approvals on signing, or for RCE or credential compromise on the API. Osero Foundation pays in USDC on Ethereum mainnet or Base within 10 days of a valid decision.\n\nThe program went live on Sherlock on November 25, 2026 and has no closing date. Sherlock asks for a 250 USDC deposit with each submission, at every severity level.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Osero",
+          "slug": "osero",
+          "orgType": "company",
+          "website": "https://www.osero.com",
+          "description": "Stablecoin savings infrastructure built on Sky Ecosystem (USDS, sUSDS).",
+          "socialLinks": [
+            {
+              "url": "https://x.com/OseroHQ",
+              "platform": "twitter"
+            },
+            {
+              "url": "https://github.com/osero-io",
+              "platform": "github"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "osero",
+        "submittedAt": "2026-11-26T00:38:17.434Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:38:17.997Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Sherlock",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "payout": {
+              "max": 15000,
+              "min": 7500,
+              "model": "range"
+            },
+            "severity": "critical"
+          },
+          {
+            "payout": {
+              "max": 3500,
+              "min": 1500,
+              "model": "range"
+            },
+            "severity": "high"
+          },
+          {
+            "payout": {
+              "max": 1000,
+              "min": 500,
+              "model": "range"
+            },
+            "severity": "medium"
+          },
+          {
+            "payout": {
+              "max": 250,
+              "min": 100,
+              "model": "range"
+            },
+            "severity": "low"
+          }
+        ]
+      },
+      "summary": "Sherlock bug bounty for Osero's TypeScript SDK and hosted Swap API for USDC, USDS and sUSDS swaps on EVM chains. Up to $15,000 USDC, paid on Ethereum or Base. Ongoing.",
+      "ecosystems": [
+        "Ethereum",
+        "Base",
+        "Arbitrum",
+        "Optimism"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Stablecoins",
+        "Websites and Applications"
+      ],
+      "eligibility": "Sanctions screening for every payout and KYC for High and Critical rewards. People who work or worked on the in-scope code or systems, and Sherlock staff who triage this program, are not eligible.",
+      "prerequisites": "Submit through the Sherlock program page with a 250 USDC deposit per submission. Use the staging API (api-dev.osero.org) for intrusive tests. Read the scope and rules on Sherlock first.",
+      "additionalReferences": "Announcement: https://www.osero.com/blog/osero-bug-bounty-program-is-now-live · SDK: https://github.com/osero-io/kit · Sky bug bounty (contracts): https://immunefi.com/bug-bounty/sky/information/",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/455",
+      "website": "https://audits.sherlock.xyz/bug-bounties/455",
+      "socialLinks": [
+        {
+          "url": "https://x.com/OseroHQ",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USDC",
+        "maxAward": 15000
+      },
+      "deadlines": [
+        {
+          "label": "submission",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-11-25T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:38:17.432Z",
+      "updatedAt": "2026-11-26T00:38:17.434Z"
     },
     {
       "specVersion": "1.0.1",
@@ -17854,6 +19342,189 @@
     },
     {
       "specVersion": "1.0.1",
+      "id": "raac:core-contracts-bounty-contest",
+      "fundingType": "bounty",
+      "title": "RAAC Core Contracts Bounty Contest (Guardian Defender)",
+      "description": "Guardian runs a 30-day public vulnerability bounty contest on Guardian Defender for RAAC's core contracts. RAAC is a lending protocol backed by real-world assets. Its Core V1 is deployed on Ethereum mainnet, according to the RAAC documentation.\n\nOnly Critical issues are rewarded. The $100,000 is the pot of Guardian's November - December 2026 season, shared across all contests in that season. It is not a prize reserved for RAAC. Duplicates are not rewarded. KYC is required to submit findings.\n\nThe contest runs from November 9, 2026 15:00 UTC to December 9, 2026 15:00 UTC, according to the contest data on Guardian Defender. The contest repository is public.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "RAAC",
+          "slug": "raac",
+          "orgType": "protocol",
+          "website": "https://raac.io",
+          "ecosystems": [
+            "Ethereum"
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "raac",
+        "submittedAt": "2026-11-26T00:38:18.694Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-11-26T00:38:18.856Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Guardian Defender",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "label": "Share of the $100,000 seasonal pool",
+            "payout": {
+              "max": 100000,
+              "model": "up_to"
+            },
+            "severity": "critical"
+          }
+        ],
+        "rewardPoolStatus": "unknown"
+      },
+      "summary": "Critical-only vulnerability contest on RAAC's core contracts, run by Guardian on Guardian Defender until December 9, 2026, 15:00 UTC. Critical findings share Guardian's $100,000 seasonal pool with other contests. KYC required.",
+      "sponsoringOrganizations": [
+        {
+          "name": "Guardian",
+          "slug": "guardian",
+          "orgType": "company",
+          "website": "https://guardianaudits.com"
+        }
+      ],
+      "ecosystems": [
+        "Ethereum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Audit Competition",
+        "RWA",
+        "Smart Contract"
+      ],
+      "eligibility": "KYC is required to submit findings.",
+      "prerequisites": "Read the contest rules and scope on Guardian Defender, then submit Critical issues through the contest page.",
+      "additionalReferences": "Contest repository: https://github.com/GuardianOrg/RAAC-Core-Contracts-Bounty-Contest · RAAC Core V1 docs: https://docs.raac.io/",
+      "applicationUrl": "https://defender.guardianaudits.com/contests/01a1a379-b7c1-72d9-8075-5318b386f2e4",
+      "website": "https://defender.guardianaudits.com/contests/01a1a379-b7c1-72d9-8075-5318b386f2e4",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "date": "2026-12-09T15:00:00.000Z",
+          "label": "submission",
+          "deadlineType": "fixed"
+        }
+      ],
+      "createdAt": "2026-11-26T00:38:18.692Z",
+      "updatedAt": "2026-11-26T00:38:18.694Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "robinhood:robinhood-chain-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Robinhood Chain Bug Bounty",
+      "description": "Robinhood Markets runs a bug bounty on Cantina for Robinhood Chain, its chain for real-world assets. Scope covers the smart contracts that power tokenization on Robinhood Chain, just-in-time spending for Robinhood's crypto wallet, the public web interfaces and docs portals, and the testnet faucet and explorer.\n\nMaximum rewards: Critical $1,000,000, High $100,000, Medium $25,000, Low $5,000. Severity follows the program's own Web3 and Web2 definitions and the Cantina bug bounty severity framework. The program started September 8, 2026 and has no closing date.\n\nCantina requires a $30 deposit and KYC to join. Reward decisions are at Robinhood's sole discretion.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Robinhood",
+          "slug": "robinhood",
+          "orgType": "company",
+          "website": "https://robinhood.com",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "socialLinks": [
+            {
+              "url": "https://x.com/RobinhoodApp",
+              "platform": "twitter"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "robinhood",
+        "submittedAt": "2026-11-26T00:38:20.000Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:38:20.279Z"
+      },
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "platform": "Cantina",
+        "bountyKind": "security",
+        "rewardTiers": [
+          {
+            "payout": {
+              "max": 1000000,
+              "model": "up_to"
+            },
+            "severity": "critical"
+          },
+          {
+            "payout": {
+              "max": 100000,
+              "model": "up_to"
+            },
+            "severity": "high"
+          },
+          {
+            "payout": {
+              "max": 25000,
+              "model": "up_to"
+            },
+            "severity": "medium"
+          },
+          {
+            "payout": {
+              "max": 5000,
+              "model": "up_to"
+            },
+            "severity": "low"
+          }
+        ],
+        "severityScheme": "Cantina Bug Bounty Severity Classification Framework"
+      },
+      "summary": "Cantina-triaged bug bounty for Robinhood Chain tokenization contracts, wallet JIT spending, web surfaces, faucet and explorer. Up to $1,000,000 for critical findings. Ongoing.",
+      "ecosystems": [
+        "Ethereum",
+        "Arbitrum"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "RWA",
+        "L2",
+        "Smart Contract",
+        "Websites and Applications"
+      ],
+      "eligibility": "KYC is required to join. Current and former Robinhood employees, and vendors who worked on the affected code in the past 6 months, are not eligible. Residents of OFAC-sanctioned countries are excluded. You must be of legal age.",
+      "prerequisites": "Join on Cantina with a $30 deposit. Report within about 24 hours of discovery with reproduction steps (a proof of concept is preferred). Do not test on mainnet; use local setups or the testnet faucet and explorer.",
+      "applicationUrl": "https://cantina.xyz/bounties/2acbecd1-3a5e-44fb-a324-a524c156d690",
+      "website": "https://cantina.xyz/bounties/2acbecd1-3a5e-44fb-a324-a524c156d690",
+      "socialLinks": [
+        {
+          "url": "https://x.com/RobinhoodApp",
+          "platform": "twitter"
+        }
+      ],
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 1000000
+      },
+      "deadlines": [
+        {
+          "label": "submission",
+          "deadlineType": "rolling"
+        }
+      ],
+      "postedAt": "2026-09-08T00:00:00.000Z",
+      "createdAt": "2026-11-26T00:38:19.998Z",
+      "updatedAt": "2026-11-26T00:38:20.000Z"
+    },
+    {
+      "specVersion": "1.0.1",
       "id": "rocket-pool-gmc:grants-round-41",
       "fundingType": "grant",
       "title": "Rocket Pool GMC Grants — Round 41",
@@ -17999,6 +19670,81 @@
       "postedAt": "2026-09-08T00:23:55.000Z",
       "createdAt": "2026-10-01T12:40:58.595Z",
       "updatedAt": "2026-10-30T04:33:14.127Z"
+    },
+    {
+      "specVersion": "1.0.1",
+      "id": "shutter-dao:impact-pilot-round-2",
+      "fundingType": "grant",
+      "title": "Shutter DAO 0x36 Impact Pilot Program Round 2",
+      "description": "Round 2 of the Shutter DAO 0x36 Impact Pilot Program rewards completed, verifiable contributions that materially advance Shutter's active product, deployment, revenue or ecosystem priorities. It does not fund future plans, generic outreach, activity alone, or work someone else already paid for.\n\nEligible work must advance at least one active workstream: private voting deployments and revenue (Snapshot, commit-reveal, real elections); Shutter API conversion toward a test, production deployment or commercial path; encrypted-mempool adoption (validators, EIPs, operators), without duplicating Brainbot, Ethereum Foundation, LUCID or client-team work; or Concorde and shared-agent deployments with a named operator and measurable results. Exceptional work outside these areas may qualify if it has a similar, evidenced link to a public Shutter priority.\n\nTimeline: Round 2 launched November 16, 2026. Completed work and evidence are due December 21, 2026. The DAO award vote is January 8, 2027 and payments are January 15, 2027. SEEDGov runs a public pass/fail submission check before the vote, and the DAO decides awards by Snapshot.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Shutter DAO 0x36",
+          "slug": "shutter-dao",
+          "orgType": "dao",
+          "website": "https://shutter.network",
+          "ecosystems": [
+            "Ethereum"
+          ],
+          "description": "DAO governing the Shutter Network, a threshold-encryption protocol for front-running protection, private voting and encrypted mempools on Ethereum.",
+          "socialLinks": [
+            {
+              "url": "https://shutternetwork.discourse.group/",
+              "platform": "forum"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "publisher": "shutter-dao",
+        "submittedAt": "2026-11-26T00:46:12.727Z",
+        "ingestedVia": "submission",
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-11-26T00:46:13.136Z"
+      },
+      "fundingDetails": {
+        "fundingType": "grant",
+        "recurring": true,
+        "milestoneBased": false,
+        "fundingMechanisms": [
+          "retroactive"
+        ]
+      },
+      "summary": "Retroactive grants for completed, verifiable work that advances Shutter's private voting, Shutter API, encrypted mempool or shared-agent priorities. Evidence due December 21, 2026; DAO vote January 8, 2027.",
+      "ecosystems": [
+        "Ethereum",
+        "Gnosis"
+      ],
+      "categories": [
+        "Funding Opportunity",
+        "Retroactive Funding",
+        "Privacy",
+        "Encrypted Mempool",
+        "Governance"
+      ],
+      "eligibility": "Anyone with completed, publicly reviewable work done by December 21, 2026. Applicants must state what they delivered personally, disclose all related compensation and conflicts, and request an amount proportionate to the work. Work already paid for by Shutter, Brainbot, a client or another grant is not eligible. Brainbot endorsement is not required.",
+      "prerequisites": "Publish a public forum post titled \"[Round 2 Retroactive Grant] — [Applicant / contribution name]\" following the template: requested award and payment address, summary, contribution and authorship, workstream connection, evidence, result and next decision, compensation and conflict disclosure, award rationale, and contact details. The narrative is limited to 600 words.",
+      "additionalReferences": "Round 1 guide: https://shutternetwork.discourse.group/t/shutter-dao-0x36-impact-pilot-program-round-1-grant-guide-application-template/951 · Program proposal: https://shutternetwork.discourse.group/t/shutter-dao-0x36-impact-pilot-program/940 · Reporting thread: https://shutternetwork.discourse.group/t/shutter-dao-0x36-impact-pilot-program-reporting-thread/962",
+      "applicationUrl": "https://shutternetwork.discourse.group/t/shutter-dao-0x36-impact-pilot-program-round-2-grant-guide-application-template/1051",
+      "website": "https://shutternetwork.discourse.group/t/shutter-dao-0x36-impact-pilot-program-round-2-grant-guide-application-template/1051",
+      "socialLinks": [
+        {
+          "url": "https://shutternetwork.discourse.group/",
+          "platform": "forum"
+        }
+      ],
+      "opensAt": "2026-11-16T00:00:00.000Z",
+      "deadlines": [
+        {
+          "date": "2026-12-21T23:59:59.000Z",
+          "label": "application",
+          "deadlineType": "fixed"
+        }
+      ],
+      "postedAt": "2026-11-17T12:13:00.000Z",
+      "createdAt": "2026-11-26T00:46:12.725Z",
+      "updatedAt": "2026-11-26T00:46:12.727Z"
     },
     {
       "specVersion": "1.0.1",
