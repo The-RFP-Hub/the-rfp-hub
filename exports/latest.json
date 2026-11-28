@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.1",
   "license": "CC0-1.0",
-  "generatedAt": "2026-11-27T12:42:25.428Z",
+  "generatedAt": "2026-11-28T11:58:36.408Z",
   "count": 192,
   "opportunities": [
     {
@@ -19094,7 +19094,7 @@
       "fundingType": "rfp",
       "title": "Logos RFP-021: Trustless Ethereum State Attestation for LEZ",
       "description": "Logos asks for a reusable primitive in the Logos Execution Zone (LEZ) that lets a LEZ program act on a fact about Ethereum state with no trusted intermediary. The module verifies Ethereum consensus and finality, verifies that a piece of state is included under a finalised Ethereum header, checks a predicate over that state, and returns a verified statement. The output carries no application action. Minting, escrow release and settlement belong to the consuming program.\n\nThe wrapped-token bridge in RFP-022 is the main consumer. Teams need experience with Ethereum consensus, the light-client and verified proxy protocols, and LEZ program development. A central feasibility question is whether in-program BLS12-381 verification fits the LEZ per-transaction cycle budget.\n\nThe RFP is tier M in the Logos RFP Program. The program does not publish a fixed budget: the proposing team sets milestones and asks for payment in USD per milestone. Proposals that cover both RFP-021 and RFP-022 get preference. Logos reviews proposals weekly and usually answers within 14 days.\n\nThe submission deadline in the program README is 27 November 2026.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Logos",
@@ -19173,7 +19173,7 @@
       "fundingType": "rfp",
       "title": "Logos RFP-022: Privacy-Preserving Wrapped ERC-20 and Ether Bridge for LEZ",
       "description": "Logos asks for a lock-and-mint bridge between Ethereum and the Logos Execution Zone (LEZ). An Ethereum vault contract escrows ERC-20 tokens and native ETH. A LEZ program mints a one-to-one wrapped token only after it verifies the deposit cryptographically, using the attestation primitive from RFP-021. Redemption burns the wrapped token on LEZ and releases the original from the vault, again on proof alone.\n\nNeither leg may publish data that links its two ends. Only amount, token and timing may remain observable, and the proposal must document any correlation that stays. The bridge must support at least USDC, USDT, DAI and WETH. Teams need experience with zero-knowledge proofs, privacy protocol design, Solidity and LEZ program development.\n\nThe RFP is tier L in the Logos RFP Program. The program does not publish a fixed budget: the proposing team sets milestones and asks for payment in USD per milestone. Proposals that cover both RFP-021 and RFP-022 get preference. Logos reviews proposals weekly and usually answers within 14 days.\n\nThe submission deadline in the program README is 27 November 2026.\n\nThe organizer gives the date only, with no time or time zone. This listing uses the end of that day in UTC (23:59:59 UTC). Check the official page for the exact cut-off.",
-      "status": "open",
+      "status": "closed",
       "operatingOrganizations": [
         {
           "name": "Logos",
